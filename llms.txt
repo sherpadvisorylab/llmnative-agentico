@@ -1,0 +1,35 @@
+# @llmnative/agentico
+
+> Agentic chat orchestrator for @llmnative/react apps. A persistent panel: the orchestrator
+> collects parameters in conversation and hands the work to host-registered subagents. Every
+> subagent has a deterministic fallback. Agentico knows nothing concrete about the host.
+
+## Host responsibilities (startup)
+
+- `registerSubagents(manifests)` — SubagentManifest: id, label, icon, description, indexPath, commands (name, summary, Zod inputSchema, describeOutput), definition (AgentDefinition), toParams, destinationIds, optional crossAgentToolIds, withCollected, manualEntry, componentContexts.
+- `registerDestinations({ id: ResultDestination })` — apply(result, { scopeId, dataProvider, storageProvider, proxyFetch }, meta).
+- `registerSubagentReports({ subagentId: SubagentReportModule })`.
+- `registerCrossAgentTools((ctx) => AgentTool[])` — ctx: attachmentsRef, collected (per-conversation scratchpad), proxyFetch.
+- `configureAgenticoPrompts(partial)` — model-facing pack; `agenticoPromptsEn` (default) / `agenticoPromptsIt`.
+- `configureEntityChatStore({ storageKey })`.
+- i18n: merge `agenticoTranslations.<locale>` into `<App i18n={{ translations }}>`; override any `agentico.*` key.
+
+## Mount
+
+```tsx
+<AgenticoProvider scope={{ id, dataProvider, storageProvider } | null}>
+  <AgenticoToggle />
+  <Agentico />
+</AgenticoProvider>
+```
+
+## Hooks
+
+- `useAgentico()` — panel state, `startOrchestrator(goal, opts)`, `commitEntityChat(subagentId, entityId, taskId, scopeId, params, title)`, `scope`.
+- `useAgenticoPageContext(text, card?)` — what the user is looking at.
+- `useSubagentComponentContext(subagentId, componentKey)` — anchor a component to a subagent.
+- `useAgent(definition)` — run an AgentDefinition directly.
+
+## AgentDefinition
+
+buildContext (always runs) · buildPrompt · buildFollowUpPrompt · parseResponse (null → fallback) · fallback (required) · describeFallback? · getTools? · microPromptIds?

@@ -1,0 +1,79 @@
+{
+  "name": "@llmnative/agentico",
+  "version": "0.1.0",
+  "description": "Agentic chat orchestrator for @llmnative/react apps: a persistent panel that talks with the user and hands the work to host-registered subagents.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "llms.txt"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build",
+    "release:check": "node scripts/release/check-release.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sherpadvisorylab/llmnative-agentico.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sherpadvisorylab/llmnative-agentico/issues"
+  },
+  "homepage": "https://github.com/sherpadvisorylab/llmnative-agentico#readme",
+  "keywords": [
+    "llmnative",
+    "agent",
+    "orchestrator",
+    "subagent",
+    "ai",
+    "react"
+  ],
+  "author": "wolfgan",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "packageManager": "npm@11.11.0",
+  "peerDependencies": {
+    "@llmnative/react": "^1.20.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^3.24.1"
+  },
+  "dependencies": {
+    "zod-to-json-schema": "^3.24.1"
+  },
+  "devDependencies": {
+    "@llmnative/react": "^1.20.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "happy-dom": "^20.14.5",
+    "lucide-react": "^1.52.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3",
+    "zod": "^3.24.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
