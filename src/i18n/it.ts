@@ -7,7 +7,7 @@ export const agenticoIt: AgenticoDict = {
     noProviderConnected: 'Nessun provider AI connesso',
     selectModelPlaceholder: 'Scegli un modello…',
     orchestratorStarterHint: 'Dì ad Agentico cosa vuoi fare — sceglierà lo strumento giusto e ti chiederà cosa serve.',
-    orchestratorStarterPlaceholder: 'es. "Estrai il tema di example.com"',
+    orchestratorStarterPlaceholder: 'Descrivi cosa vuoi fare…',
     destinationPickerTitle: 'Salva risultato in…',
     destinationApplying: 'Salvataggio…',
     destinationNoScope: 'Nessuna destinazione selezionata — selezionane una prima di salvare.',

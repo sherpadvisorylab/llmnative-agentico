@@ -7,7 +7,7 @@ export const agenticoEn: AgenticoDict = {
     noProviderConnected: 'No AI provider connected',
     selectModelPlaceholder: 'Choose a model…',
     orchestratorStarterHint: 'Tell Agentico what you want to do — it will pick the right tool and ask for what it needs.',
-    orchestratorStarterPlaceholder: 'e.g. "Extract the theme of example.com"',
+    orchestratorStarterPlaceholder: 'Describe what you want to do…',
     destinationPickerTitle: 'Save result to…',
     destinationApplying: 'Saving…',
     destinationNoScope: 'Nothing selected to save into — select one before saving.',
