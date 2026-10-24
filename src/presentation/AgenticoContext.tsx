@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { AIModelDescriptor, DataProviderAdapter, StorageProviderAdapter } from '@llmnative/react';
+import type { AIModelDescriptor, ChatbotAction, DataProviderAdapter, StorageProviderAdapter } from '@llmnative/react';
 import type { AgentActivityEntry, AgentConversation } from './useAgent';
 import type { ResultDestination } from '../domain/resultDestination';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
@@ -97,6 +97,11 @@ export interface AgenticoTask<TResult = unknown> {
      * top=vecchio/bottom=nuovo (bug segnalato). Assente = comportamento invariato, sempre in
      * fondo (equivalente a passare la lunghezza corrente del log). */
     panelExtraAnchorIndex?: number;
+    /** What the host shows at the bottom of the panel, above the composer, while the task is open
+     * (see registerSubagentControls, CR-003). */
+    panelActions?: React.ReactNode;
+    /** Buttons of the host in the composer (see registerSubagentControls, CR-003). */
+    composerActions?: ChatbotAction[];
     /** Chiamato quando questo task viene sostituito da uno nuovo (vedi openTask) o quando
      * l'utente lo interrompe — SEMPRE definito da chi possiede il task
      * (OrchestratorRunner/SubagentRunner), mai un fallback generico su closeTask: quel
@@ -285,6 +290,14 @@ interface AgenticoContextValue {
      * indietro", niente eccezione per un task ancora in corso (deliberatamente semplice,
      * raffinabile in seguito). No-op se non c'è alcun task. */
     dismissForeignTask: () => void;
+    /** Starts a subagent from a page, without the orchestrator (CR-003): it replaces the current
+     * task. `taskId` keeps one task per entity (start it again = the same task); `openingMessage`
+     * is shown as the first message of the person and given to the first turn. */
+    startSubagent: (subagentId: string, params: Record<string, unknown>, options?: { taskId?: string; openingMessage?: string }) => void;
+    /** Present = a startSubagent() is pending, read by Agentico.tsx to mount its SubagentRunner. */
+    pendingStart: { subagentId: string; params: Record<string, unknown>; taskId?: string; openingMessage?: string } | null;
+    /** Changes at every startSubagent() — React `key` of that SubagentRunner. */
+    startRunId: string | null;
 }
 
 const AgenticoContext = createContext<AgenticoContextValue | null>(null);
@@ -501,6 +514,15 @@ export function AgenticoProvider({ children, scope = null }: { children: React.R
         setResumeWithAIRunId(crypto.randomUUID());
     }, []);
 
+    const [pendingStart, setPendingStart] = useState<{ subagentId: string; params: Record<string, unknown>; taskId?: string; openingMessage?: string } | null>(null);
+    const [startRunId, setStartRunId] = useState<string | null>(null);
+
+    const startSubagent = useCallback((subagentId: string, params: Record<string, unknown>, options?: { taskId?: string; openingMessage?: string }) => {
+        openPanel();
+        setPendingStart({ subagentId, params, ...options });
+        setStartRunId(crypto.randomUUID());
+    }, [openPanel]);
+
     const dismissForeignTask = useCallback(() => {
         const current = taskRef.current;
         if (!current) return;
@@ -517,8 +539,9 @@ export function AgenticoProvider({ children, scope = null }: { children: React.R
             resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask,
             pendingManualEntry, manualEntryRunId, startManualEntry,
             pendingResumeWithAI, resumeWithAIRunId, resumeWithAI,
+            startSubagent, pendingStart, startRunId,
         }),
-        [scope, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI],
+        [scope, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
     );
 
     return (

@@ -8,7 +8,7 @@
 import './i18n/types';
 
 // ── Adapter contract (see subagentManifest.ts for the two halves) ─────────────────────────────
-export type { AgentDefinition, AgentTool, LatestAttachmentsRef } from './domain/agentDefinition';
+export type { AgentDefinition, AgentTool, LatestAttachmentsRef, AgentExecutor, AgentExecutorTurn, AgentExecutorStep } from './domain/agentDefinition';
 export type { SubagentCommand, SubagentManifest, SubagentComponentContext } from './domain/subagentManifest';
 export { defineSubagent } from './domain/defineSubagent';
 export { registerSubagents, getSubagentRegistry, findSubagentManifest } from './domain/subagentRegistry';
@@ -36,6 +36,7 @@ export {
     getEntityChat,
     listEntityChats,
     removeEntityChat,
+    entityChatTaskId,
     type EntityChatSnapshot,
 } from './domain/entityChatStore';
 
@@ -63,3 +64,4 @@ export {
     type SubagentReportModule,
     type SubagentSelection,
 } from './presentation/reports/subagentReportRegistry';
+export { registerSubagentControls, getSubagentControls, type SubagentControls, type SubagentControlsProps, type UseSubagentControls } from './presentation/subagentControls';

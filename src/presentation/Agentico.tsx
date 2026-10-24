@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Icon, interpolate } from '@llmnative/react';
+import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Icon, interpolate, useI18n } from '@llmnative/react';
 import type { AIModelDescriptor, ChatbotModelOption } from '@llmnative/react';
 import { useAgentico } from './AgenticoContext';
 import { AgentActivityLog } from './AgentActivityLog';
@@ -13,7 +13,7 @@ import { useAgenticoI18n } from '../i18n';
 import { useAIModelCatalog } from './useAIModelCatalog';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
 import { findSubagentManifest } from '../domain/subagentRegistry';
-import { listEntityChats } from '../domain/entityChatStore';
+import { entityChatTaskId, listEntityChats, removeEntityChat } from '../domain/entityChatStore';
 
 /** Larghezza fissa del pannello — passata anche come `rightInset` alle Modal che devono
  * lasciargli spazio invece di sovrapporlo (vedi Modal.rightInset nel framework). */
@@ -66,7 +66,11 @@ function AgenticoComposer({ task }: { task: AgenticoTask }) {
     // nessun modello è ancora selezionato è l'unico modo per far sì che quel fallback non scatti
     // mai più nei flussi Agentico. Nessuna chiamata AI in un task `manualEntry` (vedi handleSubmit
     // sopra): la scelta modello non ha senso qui, non deve mai bloccare l'invio.
-    const modelRequired = !manualEntry && agent.hasProviders && !agent.selectedModel;
+    // A remote task (CR-003) answers with its own agent: no attachments, and its models are the
+    // ones its executor offers (none = no picker), never required.
+    const noModel = Boolean(manualEntry) || (agent.remote && agent.remoteModels.length === 0);
+    const modelRequired = !noModel && !agent.remote && agent.hasProviders && !agent.selectedModel;
+    const models = noModel ? [] : agent.remote ? agent.remoteModels : flattenModelOptions(agent.modelsByProvider);
 
     return (
         <Chatbot
@@ -77,9 +81,10 @@ function AgenticoComposer({ task }: { task: AgenticoTask }) {
             onStop={agent.stop}
             disabled={!text.trim() || modelRequired}
             onSubmit={handleSubmit}
-            attachments={!manualEntry}
-            models={manualEntry ? [] : flattenModelOptions(agent.modelsByProvider)}
-            selectedModel={manualEntry ? '' : agent.selectedModel}
+            attachments={!manualEntry && !agent.remote}
+            models={models}
+            selectedModel={noModel ? '' : agent.selectedModel}
+            actions={task.composerActions}
             onModelChange={agent.setSelectedModel}
             modelPlaceholder={t.selectModelPlaceholder}
             minHeight={44}
@@ -129,6 +134,16 @@ function AgenticoStarterComposer() {
             maxHeight={220}
         />
     );
+}
+
+/** "2 h ago": how long ago, in the language of the app (CR-003). */
+function relativeTime(at: number, locale: string, now = Date.now()): string {
+    const seconds = Math.round((at - now) / 1000);
+    const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto', style: 'short' });
+    for (const [unit, size] of [['day', 86_400], ['hour', 3_600], ['minute', 60]] as const) {
+        if (Math.abs(seconds) >= size) return format.format(Math.round(seconds / size), unit);
+    }
+    return format.format(0, 'minute');
 }
 
 /** Card "pronto per una nuova istanza di X" — render deterministico della stessa
@@ -206,17 +221,40 @@ function AnchoredUserMessageView({ messages }: { messages: string[] }) {
  * puro doppione (bug corretto: la prima versione di questo pannello aveva un backdrop e un
  * `<button>` grezzi invece di riusare questi componenti). */
 function AgenticoHistoryDropdown({
-    scopeId, open, onOpenChange, onSelect, onNewChat,
+    scopeId, currentTaskId, open, onOpenChange, onSelect, onNewChat, onArchivedCurrent,
 }: {
     scopeId: string;
+    /** The task open in the panel: its chat is marked in the list (CR-003). */
+    currentTaskId: string | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSelect: (subagentId: string, entityId: string, snapshot: ReturnType<typeof listEntityChats>[number]) => void;
     onNewChat: () => void;
+    /** The chat open in the panel was archived: the panel lets it go. */
+    onArchivedCurrent: () => void;
 }) {
     const t = useAgenticoI18n();
+    const { locale } = useI18n();
     const [search, setSearch] = useState('');
-    const entries = useMemo(() => (open ? listEntityChats(scopeId) : []), [scopeId, open]);
+    // Bumped when a chat is archived, to read the list again.
+    const [version, setVersion] = useState(0);
+    const entries = useMemo(() => (open ? listEntityChats(scopeId) : []), [scopeId, open, version]);
+
+    /** Archives a chat (CR-003): the host first (e.g. it closes a remote session, with its own
+     * question if it has one), then off the history. A refusal of the host keeps the chat. */
+    const archive = async (entry: ReturnType<typeof listEntityChats>[number]) => {
+        const manifest = findSubagentManifest(entry.subagentId);
+        const question = await manifest?.confirmArchive?.(entry.entityId, entry.params);
+        if (question && !window.confirm(question)) return;
+        try {
+            await manifest?.onArchive?.(entry.entityId, entry.params);
+        } catch {
+            return;
+        }
+        removeEntityChat(scopeId, entry.subagentId, entry.entityId);
+        if (currentTaskId === entityChatTaskId(entry.subagentId, entry.entityId)) onArchivedCurrent();
+        setVersion((value) => value + 1);
+    };
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         if (!q) return entries;
@@ -259,10 +297,14 @@ function AgenticoHistoryDropdown({
             ) : (
                 filtered.map((entry) => {
                     const manifest = findSubagentManifest(entry.subagentId);
+                    const current = currentTaskId === entityChatTaskId(entry.subagentId, entry.entityId);
                     return (
                         <DropdownItem
                             key={`${entry.subagentId}:${entry.entityId}`}
-                            icon={manifest?.icon ?? 'bot'}
+                            // The chat open in the panel is marked: the person sees where they are.
+                            icon={current ? 'check' : manifest?.icon ?? 'bot'}
+                            className={current ? 'bg-accent font-medium' : undefined}
+                            actions={[{ icon: 'archive', label: t.archiveChat, onClick: () => void archive(entry) }]}
                             onClick={() => onSelect(entry.subagentId, entry.entityId, entry)}
                         >
                             <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
@@ -273,7 +315,7 @@ function AgenticoHistoryDropdown({
                                         invece di un vuoto silenzioso. */}
                                     <span className="text-muted-foreground">{manifest?.label ?? entry.subagentId}</span> · {entry.title || entry.entityId}
                                 </span>
-                                <span className="shrink-0 text-xs text-muted-foreground">{new Date(entry.savedAt).toLocaleString()}</span>
+                                <span className="shrink-0 text-xs text-muted-foreground" title={new Date(entry.savedAt).toLocaleString(locale)}>{relativeTime(entry.savedAt, locale)}</span>
                             </span>
                         </DropdownItem>
                     );
@@ -306,7 +348,7 @@ export function Agentico() {
         task, isOpen, pendingGoal, orchestratorRunId, pageContext, pageContextCard,
         anchoredUserMessages, pendingResume, resumeRunId, dismissForeignTask, resumeEntityChat,
         pendingManualEntry, manualEntryRunId, startManualEntry, pendingExtraDestinations,
-        pendingResumeWithAI, resumeWithAIRunId,
+        pendingResumeWithAI, resumeWithAIRunId, pendingStart, startRunId,
         scope,
     } = useAgentico();
 
@@ -382,11 +424,28 @@ export function Agentico() {
     // sempre a vista senza dover scrollare a mano, come una normale chat. SOLO se l'utente era
     // già vicino al fondo: chi ha scrollato in alto per rileggere (es. la cronologia ripresa)
     // non viene più riportato giù a forza mentre l'agente genera ancora.
+    // A reply that grows in place (a streamed turn, CR-003) does not add an entry: its length
+    // counts too, so the panel follows the text as it is written.
+    const lastDetailLength = displayedActivity.at(-1)?.detail?.length ?? 0;
     useEffect(() => {
         const el = bodyRef.current;
         if (!el || !isNearBottomRef.current) return;
         el.scrollTop = el.scrollHeight;
-    }, [activityCount, hasError]);
+    }, [activityCount, hasError, lastDetailLength]);
+
+    // The content also grows after the text arrived (Markdown laid out, a block opened): whenever
+    // its height changes, the panel follows it if the person was at the bottom (CR-003).
+    const contentRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        const el = bodyRef.current;
+        const content = contentRef.current;
+        if (!el || !content || typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(() => {
+            if (isNearBottomRef.current) el.scrollTop = el.scrollHeight;
+        });
+        observer.observe(content);
+        return () => observer.disconnect();
+    }, [task?.id, isOpen]);
 
     // Montato SEMPRE quando c'è un goal in sospeso, indipendentemente da `isOpen` — se lo
     // gatassimo dietro `!isOpen return null` sotto, chiudere il pannello smonterebbe
@@ -409,7 +468,7 @@ export function Agentico() {
             key={resumeRunId}
             manifest={resumeManifest}
             params={pendingResume.snapshot.params}
-            taskId={`entitychat-${pendingResume.subagentId}-${pendingResume.entityId}`}
+            taskId={entityChatTaskId(pendingResume.subagentId, pendingResume.entityId)}
             resumeSeed={{ history: pendingResume.snapshot.history, activity: pendingResume.snapshot.activity }}
         />
     ) : null;
@@ -440,7 +499,20 @@ export function Agentico() {
         />
     ) : null;
 
-    if (!isOpen) return <>{orchestrator}{resumeRunner}{manualEntryRunner}{resumeWithAIRunner}</>;
+    // A subagent started by a page (AgenticoContext.startSubagent, CR-003) — mounted always, as
+    // every runner above.
+    const startManifest = pendingStart ? findSubagentManifest(pendingStart.subagentId) : undefined;
+    const startRunner = pendingStart && startManifest ? (
+        <SubagentRunner
+            key={startRunId}
+            manifest={startManifest}
+            params={pendingStart.params}
+            taskId={pendingStart.taskId}
+            openingMessage={pendingStart.openingMessage}
+        />
+    ) : null;
+
+    if (!isOpen) return <>{orchestrator}{resumeRunner}{manualEntryRunner}{resumeWithAIRunner}{startRunner}</>;
 
     return (
         <>
@@ -448,6 +520,7 @@ export function Agentico() {
         {resumeRunner}
         {manualEntryRunner}
         {resumeWithAIRunner}
+        {startRunner}
         <div
             style={{ width: AGENTICO_WIDTH }}
             className="relative flex h-full shrink-0 flex-col border-l border-border bg-background"
@@ -475,10 +548,12 @@ export function Agentico() {
                 {scope && (
                     <AgenticoHistoryDropdown
                         scopeId={scope.id}
+                        currentTaskId={task?.id ?? null}
                         open={historyOpen}
                         onOpenChange={setHistoryOpen}
                         onNewChat={handleNewChat}
                         onSelect={(subagentId, entityId, snapshot) => resumeEntityChat(subagentId, entityId, snapshot)}
+                        onArchivedCurrent={dismissForeignTask}
                     />
                 )}
                 <AgenticoToggle />
@@ -495,7 +570,7 @@ export function Agentico() {
                     normalmente coi contenuti, cosi la bolla sticky dell'utente (dentro
                     AgentActivityLog) può incollarsi davvero a filo con l'header una volta
                     superato, invece di lasciare sempre visibile lo spazio di questo padding. */}
-                <div className="pt-2">
+                <div ref={contentRef} className="pt-2">
                     {task ? (
                         <>
                             {/* Prompt statico del percorso "senza AI" (vedi
@@ -534,7 +609,8 @@ export function Agentico() {
                                         "Riprova": può proseguire subito col risultato
                                         deterministico, generico per costruzione a QUALUNQUE
                                         subagent (nessuna label/logica specifica qui). */}
-                                    <ActionButton
+                                    {/* A remote agent has no deterministic result to fall back on. */}
+                                    {!task.agent.remote && <ActionButton
                                         label={t.continueWithoutAi}
                                         variant="secondary"
                                         className="shrink-0"
@@ -546,7 +622,7 @@ export function Agentico() {
                                             const r = task.agent.runFallback();
                                             if (r) task.onApplied(r);
                                         }}
-                                    />
+                                    />}
                                 </div>
                             )}
                         </>
@@ -578,6 +654,8 @@ export function Agentico() {
                 casi — solo il body sopra cambia (log live o l'hint), mai il composer
                 stesso a spostarsi al centro del pannello. */}
             <div className="border-t border-border/60 px-4 py-3">
+                {/* What the controls of the host show (registerSubagentControls, CR-003), right above the composer. */}
+                {task?.panelActions && <div className="mb-2">{task.panelActions}</div>}
                 {task
                     ? <AgenticoComposer key={task.id} task={task} />
                     : <AgenticoStarterComposer />}

@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseAIModelRef, PromptUtils, useAIProviderRegistry } from '@llmnative/react';
 import type { AIAttachment, AIConversationTurn, AIModelDescriptor, AIProviderAdapter, AIToolResult } from '@llmnative/react';
-import type { AgentDefinition, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
+import type { AgentDefinition, AgentExecutorStep, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
 import { extractErrorMessage } from '../domain/extractErrorMessage';
 import { applyMicroPrompts } from '../domain/microPrompts';
 import { toJsonSchema } from '../domain/mcpTool';
@@ -104,6 +104,11 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
     /** true dopo che run() ha eseguito almeno un turno con AI abilitata — solo allora la
      * conversazione ha una history su cui sendMessage() può continuare. */
     canContinue: boolean;
+    /** true when the turns go to `AgentDefinition.executor` (CR-003): no attachments, no
+     * deterministic fallback; the models are the executor's (`remoteModels`), not the catalog. */
+    remote: boolean;
+    /** The models a remote executor offers (`AgentExecutor.models`); `selectedModel` is one of them. */
+    remoteModels: Array<{ label: string; value: string; group?: string }>;
     /** Log delle tool call della sessione corrente, più recenti in fondo — azzerato a ogni
      * run(), accumulato attraverso i sendMessage() successivi. */
     activity: AgentActivityEntry[];
@@ -172,7 +177,7 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
 /** Solo la fetta di UseAgentResult che serve a un consumer del pannello globale (Agentico.tsx)
  * per continuare una conversazione già avviata da run() — TParams non compare in nessuno dei
  * membri qui sotto, quindi `never` è innocuo. */
-export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot'>;
+export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot'>;
 
 export function useAgent<TParams, TContext, TResult>(
     definition: AgentDefinition<TParams, TContext, TResult>,
@@ -217,6 +222,70 @@ export function useAgent<TParams, TContext, TResult>(
 
     const ref = enabled && selectedModel ? parseAIModelRef(selectedModel) : null;
     const provider = ref ? registry[ref.provider] : null;
+    const executor = definition.executor;
+    const remote = Boolean(executor);
+    // The model of a remote executor, picked among its own options: a ref too, so a turn reads the
+    // last pick even within the same render.
+    const [remoteModels, setRemoteModels] = useState<UseAgentResult<TParams, TResult>['remoteModels']>([]);
+    const [remoteModel, setRemoteModelState] = useState('');
+    const remoteModelRef = useRef('');
+    const setRemoteModel = (model: string) => {
+        remoteModelRef.current = model;
+        setRemoteModelState(model);
+    };
+    const offerRemoteModels = (params: TParams) => {
+        setRemoteModels(executor?.models?.(params) ?? []);
+        setRemoteModel(executor?.defaultModel?.(params) ?? '');
+    };
+
+    /** A turn of a remote agent (CR-003): the text of the person goes to the executor as typed,
+     * its reply grows in one "thinking" entry and its steps appear above it, so the reply stays
+     * the last thing in the log. No provider, no tool loop, no fallback. */
+    const runRemoteTurn = async (text: string, first: boolean, model?: string): Promise<TResult | null> => {
+        const session = sessionRef.current;
+        if (!session || !executor) { setError(labelsRef.current.noActiveSession); return null; }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+        const thinkingId = crypto.randomUUID();
+        setActivity((prev) => [...prev, { id: thinkingId, kind: 'thinking', label: labelsRef.current.thinking, status: 'running' }]);
+        const setThinking = (status: AgentActivityEntry['status'], detail?: string) =>
+            setActivity((prev) => prev.map((a) => (a.id === thinkingId ? { ...a, status, ...(detail !== undefined ? { detail } : {}) } : a)));
+        const onStep = (step: AgentExecutorStep) => {
+            const id = `step-${thinkingId}-${step.id}`;
+            setActivity((prev) => {
+                if (prev.some((a) => a.id === id)) return prev.map((a) => (a.id === id ? { ...a, label: step.label, status: step.status } : a));
+                const at = prev.findIndex((a) => a.id === thinkingId);
+                const entry: AgentActivityEntry = { id, kind: 'tool', label: step.label, status: step.status };
+                return at < 0 ? [...prev, entry] : [...prev.slice(0, at), entry, ...prev.slice(at)];
+            });
+        };
+        try {
+            const reply = await executor.turn({
+                params: session.params, context: session.context, text, first, signal: controller.signal,
+                ...((model || remoteModelRef.current) ? { model: model || remoteModelRef.current } : {}),
+                onText: (partial) => setThinking('running', partial),
+                onStep,
+            });
+            setThinking('done', reply.text);
+            session.history = [
+                ...session.history,
+                ...(text ? [{ role: 'user' as const, content: text }] : []),
+                { role: 'assistant' as const, content: reply.text },
+            ];
+            return reply.result ?? null;
+        } catch (err) {
+            session.history = [...session.history, ...(text ? [{ role: 'user' as const, content: text }] : [])];
+            if (controller.signal.aborted) {
+                setThinking('stopped');
+                return null;
+            }
+            setThinking('error');
+            setError(extractErrorMessage(err));
+            return null;
+        } finally {
+            abortControllerRef.current = null;
+        }
+    };
 
     /** Un turno: manda `userText` (eventualmente vuoto — vedi sotto) più la history/i tool
      * della sessione, esegue in loop i tool_calls richiesti dal modello finché non arriva un
@@ -509,6 +578,12 @@ export function useAgent<TParams, TContext, TResult>(
             const tools = definition.getTools?.(params, context, attachmentsRef) ?? [];
             sessionRef.current = { params, context, tools, history: [], logId: crypto.randomUUID(), attachmentsRef };
 
+            if (remote) {
+                setCanContinue(true);
+                offerRemoteModels(params);
+                return await runRemoteTurn(opts?.openingMessage ?? '', true);
+            }
+
             const overrideModel = opts?.model || undefined;
             const hasProvider = overrideModel ? Boolean(registry[parseAIModelRef(overrideModel)?.provider ?? '']) : Boolean(provider);
             if (!enabled || !hasProvider) {
@@ -557,7 +632,8 @@ export function useAgent<TParams, TContext, TResult>(
             const attachmentsRef: LatestAttachmentsRef = { current: undefined };
             const tools = definition.getTools?.(params, context, attachmentsRef) ?? [];
             sessionRef.current = { params, context, tools, history: seed.history, logId: crypto.randomUUID(), attachmentsRef };
-            setCanContinue(enabled && Boolean(provider));
+            if (remote) offerRemoteModels(params);
+            setCanContinue(remote || (enabled && Boolean(provider)));
         } catch (err) {
             setError(extractErrorMessage(err));
         } finally {
@@ -582,6 +658,7 @@ export function useAgent<TParams, TContext, TResult>(
             ...(opts?.attachments?.length ? { attachmentNames: opts.attachments.map((f) => f.name) } : {}),
         }]);
         try {
+            if (remote) return await runRemoteTurn(text, false, opts?.model || undefined);
             const aiAttachments = opts?.attachments?.length
                 ? await Promise.all(opts.attachments.map((file) => PromptUtils.fileToAttachment(file)))
                 : undefined;
@@ -625,7 +702,10 @@ export function useAgent<TParams, TContext, TResult>(
     );
 
     return {
-        enabled, setEnabled, hasProviders, selectedModel, setSelectedModel,
-        modelsByProvider, modelsLoading, running, error, canContinue, activity, run, resume, sendMessage, stop, runFallback, snapshot,
+        enabled, setEnabled, hasProviders,
+        // A remote executor picks among its own models, not the AI catalog of the app.
+        selectedModel: remote ? remoteModel : selectedModel,
+        setSelectedModel: remote ? setRemoteModel : setSelectedModel,
+        modelsByProvider, modelsLoading, running, error, canContinue, remote, remoteModels, activity, run, resume, sendMessage, stop, runFallback, snapshot,
     };
 }

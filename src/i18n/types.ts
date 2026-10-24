@@ -48,6 +48,8 @@ export interface AgenticoDict {
     messagePlaceholder: string;
     unsavedConversationConfirm: string;
     noSavedChats: string;
+    /** Archives a chat of the history (CR-003). */
+    archiveChat: string;
     noResults: string;
     retry: string;
     /** User message sent to the model by the retry button */

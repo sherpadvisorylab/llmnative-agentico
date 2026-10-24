@@ -37,6 +37,7 @@ export const agenticoDe: AgenticoDict = {
     messagePlaceholder: 'Nachricht schreiben…',
     unsavedConversationConfirm: 'Diese Unterhaltung wurde nicht gespeichert und geht verloren. Fortfahren?',
     noSavedChats: 'Noch keine gespeicherten Chats.',
+    archiveChat: 'Archivieren',
     noResults: 'Keine Ergebnisse.',
     retry: 'Erneut versuchen',
     retryMessage: 'Erneut versuchen.',

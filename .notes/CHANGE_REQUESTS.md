@@ -11,6 +11,78 @@
 |----|--------|----------|-----------|-------|
 | [CR-001](#cr-001--estrazione-di-agentico-come-pacchetto) | Estrazione di Agentico come pacchetto `@llmnative/agentico` | Alta | — | ✅ |
 | [CR-002](#cr-002--ui-solo-con-componenti-del-framework) | UI di Agentico solo con componenti del framework | Media | CR-001 | ⬜ |
+| [CR-003](#cr-003--subagent-remoti-avvio-diretto-chat-per-entità-azioni-del-pannello) | Subagent remoti, avvio diretto, chat per entità, azioni del pannello | Alta | CR-001 | ✅ |
+
+---
+
+## CR-003 — Subagent remoti, avvio diretto, chat per entità, azioni del pannello
+
+**Stato:** ✅ done — rilasciato in 0.2.0
+**Issue:** [#3](https://github.com/sherpadvisorylab/llmnative-agentico/issues/3)
+**Priorità:** Alta
+**Dipende da:** CR-001
+
+### Motivazione
+
+Playbook ha un agente di progettazione che non è un modello: è una sessione opencode su un server,
+con la sua memoria, che risponde a pezzi e intanto scrive file. Oggi ogni turno di un subagent va
+al provider AI di Agentico (`useAgent` → `provider.complete`), e un subagent si avvia solo
+dall'orchestratore. Un provider finto non va bene: niente streaming, prompt di Agentico da
+ripulire, l'orchestratore che userebbe lo stesso modello. Servono:
+- un esecutore dell'host per i turni;
+- l'avvio diretto da una pagina;
+- la chat legata all'entità;
+- i pulsanti dell'host nel pannello.
+
+### Scope
+
+- `AgentDefinition.executor` (`AgentExecutor`). Quando c'è, `useAgent` gli passa i turni invece
+  di passarli al provider: riceve il testo della persona, riporta la risposta mentre cresce
+  (`onText`) e i passi dell'agente (`onStep`). Non servono modello, prompt né fallback, e la
+  conversazione espone `remote: true`. Il composer nasconde modello e allegati, e il pannello
+  nasconde "Continua senza AI".
+- `useAgentico().startSubagent(subagentId, params, { taskId?, openingMessage? })`: avvia un
+  subagent da una pagina, senza orchestratore.
+- `SubagentManifest.chatEntityId(params)`: la chat si salva dopo ogni turno sotto quell'entità, ed
+  è nello storico e si riprende con `resumeEntityChat`.
+- `SubagentManifest.onlyWhenAnchored`: l'orchestratore offre il subagent solo quando la
+  conversazione è legata a lui, cioè quando sulla pagina c'è un componente ancorato.
+- `registerSubagentPanelActions`: un componente dell'host in fondo al pannello mentre il task è
+  aperto. Riceve parametri, id del task, se un turno è in corso, e `close()`.
+
+### Checklist
+
+- [x] `AgentExecutor` + `useAgent` remoto (streaming, passi, stop, resume, snapshot)
+- [x] Composer e pannello per un task remoto
+- [x] `startSubagent`
+- [x] `chatEntityId` con salvataggio a ogni turno
+- [x] `onlyWhenAnchored` nell'orchestratore
+- [x] Controlli del subagent (`registerSubagentControls`, al posto di `registerSubagentPanelActions`)
+- [x] Test (35), README, llms.txt, CHANGELOG
+- [x] Scroll del pannello che segue la risposta mentre cresce (streaming)
+- [x] Storico: la chat aperta nel pannello è segnata (spunta, sfondo)
+- [x] Verifica in playbook (tarball locale): sessione avviata dalla pagina del progetto, round in
+  streaming, risposte, typecheck, test e build dello studio
+- [x] Release 0.2.0 (24/10/2026)
+
+### Seconda parte (todo, decisa il 24/10/2026)
+
+Dipende dalla CR-107 del framework (`ChatbotAction.onClick`, `DropdownItem.actions`).
+
+- [x] **Modelli di un subagent remoto:** `AgentExecutor.models` (opzioni `{ label, value, group? }`
+  date dall'host) e `defaultModel(params)`. Il composer mostra il selettore anche per un task
+  remoto, e il turno riceve `model`. L'host decide cosa vuol dire (per playbook: il modello della
+  sessione, dal messaggio successivo).
+- [x] **Azioni del subagent nel prompt:** `SubagentManifest`/registro presentation con azioni del
+  composer (`ChatbotAction` con `onClick`, `disabled` mentre un turno è in corso). Sostituiscono
+  `registerSubagentPanelActions` come posto dei comandi (es. "Concludi e apri la PR" apre la modale
+  dell'host); la barra sopra il composer resta solo per stati e messaggi.
+- [x] **Archivia nello storico:** icona al passaggio del mouse sulla riga (`DropdownItem.actions`).
+  Toglie la chat dallo storico (`removeEntityChat`) e chiama `SubagentManifest.onArchive?(entityId,
+  params)` per l'host (per playbook: chiude la sessione sul runner, senza PR). Chiede conferma solo
+  se l'host lo dice (`confirmArchive?(entityId, params)` → testo o niente).
+- [x] **Storico con tempo relativo:** "2 h fa" (Intl.RelativeTimeFormat, lingua corrente) al posto
+  di data e ora; data e ora complete nel titolo al passaggio del mouse.
 
 ---
 

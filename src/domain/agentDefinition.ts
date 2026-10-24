@@ -92,4 +92,48 @@ export interface AgentDefinition<TParams, TContext, TResult> {
      * agente: qui si dichiara solo QUALI si vogliono, mai il loro testo. Assente o [] =
      * nessuno. */
     microPromptIds?: string[];
+    /** Present = the turns of this agent are answered by the host, not by the AI provider of
+     * Agentico (CR-003): a remote agent with its own memory, for example an opencode session on
+     * a server. `useAgent` then builds no prompt, needs no model and never falls back: it gives
+     * the executor the text of the person and shows what it reports. `buildPrompt`,
+     * `buildFollowUpPrompt`, `parseResponse` and `fallback` stay required by the type but are not
+     * called. */
+    executor?: AgentExecutor<TParams, TContext, TResult>;
+}
+
+/** One step of a remote agent, shown as a line of the activity log and updated by `id`
+ * (e.g. "wrote GLOSSARY.md"). */
+export interface AgentExecutorStep {
+    id: string;
+    label: string;
+    status: 'running' | 'done' | 'error';
+}
+
+/** One turn given to an `AgentExecutor`. */
+export interface AgentExecutorTurn<TParams, TContext> {
+    params: TParams;
+    context: TContext;
+    /** What the person wrote: the opening message on the first turn (possibly empty), then
+     * each follow-up, as typed — never a prompt built by Agentico. */
+    text: string;
+    /** true on the turn of `run()`, false on every follow-up. */
+    first: boolean;
+    /** Aborted when the person stops the turn. */
+    signal: AbortSignal;
+    /** The model the person picked among `AgentExecutor.models`, if the executor offers any. */
+    model?: string;
+    /** The reply so far, whole (not a delta): shown as it grows. */
+    onText(text: string): void;
+    /** A step of the agent: added the first time its id is seen, updated after. */
+    onStep(step: AgentExecutorStep): void;
+}
+
+/** The host side of a remote agent: one call per turn, resolved when its reply is complete. */
+export interface AgentExecutor<TParams, TContext, TResult> {
+    turn(turn: AgentExecutorTurn<TParams, TContext>): Promise<{ text: string; result?: TResult }>;
+    /** The models the person can pick in the composer, at any time: what one means is the host's
+     * (e.g. the model of the remote session from the next message). Absent = no picker. */
+    models?(params: TParams): Array<{ label: string; value: string; group?: string }>;
+    /** The model picked at first, e.g. the one the remote session runs with. */
+    defaultModel?(params: TParams): string | undefined;
 }

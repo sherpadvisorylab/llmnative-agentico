@@ -59,6 +59,10 @@ configureAgenticoPrompts({                                    // optional: langu
 | **Scope** — the host's current tenant/company: id + data and storage providers | `<AgenticoProvider scope>` |
 | **Page context** — what the user is looking at, for the orchestrator prompt | `useAgenticoPageContext`, `useSubagentComponentContext` |
 | **Saved chats** — one chat per saved entity, resumable | `configureEntityChatStore`, `getEntityChat`, `listEntityChats` |
+| **Remote subagents** — turns answered by the host (a remote agent with its own memory, e.g. an opencode session), streamed with its steps; its own models in the composer, no fallback | `AgentDefinition.executor` (`AgentExecutor`, `models`, `defaultModel`) |
+| **Direct start** — a page starts a subagent without the orchestrator; with `chatEntityId` its chat is saved at every turn under that entity and resumed from the history; `onlyWhenAnchored` keeps it off the other pages | `useAgentico().startSubagent`, `entityChatTaskId`, `SubagentManifest.chatEntityId`, `SubagentManifest.onlyWhenAnchored` |
+| **Controls** — the actions of the prompt of a subagent (e.g. "Finish") and what the host shows above it, from a hook of the host | `registerSubagentControls` |
+| **History** — chats per entity, the open one marked, archived on hover (with the host deciding what archiving does) | `SubagentManifest.onArchive`, `confirmArchive` |
 | **Prompts** — model-facing text (en default, it included) | `configureAgenticoPrompts`, `agenticoPromptsEn`, `agenticoPromptsIt` |
 | **Strings** — user-facing text, namespace `agentico` of the framework i18n (en/it/de) | `agenticoTranslations`, `I18nDict.agentico` |
 

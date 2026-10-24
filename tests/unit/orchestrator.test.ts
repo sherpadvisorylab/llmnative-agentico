@@ -68,7 +68,19 @@ describe('orchestrator', () => {
         expect(definition.getTools!({ ...params, scopedSubagentId: 'mapping' }, context).map((tool) => tool.name)).toEqual(['read_list', 'mapping_generate']);
     });
 
-    it('hands off with what the tools collected, through the manifest withCollected hook', async () => {
+    it('offers a subagent for one page only where the conversation is scoped to it', () => {
+        registerSubagents([mappingManifest(), { ...mappingManifest(), id: 'design', label: 'Design', onlyWhenAnchored: true }]);
+        const definition = createOrchestratorAgentDefinition(labels);
+        const params = { userGoal: 'design', pageContext: null, scopedSubagentId: null };
+        const context = contextOf(definition, params);
+
+        expect(definition.getTools!(params, context).map((tool) => tool.name)).toEqual(['mapping_generate']);
+        expect(definition.buildPrompt(params, context)).not.toContain('design [generate]');
+        const scoped = { ...params, scopedSubagentId: 'design' };
+        expect(definition.getTools!(scoped, contextOf(definition, scoped)).map((tool) => tool.name)).toEqual(['mapping_generate', 'design_generate']);
+    });
+
+        it('hands off with what the tools collected, through the manifest withCollected hook', async () => {
         registerSubagents([mappingManifest((input, collected) => ({ ...input, paths: collected.paths ?? input.paths }))]);
         registerCrossAgentTools(listTool('read_list'));
         const definition = createOrchestratorAgentDefinition(labels);

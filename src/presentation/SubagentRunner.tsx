@@ -11,6 +11,8 @@ import { getSubagentReport, type SubagentSelection } from './reports/subagentRep
 import { GenericResultPreview } from './reports/GenericResultPreview';
 import { deriveHistoryTitle } from './deriveHistoryTitle';
 import { buildLiveAnchorDestination } from './liveAnchorDestination';
+import { getSubagentControls, type UseSubagentControls } from './subagentControls';
+import { saveEntityChat } from '../domain/entityChatStore';
 
 /** Monta il vero subagent (useAgent(manifest.definition)) e lo esegue una volta al mount con i
  * parametri già raccolti dall'orchestratore Agentico — nessun passo utente aggiuntivo, la
@@ -25,8 +27,10 @@ import { buildLiveAnchorDestination } from './liveAnchorDestination';
  * risultato ai componentAnchors, ResultDestinationPicker di riserva, registrazione del task) è
  * IDENTICO a un run normale — un follow-up dopo un resume produce un risultato esattamente come
  * un follow-up dopo un run, nessuna duplicazione di logica per il caso "ripreso". */
+const noControls: UseSubagentControls = () => ({});
+
 export function SubagentRunner({
-    manifest, params, extraDestinations, precedingActivity, taskId: taskIdProp, resumeSeed, model,
+    manifest, params, extraDestinations, precedingActivity, taskId: taskIdProp, resumeSeed, model, openingMessage,
 }: {
     manifest: SubagentManifest<any, any, any>;
     params: Record<string, unknown>;
@@ -54,6 +58,9 @@ export function SubagentRunner({
      * OrchestratorRunner — vedi il commento lì). Non passato per un `resumeSeed` — lì non c'è una
      * scelta "di questo giro" da propagare, si continua semplicemente la chat salvata così com'era. */
     model?: string;
+    /** The first message of the person, when a page starts the subagent directly
+     * (AgenticoContext.startSubagent, CR-003): shown in the log and given to the first turn. */
+    openingMessage?: string;
 }) {
     const agent = useAgent(manifest.definition, { defaultEnabled: true });
     const sidebar = useAgentico();
@@ -89,7 +96,8 @@ export function SubagentRunner({
     // fallback deterministico, anche quando un provider è configurato. Se non c'è nessun
     // provider (`!hasProviders`), non arriverà mai un selectedModel: si parte comunque subito,
     // run() userà il fallback come previsto.
-    const readyToStart = !agent.hasProviders || agent.selectedModel !== '';
+    // A remote subagent (CR-003) has no model to wait for.
+    const readyToStart = agent.remote || !agent.hasProviders || agent.selectedModel !== '';
 
     useEffect(() => {
         if (startedRef.current || !readyToStart) return;
@@ -102,7 +110,7 @@ export function SubagentRunner({
             // later interaction (a follow-up message, a retry) to keep reading the user's actual
             // choice instead of this instance's own just-resolved default.
             if (model) agent.setSelectedModel(model);
-            void agent.run(manifest.toParams(params), { model }).then((r) => { if (r) setResult(r); });
+            void agent.run(manifest.toParams(params), { model, openingMessage }).then((r) => { if (r) setResult(r); });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [readyToStart]);
@@ -210,6 +218,33 @@ export function SubagentRunner({
         [liveAnchorDestination, extraDestinations],
     );
 
+    // A subagent whose chats belong to an entity (CR-003) saves the chat after every turn: it is in
+    // the history and is resumed on that entity, without the host having to commit it.
+    const chatEntityId = manifest.chatEntityId?.(params);
+    const wasRunningRef = useRef(false);
+    useEffect(() => {
+        const ended = wasRunningRef.current && !agent.running;
+        wasRunningRef.current = agent.running;
+        if (!ended || !chatEntityId || !scope) return;
+        const snap = agent.snapshot();
+        if (!snap) return;
+        saveEntityChat({
+            scopeId: scope.id, subagentId: manifest.id, entityId: chatEntityId, params, title: deriveHistoryTitle(manifest, params),
+            history: snap.history,
+            activity: [...(precedingActivity ?? []), ...snap.activity],
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [agent.running]);
+
+    const dismiss = () => {
+        dismissedRef.current = true;
+        if (agent.running) agent.stop();
+        sidebar.closeTask(taskId);
+    };
+    // The controls of the host for this subagent: actions of the prompt and what it shows above.
+    const useControls = useRef<UseSubagentControls>(getSubagentControls(manifest.id) ?? noControls).current;
+    const controls = useControls({ params, taskId, running: agent.running, close: dismiss });
+
     const handleDestinationApplied = (destinationId: string) => {
         setAppliedIds((prev) => (prev.includes(destinationId) ? prev : [...prev, destinationId]));
     };
@@ -233,11 +268,11 @@ export function SubagentRunner({
             // generico del subagent — più utile nell'header di Agentico.
             id: taskId, title: deriveHistoryTitle(manifest, params), icon: manifest.icon, agent, onApplied: (r: unknown) => setResult(r), precedingActivity,
             panelExtraAnchorIndex: panelExtraAnchorIndexRef.current,
-            onDismiss: () => {
-                dismissedRef.current = true;
-                if (agent.running) agent.stop();
-                sidebar.closeTask(taskId);
-            },
+            onDismiss: dismiss,
+            // Saved at every turn: leaving it asks nothing (see Agentico.tsx, "new chat").
+            ...(chatEntityId ? { savedToDisk: true } : {}),
+            panelActions: controls.content,
+            composerActions: controls.actions,
             panelExtra: result ? (
                 <>
                     {selectionModule && selection ? (
@@ -266,7 +301,7 @@ export function SubagentRunner({
         // asincrono non faceva mai ri-registrare l'`agent` fresco in sidebar.openTask, e la
         // tendina di selezione modello restava vuota per l'intera durata del task.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [agent.activity, agent.running, agent.error, agent.canContinue, agent.selectedModel, agent.modelsByProvider, agent.hasProviders, sidebar.openTask, sidebar.componentAnchors, taskId, manifest, params, result, filteredResult, selection, appliedIds, extraDestinations, precedingActivity, autoApplyError]);
+    }, [agent.activity, agent.running, agent.error, agent.canContinue, agent.selectedModel, agent.modelsByProvider, agent.hasProviders, agent.remoteModels, sidebar.openTask, sidebar.componentAnchors, taskId, manifest, params, result, filteredResult, selection, appliedIds, extraDestinations, precedingActivity, autoApplyError, controls.content, controls.actions]);
 
     useEffect(() => {
         return () => { sidebar.closeTask(taskId); };

@@ -109,3 +109,8 @@ export function removeEntityChat(scopeId: string, subagentId: string, entityId: 
 export function listEntityChats(scopeId: string): EntityChatSnapshot[] {
     return readAll().filter((e) => e.scopeId === scopeId).sort((a, b) => b.savedAt - a.savedAt);
 }
+
+/** The id of the Agentico task of the chat of an entity: the same when the chat is resumed from
+ * the history and when a page starts it again (AgenticoContext.startSubagent), so it stays one
+ * task (CR-003). */
+export const entityChatTaskId = (subagentId: string, entityId: string) => `entitychat-${subagentId}-${entityId}`;

@@ -51,13 +51,19 @@ export interface OrchestratorLabels {
     collecting: string;
 }
 
+/** The subagents the orchestrator offers: all of them, but one for a page only (onlyWhenAnchored,
+ * CR-003) only when the conversation is scoped to it — in its catalog and in its tools alike. */
+function offeredSubagents(scopedSubagentId: string | null) {
+    return getSubagentRegistry().filter((manifest) => !manifest.onlyWhenAnchored || scopedSubagentId === manifest.id);
+}
+
 export function createOrchestratorAgentDefinition(
     labels: OrchestratorLabels,
 ): AgentDefinition<OrchestratorAgentParams, OrchestratorAgentContext, OrchestratorResult> {
     return {
-        buildContext() {
+        buildContext(params) {
             return {
-                cliCatalog: renderRegistryCli(getSubagentRegistry()),
+                cliCatalog: renderRegistryCli(offeredSubagents(params.scopedSubagentId)),
                 handoff: { current: null },
                 collected: {},
             };
@@ -100,7 +106,7 @@ export function createOrchestratorAgentDefinition(
                 ? allCrossAgentTools.filter((tool) => (scopedManifest.crossAgentToolIds ?? []).includes(tool.name))
                 : allCrossAgentTools;
 
-            const handoffTools: AgentTool[] = getSubagentRegistry().flatMap((manifest) =>
+            const handoffTools: AgentTool[] = offeredSubagents(params.scopedSubagentId).flatMap((manifest) =>
                 manifest.commands.map((command) => ({
                     name: `${manifest.id}_${command.name}`,
                     description: `${manifest.label}: ${command.summary}`,

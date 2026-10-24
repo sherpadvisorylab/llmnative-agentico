@@ -166,6 +166,20 @@ export interface SubagentManifest<TParams = any, TContext = any, TResult = any> 
      * orchestratorHint/humanSummary* per il vecchio meccanismo a livello di pagina, ancora usato
      * da redirects/html-to-liquid finché non vengono migrati). */
     componentContexts?: Record<string, SubagentComponentContext>;
+    /** The entity a chat of this subagent belongs to, from its raw params (e.g. the project it
+     * designs): when set, SubagentRunner saves the chat after every turn under it (see
+     * entityChatStore), so it is in the history and can be resumed on that entity (CR-003).
+     * Absent = saved only when the host commits it (commitEntityChat), as before. */
+    chatEntityId?(params: Record<string, unknown>): string | undefined;
+    /** true = the orchestrator offers this subagent only when the conversation is scoped to it,
+     * i.e. a component anchored to it is on the page (CR-003): a subagent that makes sense on
+     * one page only (e.g. the design of the project open there). Absent = offered everywhere. */
+    onlyWhenAnchored?: boolean;
+    /** Archiving a chat of this subagent from the history (CR-003): what the host does besides
+     * taking it off the history, e.g. close the remote session. A rejection keeps the chat. */
+    onArchive?(entityId: string, params: Record<string, unknown>): Promise<void> | void;
+    /** The question asked before archiving, if any (e.g. "close it without a pull request?"). */
+    confirmArchive?(entityId: string, params: Record<string, unknown>): Promise<string | undefined> | string | undefined;
 }
 
 /** Coppia di messaggi per UN punto di ancoraggio componente↔subagent (vedi

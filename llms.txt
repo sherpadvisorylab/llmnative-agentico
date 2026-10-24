@@ -6,9 +6,11 @@
 
 ## Host responsibilities (startup)
 
-- `registerSubagents(manifests)` — SubagentManifest: id, label, icon, description, indexPath, commands (name, summary, Zod inputSchema, describeOutput), definition (AgentDefinition), toParams, destinationIds, optional crossAgentToolIds, withCollected, manualEntry, componentContexts.
+- `registerSubagents(manifests)` — SubagentManifest: id, label, icon, description, indexPath, commands (name, summary, Zod inputSchema, describeOutput), definition (AgentDefinition), toParams, destinationIds, optional crossAgentToolIds, withCollected, manualEntry, componentContexts, chatEntityId (chat saved at every turn under that entity), onlyWhenAnchored (offered by the orchestrator only when scoped to it).
 - `registerDestinations({ id: ResultDestination })` — apply(result, { scopeId, dataProvider, storageProvider, proxyFetch }, meta).
 - `registerSubagentReports({ subagentId: SubagentReportModule })`.
+- `registerSubagentControls({ subagentId: useControls })` — a hook of the host per task (props: params, taskId, running, close) returning `{ actions?: ChatbotAction[] (with onClick), content?: ReactNode }`, memoized: actions in the prompt, content above it.
+- `SubagentManifest.onArchive(entityId, params)` / `confirmArchive(entityId, params)` — archiving a chat from the history (hover icon).
 - `registerCrossAgentTools((ctx) => AgentTool[])` — ctx: attachmentsRef, collected (per-conversation scratchpad), proxyFetch.
 - `configureAgenticoPrompts(partial)` — model-facing pack; `agenticoPromptsEn` (default) / `agenticoPromptsIt`.
 - `configureEntityChatStore({ storageKey })`.
@@ -25,11 +27,13 @@
 
 ## Hooks
 
-- `useAgentico()` — panel state, `startOrchestrator(goal, opts)`, `commitEntityChat(subagentId, entityId, taskId, scopeId, params, title)`, `scope`.
+- `useAgentico()` — panel state, `startOrchestrator(goal, opts)`, `startSubagent(subagentId, params, { taskId?, openingMessage? })` (use `entityChatTaskId(subagentId, entityId)` as taskId), `resumeEntityChat`, `commitEntityChat(subagentId, entityId, taskId, scopeId, params, title)`, `scope`.
 - `useAgenticoPageContext(text, card?)` — what the user is looking at.
 - `useSubagentComponentContext(subagentId, componentKey)` — anchor a component to a subagent.
 - `useAgent(definition)` — run an AgentDefinition directly.
 
 ## AgentDefinition
 
-buildContext (always runs) · buildPrompt · buildFollowUpPrompt · parseResponse (null → fallback) · fallback (required) · describeFallback? · getTools? · microPromptIds?
+buildContext (always runs) · buildPrompt · buildFollowUpPrompt · parseResponse (null → fallback) · fallback (required) · describeFallback? · getTools? · microPromptIds? · executor?
+
+`executor.turn({ params, context, text, first, signal, model?, onText(whole reply so far), onStep({ id, label, status }) }) → { text, result? }`; `executor.models(params)` / `defaultModel(params)` put the models of the executor in the composer: the turns go to the host instead of the AI provider; `text` is what the person typed (opening message on the first turn). The conversation is `remote: true`: no attachments, no fallback; the picker shows `remoteModels`.
