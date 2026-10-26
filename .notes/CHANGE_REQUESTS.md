@@ -12,6 +12,48 @@
 | [CR-001](#cr-001--estrazione-di-agentico-come-pacchetto) | Estrazione di Agentico come pacchetto `@llmnative/agentico` | Alta | — | ✅ |
 | [CR-002](#cr-002--ui-solo-con-componenti-del-framework) | UI di Agentico solo con componenti del framework | Media | CR-001 | ⬜ |
 | [CR-003](#cr-003--subagent-remoti-avvio-diretto-chat-per-entità-azioni-del-pannello) | Subagent remoti, avvio diretto, chat per entità, azioni del pannello | Alta | CR-001 | ✅ |
+| [CR-004](#cr-004--messaggi-a-parti-testo-ragionamento-passi-domande) | Messaggi a parti: testo, ragionamento, passi, domande | Alta | CR-109 (framework) | ⬜ |
+
+---
+
+## CR-004 — Messaggi a parti: testo, ragionamento, passi, domande
+
+**Stato:** ⬜ todo
+**Issue:** [#4](https://github.com/sherpadvisorylab/llmnative-agentico/issues/4)
+**Priorità:** Alta
+**Dipende da:** CR-109 di `@llmnative/react` (componenti di chat)
+
+### Motivazione
+
+Emersa nel Playbook il 26/10/2026 (agente di progettazione). Oggi un messaggio dell'agente è testo con
+un parser Markdown fatto in casa (grassetto, codice, link): tabelle ed elenchi escono grezzi; il
+ragionamento del modello, quando arriva, si mescola alla risposta; le domande sono testo. Gli altri
+chatbot dividono una risposta in parti, ognuna con il suo componente.
+
+### Scope
+
+- **Modello a parti** del messaggio dell'agente, sul modello del Vercel AI SDK / AG-UI: `text`,
+  `reasoning`, `tool` (i passi, raggruppati e richiudibili), `questions`. L'executor di un subagent
+  remoto (CR-003) le emette: `onText` resta per compatibilità, si aggiungono `onReasoning` e
+  `onQuestions`.
+- **Rendering** con i componenti del framework (CR-109): `ChatMarkdown` per il testo (al posto
+  dell'`InlineMarkdown` attuale), `ChatReasoning`, i passi raggruppati, `ChatQuestions`.
+- **Risposta alle domande**: le risposte scelte tornano all'executor come messaggio strutturato
+  (`answers`), non come testo da interpretare; il subagent decide come inoltrarle (il Playbook le passa
+  allo strumento `question` di opencode).
+- Il messaggio dell'utente fissato in cima (sticky) senza sovrapporsi al testo sotto.
+- Chat salvate (`EntityChatSnapshot`) compatibili: le parti si salvano e si ricaricano.
+- Test, README/docs, CHANGELOG.
+
+### Checklist
+
+- [ ] Modello a parti ed executor (`onReasoning`, `onQuestions`, risposte strutturate)
+- [ ] Rendering con `ChatMarkdown`, `ChatReasoning`, passi raggruppati, `ChatQuestions`
+- [ ] Messaggio dell'utente in cima senza sovrapposizioni
+- [ ] Chat salvate compatibili
+- [ ] Test, docs, CHANGELOG
+- [ ] Verificato nel Playbook (domande di BMAD e di Matt interattive, tabelle, ragionamento richiudibile)
+- [ ] Release
 
 ---
 
