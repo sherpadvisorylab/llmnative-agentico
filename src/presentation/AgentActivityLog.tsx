@@ -1,6 +1,7 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
-import { Code, Icon } from '@llmnative/react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, Tree, interpolate } from '@llmnative/react';
 import type { AgentActivityEntry } from './useAgent';
+import type { AgentMessagePart, AgentQuestionAnswer, AgentToolPart } from '../domain/messageParts';
 import { useAgenticoI18n, type AgenticoDict } from '../i18n';
 
 /** Un blocco ```lang ... ``` dentro al testo, o testo semplice attorno — il modello spesso
@@ -93,62 +94,16 @@ function DetailCodeBlock({ content, language }: { content: string; language?: st
     );
 }
 
-/** Un pezzo di testo inline riconosciuto dal mini-markdown qui sotto. */
-type InlineToken =
-    | { type: 'text'; content: string }
-    | { type: 'bold'; content: string }
-    | { type: 'code'; content: string }
-    | { type: 'link'; content: string; href: string };
-
-/** Markdown inline minimo — **bold**, `code`, [link](url) — non un parser markdown completo
- * (stesso spirito di parseDetailSegments sopra): il modello a volte scrive prosa con questa
- * sintassi (riepiloghi, nomi di campo in bold, link alle fonti) e mostrarla letterale coi
- * simboli è peggio che non gestirla affatto. Niente liste/heading/tabelle: non servono in una
- * riga di log/riepilogo breve. */
-function parseInlineMarkdown(text: string): InlineToken[] {
-    const tokens: InlineToken[] = [];
-    const re = /\*\*(.+?)\*\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)/g;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = re.exec(text))) {
-        if (match.index > lastIndex) tokens.push({ type: 'text', content: text.slice(lastIndex, match.index) });
-        if (match[1] !== undefined) tokens.push({ type: 'bold', content: match[1] });
-        else if (match[2] !== undefined) tokens.push({ type: 'code', content: match[2] });
-        else if (match[3] !== undefined) tokens.push({ type: 'link', content: match[3], href: match[4] });
-        lastIndex = re.lastIndex;
-    }
-    if (lastIndex < text.length) tokens.push({ type: 'text', content: text.slice(lastIndex) });
-    return tokens;
-}
-
-function InlineMarkdown({ text }: { text: string }) {
-    return (
-        <>
-            {parseInlineMarkdown(text).map((tok, i) => {
-                if (tok.type === 'bold') return <strong key={i} className="font-semibold text-foreground">{tok.content}</strong>;
-                if (tok.type === 'code') return <code key={i} className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] break-words">{tok.content}</code>;
-                if (tok.type === 'link') {
-                    return (
-                        <a key={i} href={tok.href} target="_blank" rel="noreferrer" className="text-primary underline underline-offset-2">
-                            {tok.content}
-                        </a>
-                    );
-                }
-                return <React.Fragment key={i}>{tok.content}</React.Fragment>;
-            })}
-        </>
-    );
-}
-
-/** Il contenuto di `detail` — testo semplice più eventuali blocchi di codice, ciascuno reso
- * col syntax-highlighter del framework invece che coi backtick grezzi in un <p>. */
-function DetailContent({ text }: { text: string }) {
+/** Il contenuto di `detail` — testo (Markdown, con `ChatMarkdown` del framework, CR-004) più
+ * eventuali blocchi di codice, ciascuno reso col syntax-highlighter del framework (collassabile,
+ * vedi DetailCodeBlock) invece che coi backtick grezzi. */
+function DetailContent({ text, tone }: { text: string; tone?: 'default' | 'muted' }) {
     const segments = parseDetailSegments(text);
     return (
         <>
             {segments.map((seg, i) => seg.type === 'code'
                 ? <DetailCodeBlock key={i} content={seg.content} language={seg.language} />
-                : (seg.content.trim() && <p key={i} className="whitespace-pre-wrap break-words"><InlineMarkdown text={seg.content} /></p>)
+                : (seg.content.trim() && <ChatMarkdown key={i} content={seg.content.trim()} tone={tone} className="break-words text-xs leading-relaxed" />)
             )}
         </>
     );
@@ -190,23 +145,6 @@ function thinkingDisplayLabel(entry: AgentActivityEntry, t: AgenticoDict): strin
     return t.responseReceived;
 }
 
-/** Una voce del log — le tool call sono una riga sola (etichetta già breve, niente da
- * espandere). I turni "sto pensando": codice E prosa (se presenti) sono SEMPRE visibili,
- * subito, mai dietro un click — nessun collapse a livello di riga. Due motivi, non uno solo:
- * (1) un dump JSON grezzo non ha "ragionamento" da nascondere; (2) il riepilogo del
- * micro-prompt "closing-summary" esiste PROPRIO perché l'utente lo legga — nasconderlo dietro
- * un chevron ne vanificherebbe lo scopo (il difetto segnalato: appariva un'etichetta
- * "Riepilogo:" da cliccare, che poi mostrava di nuovo "Riepilogo: …" per intero — la stessa
- * frase due volte, un click di troppo per qualcosa che dovrebbe essere già lì). La prosa vive
- * in un riquadro delimitato (bordo + sfondo, come un box di testo/uno "snippet"), con un
- * tetto di altezza e scroll interno solo se davvero molto lunga — mai nascosta, mai flottante
- * senza contenitore. I messaggi utente sono una bolla di chat allineata a destra — sempre per
- * intero — e "sticky" in cima allo scroll (stile IDE agentici: il prompt corrente resta
- * visibile mentre l'attività che genera scorre sotto). `sticky` su OGNI bolla utente, non solo
- * sull'ultima: è il normale comportamento a cascata degli elementi sticky (ogni bolla
- * successiva spinge via quella precedente non appena la raggiunge scorrendo) a garantire che
- * sia sempre e solo l'ultima a restare agganciata in un dato momento — nessuno stato/ref da
- * tracciare a mano. */
 /** Altezza da collassato, in px — abbastanza per ~4 righe a text-xs. Sopra questa soglia la
  * bolla utente collassa di default (fade + maniglia "espandi" sotto, stesso pattern di
  * DetailCodeBlock) invece di occupare tutto lo spazio verticale disponibile: la bolla è
@@ -220,7 +158,13 @@ const USER_BUBBLE_COLLAPSED_MAX_HEIGHT = 96;
  * MAI l'intera bolla — stesso motivo per cui ChatGPT/Claude fanno lo stesso: il testo dentro
  * deve restare selezionabile col mouse senza che un click/trascinamento apra o chiuda la bolla.
  * Non inventato da zero: è il pattern "show more/less con maniglia separata" già standard nei
- * chatbot conversazionali per i turni utente lunghi. */
+ * chatbot conversazionali per i turni utente lunghi.
+ *
+ * Sticky in cima (CR-004) ma solo dentro il suo turno (vedi AgentActivityLog): quando il turno
+ * finisce di scorrere, la bolla se ne va con lui invece di restare sotto quella del turno dopo
+ * (prima tutte le bolle erano sticky nella stessa lista, e una bolla più alta spuntava sotto
+ * una più bassa, sopra il testo). Sfondo pieno e `z-20`: il testo che scorre sotto (tabelle,
+ * codice) non le passa sopra. */
 function UserMessageBubble({ entry }: { entry: AgentActivityEntry }) {
     const contentRef = useRef<HTMLDivElement>(null);
     const [expanded, setExpanded] = useState(false);
@@ -235,7 +179,7 @@ function UserMessageBubble({ entry }: { entry: AgentActivityEntry }) {
     const collapsed = overflowing && !expanded;
 
     return (
-        <li className="sticky top-0 z-10 flex justify-end border-b border-border/40 bg-background py-1.5">
+        <div className="sticky top-0 z-20 flex justify-end border-b border-border/40 bg-background py-1.5">
             <div className="max-w-[85%] rounded-lg bg-primary/10 text-xs text-foreground">
                 <div
                     ref={contentRef}
@@ -274,13 +218,116 @@ function UserMessageBubble({ entry }: { entry: AgentActivityEntry }) {
                     </button>
                 )}
             </div>
-        </li>
+        </div>
     );
 }
 
-function ActivityRow({ entry }: { entry: AgentActivityEntry }) {
+/** The icon of a step in its group: the framework Icon names, coloured by the Tree as muted. */
+const STEP_ICONS: Record<AgentToolPart['status'], string> = {
+    running: 'loader-circle',
+    done: 'check',
+    error: 'x',
+    stopped: 'circle-slash',
+};
+
+/** Consecutive steps of a remote agent (CR-004), as one collapsible group: a `Tree` of the
+ * framework with one branch, closed by default. Its line says the step running now, or how many
+ * steps there were; open, it lists them with their status. */
+function StepsGroup({ steps }: { steps: AgentToolPart[] }) {
     const t = useAgenticoI18n();
-    if (entry.kind === 'user') return <UserMessageBubble entry={entry} />;
+    const running = steps.filter((s) => s.status === 'running').at(-1);
+    const failed = steps.some((s) => s.status === 'error');
+    const summary = running?.label ?? (steps.length === 1 ? t.oneStep : interpolate(t.steps, { count: steps.length }));
+    return (
+        <Tree
+            ariaLabel={t.stepsLabel}
+            selectedId={null}
+            itemClassName="py-0.5 text-xs text-muted-foreground"
+            nodes={[{
+                id: `steps-${steps[0]?.id ?? ''}`,
+                label: summary,
+                icon: running ? 'loader-circle' : failed ? 'circle-alert' : 'list-checks',
+                children: steps.map((step) => ({
+                    id: step.id,
+                    label: <span className={step.status === 'error' ? 'text-destructive' : undefined}>{step.label}</span>,
+                    icon: STEP_ICONS[step.status],
+                })),
+            }]}
+        />
+    );
+}
+
+/** What the log needs to let the person answer questions (CR-004): the entries of the live
+ * conversation (`canAnswer`) and where the answers go. Without it, unanswered questions are shown
+ * disabled. */
+export interface AgentActivityLogQuestions {
+    canAnswer: (entryId: string) => boolean;
+    onAnswer: (entryId: string, partId: string, answers: AgentQuestionAnswer[]) => Promise<unknown>;
+}
+
+/** A message in parts (CR-004), in the order the parts arrived: text with `ChatMarkdown`
+ * (repaired while it streams), reasoning with `ChatReasoning`, consecutive steps as one group,
+ * questions with `ChatQuestions` (read-only once answered). */
+function MessageParts({ entry, questions }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions }) {
+    const parts = entry.parts ?? [];
+    const blocks: Array<{ key: string; part: Exclude<AgentMessagePart, AgentToolPart> } | { key: string; steps: AgentToolPart[] }> = [];
+    for (const part of parts) {
+        const last = blocks.at(-1);
+        if (part.type === 'tool') {
+            if (last && 'steps' in last) last.steps.push(part);
+            else blocks.push({ key: `tool-${part.id}`, steps: [part] });
+        } else {
+            blocks.push({ key: `${part.type}-${part.id}`, part });
+        }
+    }
+    const answerable = Boolean(questions?.canAnswer(entry.id));
+    return (
+        <div className="space-y-2">
+            {blocks.map((block) => {
+                if ('steps' in block) return <StepsGroup key={block.key} steps={block.steps} />;
+                const { part } = block;
+                if (part.type === 'text') {
+                    return part.text.trim()
+                        ? <ChatMarkdown key={block.key} content={part.text} streaming={part.streaming} className="break-words text-xs leading-relaxed text-foreground" />
+                        : null;
+                }
+                if (part.type === 'reasoning') {
+                    return <ChatReasoning key={block.key} content={part.text} streaming={part.streaming} duration={part.duration} className="my-0" />;
+                }
+                return (
+                    <ChatQuestions
+                        key={block.key}
+                        questions={part.questions}
+                        {...(part.answers ? { answers: part.answers } : {})}
+                        disabled={!part.answers && !answerable}
+                        onSubmit={questions && answerable ? (answers) => questions.onAnswer(entry.id, part.id, answers) : undefined}
+                        className="text-xs"
+                    />
+                );
+            })}
+        </div>
+    );
+}
+
+function ActivityRow({ entry, questions }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions }) {
+    const t = useAgenticoI18n();
+
+    // A message in parts (remote agent, CR-004): the parts say it all; a status line only while
+    // nothing arrived yet, or when the turn stopped or failed.
+    if (entry.kind === 'thinking' && entry.parts) {
+        const showStatus = entry.status === 'error' || entry.status === 'stopped' || (entry.status === 'running' && entry.parts.length === 0);
+        return (
+            <li className="text-xs text-muted-foreground">
+                {entry.parts.length > 0 && <MessageParts entry={entry} questions={questions} />}
+                {showStatus && (
+                    <div className={`flex items-start gap-1.5 ${entry.parts.length > 0 ? 'mt-1' : ''}`}>
+                        <span className="pt-px"><ActivityStatusIcon status={entry.status} /></span>
+                        <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{thinkingDisplayLabel(entry, t)}</span>
+                    </div>
+                )}
+            </li>
+        );
+    }
 
     const segments = entry.kind === 'thinking' && entry.detail ? parseDetailSegments(entry.detail) : [];
     const codeSegments = segments.filter((s): s is Extract<DetailSegment, { type: 'code' }> => s.type === 'code');
@@ -306,12 +353,11 @@ function ActivityRow({ entry }: { entry: AgentActivityEntry }) {
             {textSegments.length > 0 && (
                 // Testo libero, non incastonato in un box — stessa resa delle altre righe
                 // ("Sto ricontrollando…" ecc.), niente bordo/sfondo/scroll proprio: scorre con
-                // lo scroll principale del pannello, non con un secondo scroll interno.
+                // lo scroll principale del pannello, non con un secondo scroll interno. Markdown
+                // GFM con `ChatMarkdown` del framework (CR-004: tabelle, elenchi, titoli).
                 <div className="mt-1 ml-[18px] space-y-2">
                     {textSegments.map((seg, i) => (
-                        <p key={i} className="whitespace-pre-wrap leading-relaxed text-muted-foreground">
-                            <InlineMarkdown text={seg.content.trim()} />
-                        </p>
+                        <ChatMarkdown key={i} content={seg.content.trim()} tone="muted" className="break-words text-xs leading-relaxed" />
                     ))}
                 </div>
             )}
@@ -322,12 +368,30 @@ function ActivityRow({ entry }: { entry: AgentActivityEntry }) {
 /** Il log di attività di un agente, usato dal pannello globale (Agentico) — ogni agente ora
  * ci passa attraverso, il pannello embedded legacy (AgentFollowUp) è stato ritirato una volta
  * migrato anche l'ultimo consumer (import HTML/JSX, vedi ComponentEditPage.tsx). Un solo posto
- * per l'icon-system e la logica "sto pensando" transitorio/collassabile. */
-export function AgentActivityLog({ activity }: { activity: AgentActivityEntry[] }) {
+ * per l'icon-system e la logica "sto pensando" transitorio/collassabile.
+ *
+ * One `<li>` per turn (CR-004): the message of the person, sticky at the top while its turn
+ * scrolls, then what the agent did and said. Entries before the first message of the person
+ * (an opening without text) form a turn of their own, without a bubble. */
+export function AgentActivityLog({ activity, questions }: { activity: AgentActivityEntry[]; questions?: AgentActivityLogQuestions }) {
     if (activity.length === 0) return null;
+    const turns: Array<{ user?: AgentActivityEntry; entries: AgentActivityEntry[] }> = [];
+    for (const entry of activity) {
+        if (entry.kind === 'user' || turns.length === 0) turns.push(entry.kind === 'user' ? { user: entry, entries: [] } : { entries: [entry] });
+        else turns[turns.length - 1].entries.push(entry);
+    }
     return (
         <ul className="space-y-0.5">
-            {activity.map((entry) => <ActivityRow key={entry.id} entry={entry} />)}
+            {turns.map((turn) => (
+                <li key={turn.user?.id ?? turn.entries[0]?.id}>
+                    {turn.user && <UserMessageBubble entry={turn.user} />}
+                    {turn.entries.length > 0 && (
+                        <ul className="space-y-0.5">
+                            {turn.entries.map((entry) => <ActivityRow key={entry.id} entry={entry} questions={questions} />)}
+                        </ul>
+                    )}
+                </li>
+            ))}
         </ul>
     );
 }

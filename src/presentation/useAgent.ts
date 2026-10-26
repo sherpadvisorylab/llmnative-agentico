@@ -17,7 +17,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseAIModelRef, PromptUtils, useAIProviderRegistry } from '@llmnative/react';
 import type { AIAttachment, AIConversationTurn, AIModelDescriptor, AIProviderAdapter, AIToolResult } from '@llmnative/react';
-import type { AgentDefinition, AgentExecutorStep, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
+import type { AgentDefinition, AgentExecutorPartOptions, AgentExecutorStep, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
+import {
+    DEFAULT_REASONING_PART_ID, DEFAULT_TEXT_PART_ID, formatQuestionAnswers, messagePartsText, upsertMessagePart,
+    type AgentMessagePart, type AgentQuestion, type AgentQuestionAnswer, type AgentQuestionsAnswers, type AgentReasoningPart,
+} from '../domain/messageParts';
 import { extractErrorMessage } from '../domain/extractErrorMessage';
 import { applyMicroPrompts } from '../domain/microPrompts';
 import { toJsonSchema } from '../domain/mcpTool';
@@ -84,6 +88,10 @@ export interface AgentActivityEntry {
      * doveva fidarsi a memoria (bug osservato: un allegato sembrava "sparito" perché non
      * c'era traccia visiva che fosse mai arrivato). */
     attachmentNames?: string[];
+    /** On the turns of a remote agent (CR-004): the message in parts (text, reasoning, steps,
+     * questions), in the order they arrived. `detail` still holds its text. Absent on the turns of
+     * the AI provider and on chats saved before 0.3.0, shown from `detail` as before. */
+    parts?: AgentMessagePart[];
 }
 
 /** Stato di gating/selezione — non generico, condiviso dal componente <AgentControls />
@@ -172,12 +180,18 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
      * chiamata (tipicamente un click su Salva, molto dopo l'ultimo turno), mai una chiusura
      * stantia catturata al mount. */
     snapshot: () => { history: AIConversationTurn[]; activity: AgentActivityEntry[] } | null;
+    /** Answers the questions part `partId` of the entry `entryId` (CR-004). If the turn that asked
+     * is still waiting, its `onQuestions` promise resolves; otherwise a new turn of the executor
+     * carries them (`AgentExecutorTurn.answers`, with empty `text`). Either way the part keeps the
+     * answers and shows them read-only. Resolves with the result of that new turn, if any; rejects
+     * (leaving the form open) when another turn is running or the entry is not of this conversation. */
+    answerQuestions: (entryId: string, partId: string, answers: AgentQuestionAnswer[]) => Promise<TResult | null>;
 }
 
 /** Solo la fetta di UseAgentResult che serve a un consumer del pannello globale (Agentico.tsx)
  * per continuare una conversazione già avviata da run() — TParams non compare in nessuno dei
  * membri qui sotto, quindi `never` è innocuo. */
-export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot'>;
+export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions'>;
 
 export function useAgent<TParams, TContext, TResult>(
     definition: AgentDefinition<TParams, TContext, TResult>,
@@ -189,7 +203,18 @@ export function useAgent<TParams, TContext, TResult>(
     const [running, setRunning]     = useState(false);
     const [error, setError]         = useState<string | null>(null);
     const [canContinue, setCanContinue] = useState(false);
-    const [activity, setActivity] = useState<AgentActivityEntry[]>([]);
+    const [activity, setActivityState] = useState<AgentActivityEntry[]>([]);
+    // The log as last set, readable outside a render (answerQuestions looks its entry up there).
+    const activityRef = useRef<AgentActivityEntry[]>([]);
+    const setActivity = (next: AgentActivityEntry[] | ((prev: AgentActivityEntry[]) => AgentActivityEntry[])) => {
+        setActivityState((prev) => {
+            const value = typeof next === 'function' ? next(prev) : next;
+            activityRef.current = value;
+            return value;
+        });
+    };
+    // Questions asked by a turn still running, by `${entryId}:${partId}`: answering resolves them.
+    const pendingQuestionsRef = useRef(new Map<string, { resolve: (answers: AgentQuestionAnswer[]) => void; reject: (reason: unknown) => void }>());
     const labels = useAgenticoI18n();
     const labelsRef = useRef(labels);
     labelsRef.current = labels;
@@ -238,52 +263,159 @@ export function useAgent<TParams, TContext, TResult>(
         setRemoteModel(executor?.defaultModel?.(params) ?? '');
     };
 
-    /** A turn of a remote agent (CR-003): the text of the person goes to the executor as typed,
-     * its reply grows in one "thinking" entry and its steps appear above it, so the reply stays
-     * the last thing in the log. No provider, no tool loop, no fallback. */
-    const runRemoteTurn = async (text: string, first: boolean, model?: string): Promise<TResult | null> => {
+    /** A turn of a remote agent (CR-003): the text of the person goes to the executor as typed and
+     * its message grows in one "thinking" entry, in parts (CR-004): text, reasoning, steps and
+     * questions, in the order they arrive. No provider, no tool loop, no fallback. `answers` = the
+     * turn carries the answers to the questions of an earlier turn (`historyText` is how the history
+     * of the chat records them). */
+    const runRemoteTurn = async (
+        text: string,
+        first: boolean,
+        model?: string,
+        answers?: AgentQuestionsAnswers & { historyText: string },
+    ): Promise<TResult | null> => {
         const session = sessionRef.current;
         if (!session || !executor) { setError(labelsRef.current.noActiveSession); return null; }
         const controller = new AbortController();
         abortControllerRef.current = controller;
         const thinkingId = crypto.randomUUID();
-        setActivity((prev) => [...prev, { id: thinkingId, kind: 'thinking', label: labelsRef.current.thinking, status: 'running' }]);
-        const setThinking = (status: AgentActivityEntry['status'], detail?: string) =>
-            setActivity((prev) => prev.map((a) => (a.id === thinkingId ? { ...a, status, ...(detail !== undefined ? { detail } : {}) } : a)));
-        const onStep = (step: AgentExecutorStep) => {
-            const id = `step-${thinkingId}-${step.id}`;
-            setActivity((prev) => {
-                if (prev.some((a) => a.id === id)) return prev.map((a) => (a.id === id ? { ...a, label: step.label, status: step.status } : a));
-                const at = prev.findIndex((a) => a.id === thinkingId);
-                const entry: AgentActivityEntry = { id, kind: 'tool', label: step.label, status: step.status };
-                return at < 0 ? [...prev, entry] : [...prev.slice(0, at), entry, ...prev.slice(at)];
+        setActivity((prev) => [...prev, { id: thinkingId, kind: 'thinking', label: labelsRef.current.thinking, status: 'running', parts: [] }]);
+
+        // When each reasoning part started, to say how long the model reasoned.
+        const reasoningStarted = new Map<string, number>();
+        const secondsSince = (id: string) => Math.max(1, Math.round((Date.now() - (reasoningStarted.get(id) ?? Date.now())) / 1000));
+        const closeReasoning = (part: AgentReasoningPart): AgentReasoningPart => ({ ...part, streaming: false, duration: part.duration ?? secondsSince(part.id) });
+        const updateParts = (change: (parts: AgentMessagePart[]) => AgentMessagePart[], status?: AgentActivityEntry['status']) =>
+            setActivity((prev) => prev.map((a) => {
+                if (a.id !== thinkingId) return a;
+                const parts = change(a.parts ?? []);
+                const detail = messagePartsText(parts);
+                return { ...a, parts, ...(status ? { status } : {}), ...(detail ? { detail } : {}) };
+            }));
+        const upsert = (part: AgentMessagePart) => updateParts((parts) => upsertMessagePart(parts, part, closeReasoning));
+
+        // A text part with an id of the host: the reply is then in its parts, not set again from reply.text.
+        let textWithId = false;
+        const onText = (partial: string, part?: AgentExecutorPartOptions) => {
+            if (part?.id && part.id !== DEFAULT_TEXT_PART_ID) textWithId = true;
+            upsert({ type: 'text', id: part?.id ?? DEFAULT_TEXT_PART_ID, text: partial, streaming: !part?.done });
+        };
+        const onReasoning = (partial: string, part?: AgentExecutorPartOptions & { duration?: number }) => {
+            const id = part?.id ?? DEFAULT_REASONING_PART_ID;
+            if (!reasoningStarted.has(id)) reasoningStarted.set(id, Date.now());
+            upsert({
+                type: 'reasoning', id, text: partial, streaming: !part?.done,
+                ...(part?.duration !== undefined ? { duration: part.duration } : part?.done ? { duration: secondsSince(id) } : {}),
             });
         };
+        const onStep = (step: AgentExecutorStep) => upsert({ type: 'tool', id: step.id, label: step.label, status: step.status });
+
+        // The questions of this turn still waiting for their answers.
+        const turnQuestions = new Set<string>();
+        let questionsCount = 0;
+        const rejectPendingQuestions = () => {
+            for (const key of turnQuestions) {
+                const pending = pendingQuestionsRef.current.get(key);
+                pendingQuestionsRef.current.delete(key);
+                pending?.reject(new DOMException('The turn was stopped.', 'AbortError'));
+            }
+            turnQuestions.clear();
+        };
+        controller.signal.addEventListener('abort', rejectPendingQuestions);
+        const onQuestions = (questions: AgentQuestion[], part?: { id?: string }) => {
+            questionsCount += 1;
+            const id = part?.id ?? `questions-${questionsCount}`;
+            upsert({ type: 'questions', id, questions });
+            const key = `${thinkingId}:${id}`;
+            if (controller.signal.aborted) return Promise.reject(new DOMException('The turn was stopped.', 'AbortError'));
+            turnQuestions.add(key);
+            return new Promise<AgentQuestionAnswer[]>((resolve, reject) => {
+                pendingQuestionsRef.current.set(key, { resolve, reject });
+            });
+        };
+
+        /** End of the turn: nothing streams any more, and answers to its questions now go to a new turn. */
+        const finish = (status: AgentActivityEntry['status'], finalText?: string) => {
+            updateParts((parts) => {
+                const next = finalText && !textWithId
+                    ? upsertMessagePart(parts, { type: 'text', id: DEFAULT_TEXT_PART_ID, text: finalText, streaming: false }, closeReasoning)
+                    : parts;
+                return next.map((p) => {
+                    if (p.type === 'reasoning' && p.streaming) return closeReasoning(p);
+                    if (p.type === 'text' && p.streaming) return { ...p, streaming: false };
+                    if (p.type === 'tool' && p.status === 'running' && status !== 'done') return { ...p, status: 'stopped' as const };
+                    return p;
+                });
+            }, status);
+            controller.signal.removeEventListener('abort', rejectPendingQuestions);
+            for (const key of turnQuestions) pendingQuestionsRef.current.delete(key);
+            turnQuestions.clear();
+        };
+
+        const askedText = text || answers?.historyText || '';
         try {
             const reply = await executor.turn({
                 params: session.params, context: session.context, text, first, signal: controller.signal,
                 ...((model || remoteModelRef.current) ? { model: model || remoteModelRef.current } : {}),
-                onText: (partial) => setThinking('running', partial),
-                onStep,
+                ...(answers ? { answers: { id: answers.id, answers: answers.answers } } : {}),
+                onText, onReasoning, onStep, onQuestions,
             });
-            setThinking('done', reply.text);
+            finish('done', reply.text);
             session.history = [
                 ...session.history,
-                ...(text ? [{ role: 'user' as const, content: text }] : []),
+                ...(askedText ? [{ role: 'user' as const, content: askedText }] : []),
                 { role: 'assistant' as const, content: reply.text },
             ];
             return reply.result ?? null;
         } catch (err) {
-            session.history = [...session.history, ...(text ? [{ role: 'user' as const, content: text }] : [])];
+            session.history = [...session.history, ...(askedText ? [{ role: 'user' as const, content: askedText }] : [])];
             if (controller.signal.aborted) {
-                setThinking('stopped');
+                finish('stopped');
                 return null;
             }
-            setThinking('error');
+            finish('error');
             setError(extractErrorMessage(err));
             return null;
         } finally {
             abortControllerRef.current = null;
+        }
+    };
+
+    const answerQuestions = async (entryId: string, partId: string, answers: AgentQuestionAnswer[]): Promise<TResult | null> => {
+        const entry = activityRef.current.find((a) => a.id === entryId);
+        const part = entry?.parts?.find((p) => p.type === 'questions' && p.id === partId);
+        if (!part || part.type !== 'questions') {
+            setError(labelsRef.current.noActiveSession);
+            throw new Error(labelsRef.current.noActiveSession);
+        }
+        const markAnswered = () => setActivity((prev) => prev.map((a) => (a.id !== entryId ? a : {
+            ...a, parts: a.parts?.map((p) => (p.type === 'questions' && p.id === partId ? { ...p, answers } : p)),
+        })));
+        const key = `${entryId}:${partId}`;
+        const pending = pendingQuestionsRef.current.get(key);
+        if (pending) {
+            pendingQuestionsRef.current.delete(key);
+            markAnswered();
+            pending.resolve(answers);
+            return null;
+        }
+        if (runningRef.current) {
+            setError(labelsRef.current.requestInProgress);
+            throw new Error(labelsRef.current.requestInProgress);
+        }
+        if (!remote || !sessionRef.current) {
+            setError(labelsRef.current.noActiveSession);
+            throw new Error(labelsRef.current.noActiveSession);
+        }
+        runningRef.current = true;
+        setRunning(true);
+        setError(null);
+        markAnswered();
+        try {
+            return await runRemoteTurn('', false, undefined, { id: partId, answers, historyText: formatQuestionAnswers(part.questions, answers) });
+        } finally {
+            runningRef.current = false;
+            setRunning(false);
         }
     };
 
@@ -706,6 +838,6 @@ export function useAgent<TParams, TContext, TResult>(
         // A remote executor picks among its own models, not the AI catalog of the app.
         selectedModel: remote ? remoteModel : selectedModel,
         setSelectedModel: remote ? setRemoteModel : setSelectedModel,
-        modelsByProvider, modelsLoading, running, error, canContinue, remote, remoteModels, activity, run, resume, sendMessage, stop, runFallback, snapshot,
+        modelsByProvider, modelsLoading, running, error, canContinue, remote, remoteModels, activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions,
     };
 }

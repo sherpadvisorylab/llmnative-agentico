@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Icon, interpolate, useI18n } from '@llmnative/react';
 import type { AIModelDescriptor, ChatbotModelOption } from '@llmnative/react';
 import { useAgentico } from './AgenticoContext';
-import { AgentActivityLog } from './AgentActivityLog';
+import { AgentActivityLog, type AgentActivityLogQuestions } from './AgentActivityLog';
 import { AgenticoToggle } from './AgenticoToggle';
 import { OrchestratorRunner } from './OrchestratorRunner';
 import { SubagentRunner } from './SubagentRunner';
@@ -383,6 +383,16 @@ export function Agentico() {
     const activityBeforePanelExtra = displayedActivity.slice(0, panelExtraAnchorIndex);
     const activityAfterPanelExtra = displayedActivity.slice(panelExtraAnchorIndex);
     const hasError = !!(task && !task.agent.running && task.agent.error);
+    // Questions of the agent (CR-004): answerable in the entries of the live conversation only (not
+    // in the transcript that precedes it); the result of the turn that carries them is applied
+    // like the one of a message.
+    const liveEntryIds = new Set(task?.agent.activity.map((entry) => entry.id) ?? []);
+    const questions: AgentActivityLogQuestions | undefined = task ? {
+        canAnswer: (entryId) => liveEntryIds.has(entryId),
+        onAnswer: (entryId, partId, answers) => task.agent.answerQuestions(entryId, partId, answers).then((result) => {
+            if (result) task.onApplied(result);
+        }),
+    } : undefined;
     // Il fallback dell'orchestratore (agenticoOrchestratorAgent.ts) non è mai un vero handoff —
     // solo un messaggio da leggere, non può indovinare l'intento senza AI. Quando invece il
     // target è già noto (scopedSubagentId esplicito, vedi startOrchestrator/TemplateImportButton)
@@ -581,13 +591,13 @@ export function Agentico() {
                             {task.manualEntry && displayedActivity.length === 0 && (
                                 <p className="text-xs text-muted-foreground">{task.manualEntry.prompt}</p>
                             )}
-                            <AgentActivityLog activity={activityBeforePanelExtra} />
+                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} />
                             {task.panelExtra && <div className="mt-3">{task.panelExtra}</div>}
                             {/* Conversazione successiva a `panelExtra` (retry, follow-up) — un
                                 secondo <ul> (AgentActivityLog ne apre uno suo), non un problema:
                                 lo sticky delle bolle utente è per-<li> rispetto allo scroll
                                 container di questo pannello, non al singolo <ul> che le contiene. */}
-                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} />}
+                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} />}
                             {!task.agent.running && task.agent.error && (
                                 <div className="mt-2 flex items-center gap-2">
                                     <p className="flex-1 text-xs text-destructive">{task.agent.error}</p>

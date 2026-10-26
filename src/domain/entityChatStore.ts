@@ -10,6 +10,7 @@
 // estrazione coinvolta (edit manuale) non tocca lo store — vedi commitEntityChat, che è un no-op
 // quando non c'è un taskId da cui pescare uno snapshot.
 import type { AIConversationTurn } from '@llmnative/react';
+import type { AgentMessagePart } from './messageParts';
 
 /** Stessa forma di AgentActivityEntry (agentico/presentation/useAgent.ts) — ridefinita qui invece
  * di importata: il domain layer non dipende dal presentation layer, e questi campi sono
@@ -22,6 +23,10 @@ export interface EntityChatActivityEntry {
     status:  'running' | 'done' | 'error' | 'stopped';
     detail?: string;
     toolNames?: string[];
+    attachmentNames?: string[];
+    /** The message in parts (CR-004): saved and reloaded as they are. Absent in chats saved before
+     * 0.3.0, which show `detail` as before. */
+    parts?: AgentMessagePart[];
 }
 
 export interface EntityChatSnapshot {

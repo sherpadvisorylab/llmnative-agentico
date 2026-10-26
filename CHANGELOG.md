@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-26
+
+Needs `@llmnative/react` 1.34 (`ChatMarkdown`, `ChatReasoning`, `ChatQuestions`).
+
+### Added
+- Messages in parts (CR-004, GH issue #4), on the model of the Vercel AI SDK / AG-UI: the reply of a
+  remote subagent is a list of parts (`AgentMessagePart`: `text`, `reasoning`, `tool`, `questions`)
+  in `AgentActivityEntry.parts`, in the order they arrive; `detail` still holds the text.
+- `AgentExecutorTurn.onText(text, { id?, done? })`: without an id it is the one reply of CR-003 (kept
+  below the steps); with an id, a text part of its own. `onReasoning(text, { id?, done?, duration? })`:
+  the reasoning of the model, its duration measured when the executor does not give it.
+  `onQuestions(questions, { id? })`: questions in the format of the `question` tool of opencode / MCP
+  elicitation; the promise resolves with the answers (`[{ id?, header?, values }]`) when they come
+  while the turn runs.
+- `AgentExecutorTurn.answers` (`{ id, answers }`): answers given after their turn (or after the chat
+  was reloaded) start a new turn that carries them structured, with empty `text`.
+  `useAgent().answerQuestions(entryId, partId, answers)`.
+- Exported helpers and types: `upsertMessagePart`, `messagePartsText`, `formatQuestionAnswers`,
+  `DEFAULT_TEXT_PART_ID`, `DEFAULT_REASONING_PART_ID`, `AgentQuestion`, `AgentQuestionAnswer`,
+  `AgentQuestionsAnswers`, `AgentExecutorPartOptions`, the part types.
+- Strings `oneStep`, `steps`, `stepsLabel` (en/it/de).
+
+### Changed
+- Agent text is rendered with `ChatMarkdown` of the framework (GFM: tables, lists, headings, code with
+  copy; `streaming` while a part arrives), in place of the hand-written inline Markdown. The reasoning
+  with `ChatReasoning`, consecutive steps as one collapsible group (`Tree`), questions with
+  `ChatQuestions`, read-only once answered (they stay in the history answered).
+- The steps of a remote turn are parts of its message instead of separate `tool` entries of the log.
+- The message of the person stays pinned at the top only within its own turn: it no longer peeks out
+  from under the bubble of a later turn, over the text.
+- Saved chats (`EntityChatSnapshot`) keep the parts; chats saved before 0.3.0 (text only) still load
+  and show their text as Markdown.
+
 ## [0.2.0] - 2026-10-24
 
 Needs `@llmnative/react` 1.31 (Chatbot actions with `onClick`, `DropdownItem.actions`).

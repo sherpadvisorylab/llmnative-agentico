@@ -12,13 +12,13 @@
 | [CR-001](#cr-001--estrazione-di-agentico-come-pacchetto) | Estrazione di Agentico come pacchetto `@llmnative/agentico` | Alta | — | ✅ |
 | [CR-002](#cr-002--ui-solo-con-componenti-del-framework) | UI di Agentico solo con componenti del framework | Media | CR-001 | ⬜ |
 | [CR-003](#cr-003--subagent-remoti-avvio-diretto-chat-per-entità-azioni-del-pannello) | Subagent remoti, avvio diretto, chat per entità, azioni del pannello | Alta | CR-001 | ✅ |
-| [CR-004](#cr-004--messaggi-a-parti-testo-ragionamento-passi-domande) | Messaggi a parti: testo, ragionamento, passi, domande | Alta | CR-109 (framework) | ⬜ |
+| [CR-004](#cr-004--messaggi-a-parti-testo-ragionamento-passi-domande) | Messaggi a parti: testo, ragionamento, passi, domande | Alta | CR-109 (framework) | ✅ |
 
 ---
 
 ## CR-004 — Messaggi a parti: testo, ragionamento, passi, domande
 
-**Stato:** ⬜ todo
+**Stato:** ✅ done (0.3.0) — parte Agentico; verifica nel Playbook e pubblicazione npm a cura della sessione principale
 **Issue:** [#4](https://github.com/sherpadvisorylab/llmnative-agentico/issues/4)
 **Priorità:** Alta
 **Dipende da:** CR-109 di `@llmnative/react` (componenti di chat)
@@ -47,13 +47,22 @@ chatbot dividono una risposta in parti, ognuna con il suo componente.
 
 ### Checklist
 
-- [ ] Modello a parti ed executor (`onReasoning`, `onQuestions`, risposte strutturate)
-- [ ] Rendering con `ChatMarkdown`, `ChatReasoning`, passi raggruppati, `ChatQuestions`
-- [ ] Messaggio dell'utente in cima senza sovrapposizioni
-- [ ] Chat salvate compatibili
-- [ ] Test, docs, CHANGELOG
-- [ ] Verificato nel Playbook (domande di BMAD e di Matt interattive, tabelle, ragionamento richiudibile)
-- [ ] Release
+- [x] Modello a parti ed executor (`onReasoning`, `onQuestions`, risposte strutturate): `AgentMessagePart`
+  (`text` | `reasoning` | `tool` | `questions`) in `AgentActivityEntry.parts` (`src/domain/messageParts.ts`);
+  `onText(text, { id?, done? })` compatibile, `onReasoning(text, { id?, done?, duration? })` con durata
+  misurata, `onQuestions(questions, { id? }) → Promise<answers>`; risposte date dopo il turno → nuovo turno
+  con `AgentExecutorTurn.answers = { id, answers }` e `text` vuoto; `useAgent().answerQuestions`
+- [x] Rendering con `ChatMarkdown` (al posto di `InlineMarkdown`, `streaming` mentre arriva), `ChatReasoning`,
+  passi consecutivi in un gruppo richiudibile (`Tree` del framework), `ChatQuestions` (sola lettura una volta
+  risposto, resta nello storico)
+- [x] Messaggio dell'utente in cima senza sovrapposizioni: sticky dentro il proprio turno (un `<li>` per
+  turno), `z-20` e sfondo pieno; non spunta più sotto la bolla del turno dopo
+- [x] Chat salvate compatibili: le parti si salvano e si ricaricano (`EntityChatActivityEntry.parts`); le chat
+  senza parti mostrano `detail` in Markdown (test)
+- [x] Test (10 file / 44 test, nuovo `tests/unit/messageParts.test.tsx`), README, llms.txt, CHANGELOG
+- [ ] Verificato nel Playbook (domande di BMAD e di Matt interattive, tabelle, ragionamento richiudibile): a cura della sessione principale
+- [ ] Release: pronta in 0.3.0 (commit e tag `v0.3.0`, `@llmnative/react` ^1.34). Gate: `tsc --noEmit` 0 errori,
+  `npm test` 10 file / 44 test, `npm run build` OK, `npm pack --dry-run` OK. Pubblicazione npm: a cura della sessione principale
 
 ---
 

@@ -16,7 +16,7 @@ current scope (tenant, company, workspace…).
 npm install @llmnative/agentico @llmnative/react zod
 ```
 
-Requires Node.js 24 LTS, React 19 and `@llmnative/react` ≥ 1.20.
+Requires Node.js 24 LTS, React 19 and `@llmnative/react` ≥ 1.34.
 
 ## Setup (once, at startup)
 
@@ -60,6 +60,7 @@ configureAgenticoPrompts({                                    // optional: langu
 | **Page context** — what the user is looking at, for the orchestrator prompt | `useAgenticoPageContext`, `useSubagentComponentContext` |
 | **Saved chats** — one chat per saved entity, resumable | `configureEntityChatStore`, `getEntityChat`, `listEntityChats` |
 | **Remote subagents** — turns answered by the host (a remote agent with its own memory, e.g. an opencode session), streamed with its steps; its own models in the composer, no fallback | `AgentDefinition.executor` (`AgentExecutor`, `models`, `defaultModel`) |
+| **Message parts** — a remote reply in parts, as in the Vercel AI SDK / AG-UI: Markdown text (tables, lists, code; repaired while it streams), the reasoning of the model (closed, "Reasoned for 12 s"), the steps grouped and collapsible, questions answered with a click. Answers go back structured: to the waiting turn (`onQuestions` resolves) or as a new turn with `answers`. Parts are saved with the chat; chats saved with text only still load | `AgentExecutorTurn.onText(text, { id?, done? })`, `onReasoning(text, { id?, done?, duration? })`, `onStep`, `onQuestions(questions, { id? })`, `AgentExecutorTurn.answers`, `AgentMessagePart`, `useAgent().answerQuestions` |
 | **Direct start** — a page starts a subagent without the orchestrator; with `chatEntityId` its chat is saved at every turn under that entity and resumed from the history; `onlyWhenAnchored` keeps it off the other pages | `useAgentico().startSubagent`, `entityChatTaskId`, `SubagentManifest.chatEntityId`, `SubagentManifest.onlyWhenAnchored` |
 | **Controls** — the actions of the prompt of a subagent (e.g. "Finish") and what the host shows above it, from a hook of the host | `registerSubagentControls` |
 | **History** — chats per entity, the open one marked, archived on hover (with the host deciding what archiving does) | `SubagentManifest.onArchive`, `confirmArchive` |

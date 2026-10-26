@@ -39,6 +39,13 @@ export interface AgenticoDict {
     tooManyToolTurns: string;
     aiDisabledFallback: string;
     continueWithoutAiFallback: string;
+    // Parts of a message (CR-004)
+    /** The group of the steps of the agent, when it holds one step. */
+    oneStep: string;
+    /** The group of the steps of the agent. `{count}` = number of steps */
+    steps: string;
+    /** Accessible name of the group of the steps. */
+    stepsLabel: string;
     // Panel
     /** `{label}` = subagent label */
     newInstance: string;

@@ -9,6 +9,7 @@
 
 import type { z } from 'zod';
 import type { AIAttachment } from '@llmnative/react';
+import type { AgentQuestion, AgentQuestionAnswer, AgentQuestionsAnswers } from './messageParts';
 
 /** Rif mutabile, sempre aggiornato da useAgent.ts all'inizio di ogni turno (roundTrip 0) con
  * gli allegati grezzi (base64) di QUESTO turno — mai un valore statico catturato una volta:
@@ -122,10 +123,37 @@ export interface AgentExecutorTurn<TParams, TContext> {
     signal: AbortSignal;
     /** The model the person picked among `AgentExecutor.models`, if the executor offers any. */
     model?: string;
-    /** The reply so far, whole (not a delta): shown as it grows. */
-    onText(text: string): void;
-    /** A step of the agent: added the first time its id is seen, updated after. */
+    /** Present when the person answered questions of an earlier turn (CR-004): the turn carries
+     * them, structured, with `text` empty. The executor decides how to forward them (e.g. to the
+     * `question` tool of its session). Questions answered while their own turn is still running
+     * resolve the promise of `onQuestions` instead. */
+    answers?: AgentQuestionsAnswers;
+    /** The reply so far, whole (not a delta): shown as it grows, as Markdown. Without `part.id` it
+     * is the one reply of the turn (CR-003), kept below the steps and the reasoning; with an id it is
+     * a text part of its own, in the order it first arrived (CR-004). `part.done` ends its streaming. */
+    onText(text: string, part?: AgentExecutorPartOptions): void;
+    /** The reasoning of the model so far, whole (not a delta), as Markdown: shown closed behind
+     * "Reasoned for 12 s" (CR-004). Without `part.id` it is one reasoning part per turn. It ends with
+     * `part.done`, when another kind of part arrives, or with the turn; `part.duration` (seconds)
+     * replaces the time Agentico measures. */
+    onReasoning(text: string, part?: AgentExecutorPartOptions & { duration?: number }): void;
+    /** A step of the agent: added the first time its id is seen, updated after. Consecutive steps
+     * are shown as one collapsible group. */
     onStep(step: AgentExecutorStep): void;
+    /** Questions to the person, answered with a click (CR-004). The promise resolves with the
+     * answers if they come while this turn is still running (e.g. the session waits for them);
+     * once the turn has ended (or the chat was reloaded), the answers arrive as a new turn with
+     * `answers` instead. It rejects when the person stops the turn. `part.id` names the set
+     * (default: made up by Agentico) and is the `answers.id` of that later turn. */
+    onQuestions(questions: AgentQuestion[], part?: { id?: string }): Promise<AgentQuestionAnswer[]>;
+}
+
+/** Which part an `onText`/`onReasoning` call updates, and whether it is complete. */
+export interface AgentExecutorPartOptions {
+    /** The part to update: created the first time it is seen. */
+    id?: string;
+    /** The part is complete: no longer streaming. */
+    done?: boolean;
 }
 
 /** The host side of a remote agent: one call per turn, resolved when its reply is complete. */

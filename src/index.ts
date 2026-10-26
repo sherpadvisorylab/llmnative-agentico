@@ -8,7 +8,23 @@
 import './i18n/types';
 
 // ── Adapter contract (see subagentManifest.ts for the two halves) ─────────────────────────────
-export type { AgentDefinition, AgentTool, LatestAttachmentsRef, AgentExecutor, AgentExecutorTurn, AgentExecutorStep } from './domain/agentDefinition';
+export type { AgentDefinition, AgentTool, LatestAttachmentsRef, AgentExecutor, AgentExecutorTurn, AgentExecutorStep, AgentExecutorPartOptions } from './domain/agentDefinition';
+export {
+    DEFAULT_TEXT_PART_ID,
+    DEFAULT_REASONING_PART_ID,
+    upsertMessagePart,
+    messagePartsText,
+    formatQuestionAnswers,
+    type AgentMessagePart,
+    type AgentTextPart,
+    type AgentReasoningPart,
+    type AgentToolPart,
+    type AgentQuestionsPart,
+    type AgentQuestion,
+    type AgentQuestionOption,
+    type AgentQuestionAnswer,
+    type AgentQuestionsAnswers,
+} from './domain/messageParts';
 export type { SubagentCommand, SubagentManifest, SubagentComponentContext } from './domain/subagentManifest';
 export { defineSubagent } from './domain/defineSubagent';
 export { registerSubagents, getSubagentRegistry, findSubagentManifest } from './domain/subagentRegistry';

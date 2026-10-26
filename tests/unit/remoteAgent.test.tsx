@@ -36,19 +36,23 @@ describe('a remote agent', () => {
         await waitFor(() => expect(turns).toHaveLength(1));
         expect(turns[0]).toMatchObject({ params: { project: 'shop' }, text: 'Online orders', first: true });
 
-        // The reply grows in one entry; the steps go above it.
+        // The reply grows in one entry, in parts; the steps go above the reply.
         act(() => turns[0].onText('Q1 - Cut'));
         act(() => turns[0].onStep({ id: 'p1', label: 'loaded grilling', status: 'done' }));
         act(() => turns[0].onText('Q1 - Cutoff?'));
-        expect(result.current.activity.map((entry) => [entry.kind, entry.label === 'loaded grilling' ? entry.label : entry.detail, entry.status])).toEqual([
+        expect(result.current.activity.map((entry) => [entry.kind, entry.detail, entry.status])).toEqual([
             ['user', 'Online orders', 'done'],
-            ['tool', 'loaded grilling', 'done'],
             ['thinking', 'Q1 - Cutoff?', 'running'],
+        ]);
+        expect(result.current.activity[1].parts).toEqual([
+            { type: 'tool', id: 'p1', label: 'loaded grilling', status: 'done' },
+            { type: 'text', id: 'text', text: 'Q1 - Cutoff?', streaming: true },
         ]);
 
         await act(async () => { turns[0].reply('Q1 - Cutoff?'); await run; });
         expect(result.current.canContinue).toBe(true);
         expect(result.current.activity.at(-1)).toMatchObject({ kind: 'thinking', detail: 'Q1 - Cutoff?', status: 'done' });
+        expect(result.current.activity.at(-1)?.parts?.at(-1)).toEqual({ type: 'text', id: 'text', text: 'Q1 - Cutoff?', streaming: false });
 
         let next!: Promise<string | null>;
         act(() => { next = result.current.sendMessage('Yes to all'); });
