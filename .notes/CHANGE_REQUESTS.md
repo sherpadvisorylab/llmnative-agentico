@@ -13,6 +13,56 @@
 | [CR-002](#cr-002--ui-solo-con-componenti-del-framework) | UI di Agentico solo con componenti del framework | Media | CR-001 | ⬜ |
 | [CR-003](#cr-003--subagent-remoti-avvio-diretto-chat-per-entità-azioni-del-pannello) | Subagent remoti, avvio diretto, chat per entità, azioni del pannello | Alta | CR-001 | ✅ |
 | [CR-004](#cr-004--messaggi-a-parti-testo-ragionamento-passi-domande) | Messaggi a parti: testo, ragionamento, passi, domande | Alta | CR-109 (framework) | ✅ |
+| [CR-005](#cr-005--pannello-ridimensionabile-e-domande-ancorate-in-fondo) | Pannello ridimensionabile e domande ancorate in fondo alla chat | Alta | CR-004 | ✅ |
+
+---
+
+## CR-005 — Pannello ridimensionabile e domande ancorate in fondo
+
+**Stato:** ✅ done (0.4.0) — parte Agentico; verifica nel Playbook e pubblicazione npm a cura della sessione principale
+**Issue:** [#5](https://github.com/sherpadvisorylab/llmnative-agentico/issues/5)
+**Priorità:** Alta
+**Dipende da:** CR-004
+
+### Motivazione
+
+Emersa nel Playbook il 27/10/2026 (agente di progettazione). La colonna di Agentico ha una larghezza
+fissa (420 px): stretta per tabelle e piani lunghi, larga su schermi piccoli. Le domande dell'agente
+compaiono nel thread che scorre, sotto la bolla dell'utente fissata in cima, con il composer ancora
+aperto: poco spazio per leggere, e non è chiaro che la conversazione aspetta una risposta. Claude Code
+e Cursor ancorano le domande in fondo, al posto del prompt.
+
+### Scope
+
+- **Pannello ridimensionabile**: il bordo interno (verso la pagina) si trascina col puntatore; è un
+  `role="separator"` focalizzabile (frecce, Shift, Home/End), doppio clic per il default; limiti min/max
+  (320 px … 60vw); larghezza salvata per browser in `localStorage` (`agentico:panel-width`, try/catch).
+  Props di `<Agentico>`: `defaultWidth`, `minWidth`, `maxWidth` (px o `'<n>vw'`), `onWidthChange`.
+  Il framework non ha uno splitter: maniglia in Agentico, solo token del tema.
+- **Domande ancorate**: le domande senza risposta dell'ultimo messaggio dell'agente (turno non fermato
+  né fallito, rispondibili) vanno in fondo al pannello al posto del composer, alte quanto serve fino
+  all'area della chat e poi con scroll interno; Stop mentre il turno è in corso. Intanto la bolla
+  dell'utente non resta fissata in cima. Con la risposta (o il turno fermato) tornano nel thread in sola
+  lettura e il composer ricompare. Domande senza risposta di una chat ricaricata: ancorate e
+  rispondibili.
+- Test, README, llms.txt, CHANGELOG, versione 0.4.0.
+
+### Checklist
+
+- [x] `usePanelWidth` + `AgenticoResizeHandle` (`src/presentation/panelWidth.ts`,
+  `src/presentation/AgenticoResizeHandle.tsx`): trascinamento con pointer capture, tastiera, doppio clic,
+  clamp anche al ridimensionamento della finestra, `localStorage` in try/catch
+- [x] Props `defaultWidth`/`minWidth`/`maxWidth`/`onWidthChange`, export `AgenticoProps`,
+  `AgenticoPanelSize`, `AGENTICO_MIN_WIDTH`, `AGENTICO_MAX_WIDTH`, `AGENTICO_WIDTH_STORAGE_KEY`
+- [x] `findDockedQuestions` + `QuestionsPart` (`AgentActivityLog.tsx`); il thread salta la parte
+  ancorata e non fissa la bolla dell'utente (`pinUserMessages`); sezione ancorata con `ChatQuestions`
+  (`autoFocus`) e Stop al posto del composer
+- [x] Chat ricaricata: già rispondibile (le voci del seed sono nella conversazione viva); ora ancorata,
+  coperta da test (la risposta avvia un nuovo turno con `answers`)
+- [x] i18n `resizePanel`, `resizePanelHint`, `pendingQuestions`, `stop` (en/it/de)
+- [x] Test (11 file / 52 test, nuovo `tests/unit/panel.test.tsx`), README, llms.txt, CHANGELOG
+- [ ] Verificato nel Playbook: a cura della sessione principale
+- [ ] Release: pronta in 0.4.0 (commit locale, niente tag/push/npm in questa sessione)
 
 ---
 

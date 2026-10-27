@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-27
+
+### Added
+- Resizable panel (CR-005, GH issue #5): the Agentico column is resized by dragging its inner edge
+  (the one facing the page). The edge is a focusable `role="separator"` (`aria-orientation="vertical"`,
+  `aria-valuenow/min/max`): arrow keys by 16 px (Shift: 64), Home/End to the minimum/maximum, double
+  click back to the default. A thin primary line shows on hover, focus and drag (theme tokens only).
+  The width is kept per browser in `localStorage` (`agentico:panel-width`, exported as
+  `AGENTICO_WIDTH_STORAGE_KEY`).
+- `<Agentico>` props `defaultWidth` (default `AGENTICO_WIDTH`, 420), `minWidth` (default
+  `AGENTICO_MIN_WIDTH`, 320), `maxWidth` (px or `'<n>vw'`, default `AGENTICO_MAX_WIDTH`, `'60vw'`),
+  `onWidthChange(width)`. Types `AgenticoProps`, `AgenticoPanelSize`.
+- Docked questions (CR-005): unanswered questions of the latest message of the agent are shown at the
+  bottom of the panel in place of the composer (as tall as needed up to the chat area, then scrolling
+  inside, focused for the number keys), with a Stop button while the turn runs. Meanwhile the message
+  of the person is not pinned at the top. Answered, or the turn stopped, they go back into the thread,
+  read-only, and the composer returns. Unanswered questions of a reloaded chat are docked and answerable.
+- Strings `resizePanel`, `resizePanelHint`, `pendingQuestions`, `stop` (en/it/de).
+
 ## [0.3.0] - 2026-10-26
 
 Needs `@llmnative/react` 1.34 (`ChatMarkdown`, `ChatReasoning`, `ChatQuestions`).

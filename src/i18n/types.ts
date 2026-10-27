@@ -65,6 +65,15 @@ export interface AgenticoDict {
     resumeWithAi: string;
     openPanel: string;
     closePanel: string;
+    // Resizable panel and docked questions (CR-005)
+    /** Accessible name of the edge that resizes the panel. */
+    resizePanel: string;
+    /** Tooltip of that edge. */
+    resizePanelHint: string;
+    /** Accessible name of the questions docked at the bottom of the panel. */
+    pendingQuestions: string;
+    /** Stops the turn while its questions are docked (the composer, with its stop button, is hidden). */
+    stop: string;
 }
 
 declare module '@llmnative/react' {

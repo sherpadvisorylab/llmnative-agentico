@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, Tree, interpolate } from '@llmnative/react';
 import type { AgentActivityEntry } from './useAgent';
-import type { AgentMessagePart, AgentQuestionAnswer, AgentToolPart } from '../domain/messageParts';
+import type { AgentMessagePart, AgentQuestionAnswer, AgentQuestionsPart, AgentToolPart } from '../domain/messageParts';
 import { useAgenticoI18n, type AgenticoDict } from '../i18n';
 
 /** Un blocco ```lang ... ``` dentro al testo, o testo semplice attorno — il modello spesso
@@ -165,7 +165,7 @@ const USER_BUBBLE_COLLAPSED_MAX_HEIGHT = 96;
  * (prima tutte le bolle erano sticky nella stessa lista, e una bolla più alta spuntava sotto
  * una più bassa, sopra il testo). Sfondo pieno e `z-20`: il testo che scorre sotto (tabelle,
  * codice) non le passa sopra. */
-function UserMessageBubble({ entry }: { entry: AgentActivityEntry }) {
+function UserMessageBubble({ entry, pinned = true }: { entry: AgentActivityEntry; pinned?: boolean }) {
     const contentRef = useRef<HTMLDivElement>(null);
     const [expanded, setExpanded] = useState(false);
     const [overflowing, setOverflowing] = useState(false);
@@ -179,7 +179,8 @@ function UserMessageBubble({ entry }: { entry: AgentActivityEntry }) {
     const collapsed = overflowing && !expanded;
 
     return (
-        <div className="sticky top-0 z-20 flex justify-end border-b border-border/40 bg-background py-1.5">
+        // Not pinned while questions are docked at the bottom (CR-005): the thread gets the room.
+        <div className={`${pinned ? 'sticky top-0 z-20 border-b border-border/40' : ''} flex justify-end bg-background py-1.5`}>
             <div className="max-w-[85%] rounded-lg bg-primary/10 text-xs text-foreground">
                 <div
                     ref={contentRef}
@@ -265,11 +266,53 @@ export interface AgentActivityLogQuestions {
     onAnswer: (entryId: string, partId: string, answers: AgentQuestionAnswer[]) => Promise<unknown>;
 }
 
+/** The questions part shown docked at the bottom of the panel instead of in the thread (CR-005). */
+export interface DockedQuestions {
+    entry: AgentActivityEntry;
+    part: AgentQuestionsPart;
+}
+
+/** The questions waiting for an answer in the latest message of the agent (CR-005): the last
+ * questions part without answers of the last entry, when that entry is a message in parts of a turn
+ * that did not stop or fail, and the person can answer it. Otherwise nothing is docked and the
+ * questions stay in the thread (read-only once answered). */
+export function findDockedQuestions(activity: readonly AgentActivityEntry[], canAnswer: (entryId: string) => boolean): DockedQuestions | null {
+    const entry = activity.at(-1);
+    if (!entry || entry.kind !== 'thinking' || !entry.parts) return null;
+    if (entry.status === 'stopped' || entry.status === 'error') return null;
+    const part = [...entry.parts].reverse().find((p): p is AgentQuestionsPart => p.type === 'questions');
+    if (!part || part.answers || !canAnswer(entry.id)) return null;
+    return { entry, part };
+}
+
+/** A questions part of the agent with `ChatQuestions`: answerable while the entry is live and it has
+ * no answers, read-only with its answers, disabled otherwise. */
+export function QuestionsPart({ entry, part, questions, autoFocus, className }: {
+    entry: AgentActivityEntry;
+    part: AgentQuestionsPart;
+    questions?: AgentActivityLogQuestions;
+    autoFocus?: boolean;
+    className?: string;
+}) {
+    const answerable = Boolean(questions?.canAnswer(entry.id));
+    return (
+        <ChatQuestions
+            questions={part.questions}
+            {...(part.answers ? { answers: part.answers } : {})}
+            disabled={!part.answers && !answerable}
+            onSubmit={questions && answerable ? (answers) => questions.onAnswer(entry.id, part.id, answers) : undefined}
+            autoFocus={autoFocus}
+            className={className ?? 'text-xs'}
+        />
+    );
+}
+
 /** A message in parts (CR-004), in the order the parts arrived: text with `ChatMarkdown`
  * (repaired while it streams), reasoning with `ChatReasoning`, consecutive steps as one group,
  * questions with `ChatQuestions` (read-only once answered). */
-function MessageParts({ entry, questions }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions }) {
-    const parts = entry.parts ?? [];
+function MessageParts({ entry, questions, hiddenPartId }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions; hiddenPartId?: string }) {
+    // The questions docked at the bottom of the panel (CR-005) are not repeated in the thread.
+    const parts = (entry.parts ?? []).filter((p) => !(p.type === 'questions' && p.id === hiddenPartId));
     const blocks: Array<{ key: string; part: Exclude<AgentMessagePart, AgentToolPart> } | { key: string; steps: AgentToolPart[] }> = [];
     for (const part of parts) {
         const last = blocks.at(-1);
@@ -280,7 +323,6 @@ function MessageParts({ entry, questions }: { entry: AgentActivityEntry; questio
             blocks.push({ key: `${part.type}-${part.id}`, part });
         }
     }
-    const answerable = Boolean(questions?.canAnswer(entry.id));
     return (
         <div className="space-y-2">
             {blocks.map((block) => {
@@ -294,22 +336,13 @@ function MessageParts({ entry, questions }: { entry: AgentActivityEntry; questio
                 if (part.type === 'reasoning') {
                     return <ChatReasoning key={block.key} content={part.text} streaming={part.streaming} duration={part.duration} className="my-0" />;
                 }
-                return (
-                    <ChatQuestions
-                        key={block.key}
-                        questions={part.questions}
-                        {...(part.answers ? { answers: part.answers } : {})}
-                        disabled={!part.answers && !answerable}
-                        onSubmit={questions && answerable ? (answers) => questions.onAnswer(entry.id, part.id, answers) : undefined}
-                        className="text-xs"
-                    />
-                );
+                return <QuestionsPart key={block.key} entry={entry} part={part} questions={questions} />;
             })}
         </div>
     );
 }
 
-function ActivityRow({ entry, questions }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions }) {
+function ActivityRow({ entry, questions, hiddenPartId }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions; hiddenPartId?: string }) {
     const t = useAgenticoI18n();
 
     // A message in parts (remote agent, CR-004): the parts say it all; a status line only while
@@ -318,7 +351,7 @@ function ActivityRow({ entry, questions }: { entry: AgentActivityEntry; question
         const showStatus = entry.status === 'error' || entry.status === 'stopped' || (entry.status === 'running' && entry.parts.length === 0);
         return (
             <li className="text-xs text-muted-foreground">
-                {entry.parts.length > 0 && <MessageParts entry={entry} questions={questions} />}
+                {entry.parts.length > 0 && <MessageParts entry={entry} questions={questions} hiddenPartId={hiddenPartId} />}
                 {showStatus && (
                     <div className={`flex items-start gap-1.5 ${entry.parts.length > 0 ? 'mt-1' : ''}`}>
                         <span className="pt-px"><ActivityStatusIcon status={entry.status} /></span>
@@ -373,7 +406,15 @@ function ActivityRow({ entry, questions }: { entry: AgentActivityEntry; question
  * One `<li>` per turn (CR-004): the message of the person, sticky at the top while its turn
  * scrolls, then what the agent did and said. Entries before the first message of the person
  * (an opening without text) form a turn of their own, without a bubble. */
-export function AgentActivityLog({ activity, questions }: { activity: AgentActivityEntry[]; questions?: AgentActivityLogQuestions }) {
+export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true }: {
+    activity: AgentActivityEntry[];
+    questions?: AgentActivityLogQuestions;
+    /** Questions docked at the bottom of the panel (CR-005): left out of the thread. */
+    docked?: DockedQuestions | null;
+    /** The message of the person sticks at the top while its turn scrolls (default). Off while
+     * questions are docked, so the thread has more room. */
+    pinUserMessages?: boolean;
+}) {
     if (activity.length === 0) return null;
     const turns: Array<{ user?: AgentActivityEntry; entries: AgentActivityEntry[] }> = [];
     for (const entry of activity) {
@@ -384,10 +425,12 @@ export function AgentActivityLog({ activity, questions }: { activity: AgentActiv
         <ul className="space-y-0.5">
             {turns.map((turn) => (
                 <li key={turn.user?.id ?? turn.entries[0]?.id}>
-                    {turn.user && <UserMessageBubble entry={turn.user} />}
+                    {turn.user && <UserMessageBubble entry={turn.user} pinned={pinUserMessages} />}
                     {turn.entries.length > 0 && (
                         <ul className="space-y-0.5">
-                            {turn.entries.map((entry) => <ActivityRow key={entry.id} entry={entry} questions={questions} />)}
+                            {turn.entries.map((entry) => (
+                                <ActivityRow key={entry.id} entry={entry} questions={questions} hiddenPartId={docked?.entry.id === entry.id ? docked.part.id : undefined} />
+                            ))}
                         </ul>
                     )}
                 </li>

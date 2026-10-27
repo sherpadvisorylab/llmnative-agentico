@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Icon, interpolate, useI18n } from '@llmnative/react';
 import type { AIModelDescriptor, ChatbotModelOption } from '@llmnative/react';
 import { useAgentico } from './AgenticoContext';
-import { AgentActivityLog, type AgentActivityLogQuestions } from './AgentActivityLog';
+import { AgentActivityLog, QuestionsPart, findDockedQuestions, type AgentActivityLogQuestions } from './AgentActivityLog';
+import { AgenticoResizeHandle } from './AgenticoResizeHandle';
+import { AGENTICO_WIDTH, usePanelWidth, type AgenticoPanelSize } from './panelWidth';
 import { AgenticoToggle } from './AgenticoToggle';
 import { OrchestratorRunner } from './OrchestratorRunner';
 import { SubagentRunner } from './SubagentRunner';
@@ -15,9 +17,19 @@ import type { SubagentUsageCard } from '../domain/subagentUsageCard';
 import { findSubagentManifest } from '../domain/subagentRegistry';
 import { entityChatTaskId, listEntityChats, removeEntityChat } from '../domain/entityChatStore';
 
-/** Larghezza fissa del pannello — passata anche come `rightInset` alle Modal che devono
- * lasciargli spazio invece di sovrapporlo (vedi Modal.rightInset nel framework). */
-export const AGENTICO_WIDTH = 420;
+export { AGENTICO_WIDTH };
+
+/** Props of the panel (CR-005): its width, which the person changes by dragging its inner edge. */
+export interface AgenticoProps {
+    /** Width when nothing is stored, and after a double click on the edge. Default `AGENTICO_WIDTH` (420 px). */
+    defaultWidth?: number;
+    /** Narrowest width, in px. Default 320. */
+    minWidth?: number;
+    /** Widest width: px, or a share of the viewport (`'60vw'`, the default). */
+    maxWidth?: AgenticoPanelSize;
+    /** The current width, whenever it changes (e.g. for the `rightInset` of a Modal beside the panel). */
+    onWidthChange?: (width: number) => void;
+}
 
 /** `modelsByProvider` di useAgent è raggruppato per provider — Chatbot vuole una lista
  * piatta `{label, value, pricing, group}`, stesso appiattimento che il framework fa internamente
@@ -343,7 +355,7 @@ function AgenticoHistoryDropdown({
  * (AgenticoContext), il suo toggle (AgenticoToggle) — non degli agenti verticali che esegue
  * (theme-import, html-to-liquid, ...), che restano nel proprio dominio senza questo
  * prefisso: sono contenuto che Agentico orchestra, non parte della sua identità. */
-export function Agentico() {
+export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: AgenticoProps = {}) {
     const {
         task, isOpen, pendingGoal, orchestratorRunId, pageContext, pageContextCard,
         anchoredUserMessages, pendingResume, resumeRunId, dismissForeignTask, resumeEntityChat,
@@ -355,6 +367,7 @@ export function Agentico() {
     const t = useAgenticoI18n();
     const bodyRef = useRef<HTMLDivElement | null>(null);
     const [historyOpen, setHistoryOpen] = useState(false);
+    const panelWidth = usePanelWidth({ defaultWidth, minWidth, maxWidth, onWidthChange });
 
     // "Nuova chat" — congeda il task corrente (se c'è) e torna al composer "starter" del
     // contesto attuale, che già riflette dove ci si trova (vedi anchoredUserMessages/
@@ -393,6 +406,10 @@ export function Agentico() {
             if (result) task.onApplied(result);
         }),
     } : undefined;
+    // Questions waiting in the latest message of the agent (CR-005) are docked at the bottom of the
+    // panel, in place of the composer, as Claude Code and Cursor do; the message of the person no
+    // longer sticks at the top meanwhile. Answered (or the turn stopped), they are back in the thread.
+    const docked = questions ? findDockedQuestions(displayedActivity, questions.canAnswer) : null;
     // Il fallback dell'orchestratore (agenticoOrchestratorAgent.ts) non è mai un vero handoff —
     // solo un messaggio da leggere, non può indovinare l'intento senza AI. Quando invece il
     // target è già noto (scopedSubagentId esplicito, vedi startOrchestrator/TemplateImportButton)
@@ -532,9 +549,17 @@ export function Agentico() {
         {resumeWithAIRunner}
         {startRunner}
         <div
-            style={{ width: AGENTICO_WIDTH }}
+            style={{ width: panelWidth.width }}
             className="relative flex h-full shrink-0 flex-col border-l border-border bg-background"
         >
+            <AgenticoResizeHandle
+                width={panelWidth.width}
+                min={panelWidth.min}
+                max={panelWidth.max}
+                onResize={panelWidth.set}
+                onCommit={panelWidth.commit}
+                onReset={panelWidth.reset}
+            />
             {/* Stessi `px-4 py-3` + `border-b/60` dell'header di Modal.tsx (framework) — la
                 modale di import tema è affiancata a questo pannello, deve avere
                 esattamente la stessa altezza di testata, non una vicina. L'icona robot è ORA
@@ -575,7 +600,8 @@ export function Agentico() {
                 header e bolla utente segnalato dall'utente. Lo spazio in alto si ottiene invece
                 dentro il contenuto stesso (vedi il `pt-2` di AgentActivityLog), che scorre via
                 normalmente invece di restare incollato all'header. */}
-            <div ref={bodyRef} className="flex-1 overflow-y-auto px-3 pb-2">
+            {/* `min-h-0` lets docked questions (below) take the room; `min-h-24` keeps a strip of the thread in view. */}
+            <div ref={bodyRef} className={`flex-1 overflow-y-auto px-3 pb-2 ${docked ? 'min-h-24' : 'min-h-0'}`}>
                 {/* `pt-2` qui, non sul contenitore di scroll sopra — questo div scorre via
                     normalmente coi contenuti, cosi la bolla sticky dell'utente (dentro
                     AgentActivityLog) può incollarsi davvero a filo con l'header una volta
@@ -591,13 +617,13 @@ export function Agentico() {
                             {task.manualEntry && displayedActivity.length === 0 && (
                                 <p className="text-xs text-muted-foreground">{task.manualEntry.prompt}</p>
                             )}
-                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} />
+                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} />
                             {task.panelExtra && <div className="mt-3">{task.panelExtra}</div>}
                             {/* Conversazione successiva a `panelExtra` (retry, follow-up) — un
                                 secondo <ul> (AgentActivityLog ne apre uno suo), non un problema:
                                 lo sticky delle bolle utente è per-<li> rispetto allo scroll
                                 container di questo pannello, non al singolo <ul> che le contiene. */}
-                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} />}
+                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} />}
                             {!task.agent.running && task.agent.error && (
                                 <div className="mt-2 flex items-center gap-2">
                                     <p className="flex-1 text-xs text-destructive">{task.agent.error}</p>
@@ -663,13 +689,33 @@ export function Agentico() {
                 differenza di prima): il composer resta "stuck to bottom" identico in entrambi i
                 casi — solo il body sopra cambia (log live o l'hint), mai il composer
                 stesso a spostarsi al centro del pannello. */}
-            <div className="border-t border-border/60 px-4 py-3">
-                {/* What the controls of the host show (registerSubagentControls, CR-003), right above the composer. */}
-                {task?.panelActions && <div className="mb-2">{task.panelActions}</div>}
-                {task
-                    ? <AgenticoComposer key={task.id} task={task} />
-                    : <AgenticoStarterComposer />}
-            </div>
+            {task && docked ? (
+                // Docked questions (CR-005): as tall as they need up to the whole chat area, then
+                // they scroll inside. The composer is hidden: the person answers here ("Other" takes
+                // free text); a turn still running can be stopped from here.
+                <section
+                    aria-label={t.pendingQuestions}
+                    className="flex min-h-0 shrink flex-col border-t border-border/60"
+                >
+                    {task.panelActions && <div className="shrink-0 px-4 pt-3">{task.panelActions}</div>}
+                    <div className="min-h-0 overflow-y-auto px-4 py-3">
+                        <QuestionsPart key={`${docked.entry.id}:${docked.part.id}`} entry={docked.entry} part={docked.part} questions={questions} autoFocus />
+                    </div>
+                    {task.agent.running && (
+                        <div className="flex shrink-0 justify-end px-4 pb-3">
+                            <ActionButton icon="square" label={t.stop} variant="secondary" onClick={task.agent.stop} />
+                        </div>
+                    )}
+                </section>
+            ) : (
+                <div className="border-t border-border/60 px-4 py-3">
+                    {/* What the controls of the host show (registerSubagentControls, CR-003), right above the composer. */}
+                    {task?.panelActions && <div className="mb-2">{task.panelActions}</div>}
+                    {task
+                        ? <AgenticoComposer key={task.id} task={task} />
+                        : <AgenticoStarterComposer />}
+                </div>
+            )}
         </div>
         </>
     );

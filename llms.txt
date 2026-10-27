@@ -25,6 +25,8 @@
 </AgenticoProvider>
 ```
 
+`<Agentico defaultWidth? minWidth? maxWidth? onWidthChange? />` (0.4.0): the column is resized by dragging its inner edge (a `role="separator"`: arrows by 16 px, Shift ×4, Home/End, double click = default), clamped to `minWidth` (320) … `maxWidth` (px or `'<n>vw'`, default `'60vw'`), stored per browser under `agentico:panel-width`. Defaults `AGENTICO_WIDTH` (420), `AGENTICO_MIN_WIDTH`, `AGENTICO_MAX_WIDTH`. Unanswered questions of the latest agent message (turn not stopped/failed) are docked at the bottom in place of the composer (scroll inside, Stop while the turn runs), the person's message is not pinned meanwhile; once answered they are back in the thread, read-only. Questions of a reloaded chat are answerable (docked) too.
+
 ## Hooks
 
 - `useAgentico()` — panel state, `startOrchestrator(goal, opts)`, `startSubagent(subagentId, params, { taskId?, openingMessage? })` (use `entityChatTaskId(subagentId, entityId)` as taskId), `resumeEntityChat`, `commitEntityChat(subagentId, entityId, taskId, scopeId, params, title)`, `scope`.

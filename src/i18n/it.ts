@@ -48,4 +48,8 @@ export const agenticoIt: AgenticoDict = {
     resumeWithAi: 'Riprendi con AI',
     openPanel: 'Apri pannello agente',
     closePanel: 'Chiudi pannello agente',
+    resizePanel: "Ridimensiona il pannello dell'agente",
+    resizePanelHint: 'Trascina per ridimensionare, doppio clic per ripristinare',
+    pendingQuestions: "Domande dell'agente",
+    stop: 'Ferma',
 };

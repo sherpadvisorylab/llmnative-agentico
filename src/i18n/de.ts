@@ -48,4 +48,8 @@ export const agenticoDe: AgenticoDict = {
     resumeWithAi: 'Mit AI fortsetzen',
     openPanel: 'Agentenbereich öffnen',
     closePanel: 'Agentenbereich schließen',
+    resizePanel: 'Agent-Bereich in der Größe ändern',
+    resizePanelHint: 'Ziehen zum Ändern der Größe, Doppelklick zum Zurücksetzen',
+    pendingQuestions: 'Fragen des Agenten',
+    stop: 'Stoppen',
 };

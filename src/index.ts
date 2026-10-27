@@ -60,7 +60,8 @@ export {
 export { agenticoTranslations, agenticoEn, agenticoIt, agenticoDe, useAgenticoI18n, type AgenticoDict } from './i18n';
 
 // ── UI/React (panel, provider and hooks a host mounts once) ────────────────────────────────────
-export { Agentico, AGENTICO_WIDTH } from './presentation/Agentico';
+export { Agentico, AGENTICO_WIDTH, type AgenticoProps } from './presentation/Agentico';
+export { AGENTICO_MIN_WIDTH, AGENTICO_MAX_WIDTH, AGENTICO_WIDTH_STORAGE_KEY, type AgenticoPanelSize } from './presentation/panelWidth';
 export { AgenticoToggle } from './presentation/AgenticoToggle';
 export {
     AgenticoProvider,
