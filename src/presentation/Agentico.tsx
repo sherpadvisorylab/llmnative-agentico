@@ -97,6 +97,7 @@ function AgenticoComposer({ task }: { task: AgenticoTask }) {
             models={models}
             selectedModel={noModel ? '' : agent.selectedModel}
             actions={task.composerActions}
+            commands={task.composerCommands}
             onModelChange={agent.setSelectedModel}
             modelPlaceholder={t.selectModelPlaceholder}
             minHeight={44}

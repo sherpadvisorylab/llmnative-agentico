@@ -273,6 +273,7 @@ export function SubagentRunner({
             ...(chatEntityId ? { savedToDisk: true } : {}),
             panelActions: controls.content,
             composerActions: controls.actions,
+            composerCommands: controls.commands,
             panelExtra: result ? (
                 <>
                     {selectionModule && selection ? (
@@ -301,7 +302,7 @@ export function SubagentRunner({
         // asincrono non faceva mai ri-registrare l'`agent` fresco in sidebar.openTask, e la
         // tendina di selezione modello restava vuota per l'intera durata del task.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [agent.activity, agent.running, agent.error, agent.canContinue, agent.selectedModel, agent.modelsByProvider, agent.hasProviders, agent.remoteModels, sidebar.openTask, sidebar.componentAnchors, taskId, manifest, params, result, filteredResult, selection, appliedIds, extraDestinations, precedingActivity, autoApplyError, controls.content, controls.actions]);
+    }, [agent.activity, agent.running, agent.error, agent.canContinue, agent.selectedModel, agent.modelsByProvider, agent.hasProviders, agent.remoteModels, sidebar.openTask, sidebar.componentAnchors, taskId, manifest, params, result, filteredResult, selection, appliedIds, extraDestinations, precedingActivity, autoApplyError, controls.content, controls.actions, controls.commands]);
 
     useEffect(() => {
         return () => { sidebar.closeTask(taskId); };

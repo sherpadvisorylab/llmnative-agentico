@@ -9,7 +9,7 @@
 - `registerSubagents(manifests)` — SubagentManifest: id, label, icon, description, indexPath, commands (name, summary, Zod inputSchema, describeOutput), definition (AgentDefinition), toParams, destinationIds, optional crossAgentToolIds, withCollected, manualEntry, componentContexts, chatEntityId (chat saved at every turn under that entity), onlyWhenAnchored (offered by the orchestrator only when scoped to it).
 - `registerDestinations({ id: ResultDestination })` — apply(result, { scopeId, dataProvider, storageProvider, proxyFetch }, meta).
 - `registerSubagentReports({ subagentId: SubagentReportModule })`.
-- `registerSubagentControls({ subagentId: useControls })` — a hook of the host per task (props: params, taskId, running, close) returning `{ actions?: ChatbotAction[] (with onClick), content?: ReactNode }`, memoized: actions in the prompt, content above it.
+- `registerSubagentControls({ subagentId: useControls })` — a hook of the host per task (props: params, taskId, running, close) returning `{ actions?: ChatbotAction[] (with onClick), commands?: EditorCommand[], content?: ReactNode }`, memoized: actions in the prompt, slash commands on `/` (a command without handler inserts `/name `; the turn gets it as plain `text`, the host decides what it means; hidden while docked questions replace the composer), content above it.
 - `SubagentManifest.onArchive(entityId, params)` / `confirmArchive(entityId, params)` — archiving a chat from the history (hover icon).
 - `registerCrossAgentTools((ctx) => AgentTool[])` — ctx: attachmentsRef, collected (per-conversation scratchpad), proxyFetch.
 - `configureAgenticoPrompts(partial)` — model-facing pack; `agenticoPromptsEn` (default) / `agenticoPromptsIt`.

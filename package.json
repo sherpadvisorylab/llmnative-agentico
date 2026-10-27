@@ -1,6 +1,6 @@
 {
   "name": "@llmnative/agentico",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Agentic chat orchestrator for @llmnative/react apps: a persistent panel that talks with the user and hands the work to host-registered subagents.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

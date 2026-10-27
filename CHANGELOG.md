@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-27
+
+### Added
+- Slash commands of a subagent (CR-006, GH issue #6): `SubagentControls.commands?: EditorCommand[]`
+  (the type of `@llmnative/react`), returned by the hook of `registerSubagentControls` next to
+  `actions` and `content`, with the same rule (identity kept with `useMemo`), and given to the
+  `Chatbot` of the task's composer (`commands`). Typing `/` opens the menu; a command without
+  `handler` inserts `/name `; the message reaches the executor's turn as plain `text` (e.g.
+  `"/to-spec checkout"`), with no meaning given by Agentico. No commands while docked questions
+  (CR-005) take the place of the composer. `AgenticoTask.composerCommands`.
+
 ## [0.4.0] - 2026-10-27
 
 ### Added

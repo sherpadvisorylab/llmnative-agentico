@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { AIModelDescriptor, ChatbotAction, DataProviderAdapter, StorageProviderAdapter } from '@llmnative/react';
+import type { AIModelDescriptor, ChatbotAction, DataProviderAdapter, EditorCommand, StorageProviderAdapter } from '@llmnative/react';
 import type { AgentActivityEntry, AgentConversation } from './useAgent';
 import type { ResultDestination } from '../domain/resultDestination';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
@@ -102,6 +102,8 @@ export interface AgenticoTask<TResult = unknown> {
     panelActions?: React.ReactNode;
     /** Buttons of the host in the composer (see registerSubagentControls, CR-003). */
     composerActions?: ChatbotAction[];
+    /** Slash commands of the host in the composer (see registerSubagentControls, CR-006). */
+    composerCommands?: EditorCommand[];
     /** Chiamato quando questo task viene sostituito da uno nuovo (vedi openTask) o quando
      * l'utente lo interrompe — SEMPRE definito da chi possiede il task
      * (OrchestratorRunner/SubagentRunner), mai un fallback generico su closeTask: quel

@@ -63,10 +63,35 @@ configureAgenticoPrompts({                                    // optional: langu
 | **Message parts** — a remote reply in parts, as in the Vercel AI SDK / AG-UI: Markdown text (tables, lists, code; repaired while it streams), the reasoning of the model (closed, "Reasoned for 12 s"), the steps grouped and collapsible, questions answered with a click. Answers go back structured: to the waiting turn (`onQuestions` resolves) or as a new turn with `answers`. Parts are saved with the chat; chats saved with text only still load | `AgentExecutorTurn.onText(text, { id?, done? })`, `onReasoning(text, { id?, done?, duration? })`, `onStep`, `onQuestions(questions, { id? })`, `AgentExecutorTurn.answers`, `AgentMessagePart`, `useAgent().answerQuestions` |
 | **Panel** — a column beside the page, resizable by dragging its inner edge (or with the arrow keys on it; double click resets), the width kept per browser (`localStorage`, key `agentico:panel-width`). Questions waiting in the latest message of the agent are docked at the bottom in place of the composer, until answered or stopped | `<Agentico defaultWidth minWidth maxWidth onWidthChange>`, `AGENTICO_WIDTH`, `AGENTICO_MIN_WIDTH`, `AGENTICO_MAX_WIDTH` |
 | **Direct start** — a page starts a subagent without the orchestrator; with `chatEntityId` its chat is saved at every turn under that entity and resumed from the history; `onlyWhenAnchored` keeps it off the other pages | `useAgentico().startSubagent`, `entityChatTaskId`, `SubagentManifest.chatEntityId`, `SubagentManifest.onlyWhenAnchored` |
-| **Controls** — the actions of the prompt of a subagent (e.g. "Finish") and what the host shows above it, from a hook of the host | `registerSubagentControls` |
+| **Controls** — the actions of the prompt of a subagent (e.g. "Finish"), its slash commands (e.g. `/to-spec`, sent as plain text to the executor) and what the host shows above it, from a hook of the host | `registerSubagentControls` |
 | **History** — chats per entity, the open one marked, archived on hover (with the host deciding what archiving does) | `SubagentManifest.onArchive`, `confirmArchive` |
 | **Prompts** — model-facing text (en default, it included) | `configureAgenticoPrompts`, `agenticoPromptsEn`, `agenticoPromptsIt` |
 | **Strings** — user-facing text, namespace `agentico` of the framework i18n (en/it/de) | `agenticoTranslations`, `I18nDict.agentico` |
+
+### Controls of a subagent
+
+```tsx
+import type { EditorCommand } from '@llmnative/react';
+
+// A module constant keeps its identity; inside the hook use `useMemo`.
+const commands: EditorCommand[] = [{ name: 'to-spec', description: 'Turn the design into a spec' }];
+
+registerSubagentControls({
+    design: ({ running }) => {
+        const openFinish = useFinishModal(); // the host's own
+        return useMemo(() => ({
+            actions: [{ key: 'finish', label: 'Finish', icon: 'git-pull-request', disabled: running, onClick: openFinish }],
+            commands,
+        }), [running, openFinish]);
+    },
+});
+```
+
+Actions, commands and content must keep their identity while nothing changes: a new one registers
+the task again. Typing `/` in the prompt of the task opens the commands; one without `handler`
+inserts `/name ` and the message reaches the executor's turn as plain `text` (`"/to-spec checkout"`):
+Agentico gives it no meaning. The commands live in the composer, so none are offered while docked
+questions take its place.
 
 ## Development
 

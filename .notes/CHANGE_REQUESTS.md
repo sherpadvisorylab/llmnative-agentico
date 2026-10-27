@@ -14,6 +14,48 @@
 | [CR-003](#cr-003--subagent-remoti-avvio-diretto-chat-per-entità-azioni-del-pannello) | Subagent remoti, avvio diretto, chat per entità, azioni del pannello | Alta | CR-001 | ✅ |
 | [CR-004](#cr-004--messaggi-a-parti-testo-ragionamento-passi-domande) | Messaggi a parti: testo, ragionamento, passi, domande | Alta | CR-109 (framework) | ✅ |
 | [CR-005](#cr-005--pannello-ridimensionabile-e-domande-ancorate-in-fondo) | Pannello ridimensionabile e domande ancorate in fondo alla chat | Alta | CR-004 | ✅ |
+| [CR-006](#cr-006--comandi-slash-del-subagent-nel-prompt) | Comandi slash del subagent nel prompt | Alta | CR-003 | ✅ |
+
+---
+
+## CR-006 — Comandi slash del subagent nel prompt
+
+**Stato:** ✅ done (0.5.0) — parte Agentico; verifica nel Playbook e pubblicazione npm a cura della sessione principale
+**Issue:** [#6](https://github.com/sherpadvisorylab/llmnative-agentico/issues/6)
+**Priorità:** Alta
+**Dipende da:** CR-003 (controlli del subagent)
+
+### Motivazione
+
+Emersa nel Playbook il 27/10/2026 (agente di progettazione). L'agente remoto ha comandi propri
+(es. `/to-spec`) che oggi la persona deve ricordare e scrivere a mano. Il `Chatbot` del framework ha
+già `commands?: EditorCommand[]` e `commandsTrigger` (default `/`): un menu sul trigger, e un comando
+senza handler inserisce `/nome ` nel testo. Agentico fa passare al composer di un task solo le azioni
+(`SubagentControls.actions`) e il contenuto sopra il composer.
+
+### Scope
+
+- `SubagentControls.commands?: EditorCommand[]` (il tipo del framework, importato da `@llmnative/react` come `ChatbotAction`), portato come le
+  azioni (identità stabile con `useMemo`, stesso hook `registerSubagentControls`) e passato al
+  `Chatbot` del task (`commands`). Scelta: nei controlli e non nel manifest, perché il manifest è
+  dominio (niente tipi della UI) e i controlli sono già il posto di ciò che l'host mette nel prompt;
+  così i comandi possono anche dipendere dallo stato dell'host (parametri, task, `running`).
+- Il testo del comando arriva al turno dell'esecutore come `text` del messaggio (es. `/to-spec`),
+  senza nulla di speciale: cosa vuol dire lo decide l'host.
+- Niente comandi mentre le domande ancorate (CR-005) sostituiscono il composer (il composer non c'è).
+  Mentre un turno è in corso il composer resta scrivibile e l'invio aspetta (Stop): i comandi restano
+  disponibili come il resto del testo.
+- Test, README, llms.txt, CHANGELOG, versione 0.5.0.
+
+### Checklist
+
+- [x] `SubagentControls.commands`, `AgenticoTask.composerCommands`, `Chatbot commands`
+- [x] Test (menu sul `/`, testo inviato all'esecutore, niente composer con domande ancorate): 11 file / 54 test
+- [x] README, llms.txt, CHANGELOG, versione 0.5.0
+- Nota: col framework 1.35 un `Chatbot` con `commands` non invia con Invio (solo col pulsante): da
+  correggere nel framework, Agentico non ci può fare nulla
+- [ ] Verificato nel Playbook: a cura della sessione principale
+- [ ] Release: pronta in 0.5.0 (commit locale, niente tag/push/npm in questa sessione)
 
 ---
 

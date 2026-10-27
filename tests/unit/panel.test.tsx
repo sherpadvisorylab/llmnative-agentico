@@ -8,6 +8,7 @@ import {
     AGENTICO_WIDTH_STORAGE_KEY,
     Agentico,
     AgenticoProvider,
+    registerSubagentControls,
     registerSubagents,
     useAgentico,
     type AgentActivityEntry,
@@ -16,6 +17,7 @@ import {
     type AgenticoScope,
     type EntityChatSnapshot,
     type SubagentManifest,
+    type UseSubagentControls,
 } from '../../src';
 import { clampPanelWidth, resolvePanelSize } from '../../src/presentation/panelWidth';
 import { findDockedQuestions } from '../../src/presentation/AgentActivityLog';
@@ -222,5 +224,51 @@ describe('docked questions', () => {
         expect(turns[0]).toMatchObject({ text: '', answers: { id: 'q1', answers: [{ id: 'db', header: 'Database', values: ['Postgres'] }] } });
         await act(async () => { turns[0].reply('Postgres it is'); });
         await waitFor(() => expect(screen.queryByRole('region', { name: 'Questions of the agent' })).toBeNull());
+    });
+});
+
+describe('slash commands of a subagent', () => {
+    const commands = [{ name: 'to-spec', icon: 'file-text' }, { name: 'status' }];
+    const useDesignControls: UseSubagentControls = () => React.useMemo(() => ({ commands }), []);
+
+    const openMenu = (textarea: HTMLElement, value = '/') => {
+        fireEvent.keyDown(textarea, { key: '/' });
+        fireEvent.change(textarea, { target: { value } });
+    };
+
+    it('offers the commands of the controls on "/" and sends the picked one as plain text', async () => {
+        const turns: Turn[] = [];
+        registerSubagents([remoteManifest(turns)]);
+        registerSubagentControls({ design: useDesignControls });
+        const { container } = renderPanel();
+        await waitFor(() => expect(turns).toHaveLength(1));
+        await act(async () => { turns[0].reply('Ready'); });
+
+        const textarea = container.querySelector('textarea')!;
+        openMenu(textarea);
+        const toSpec = await screen.findByRole('menuitem', { name: '/to-spec' });
+        expect(screen.getByRole('menuitem', { name: '/status' })).toBeInTheDocument();
+        fireEvent.mouseDown(toSpec);
+        await waitFor(() => expect(textarea).toHaveValue('/to-spec '));
+
+        fireEvent.change(textarea, { target: { value: '/to-spec checkout' } });
+        fireEvent.click(screen.getByRole('button', { name: /Run/i }));
+        await waitFor(() => expect(turns).toHaveLength(2));
+        expect(turns[1].text).toBe('/to-spec checkout');
+        await act(async () => { turns[1].reply('Spec written'); });
+    });
+
+    it('is not offered while docked questions take the place of the composer', async () => {
+        const turns: Turn[] = [];
+        registerSubagents([remoteManifest(turns)]);
+        registerSubagentControls({ design: useDesignControls });
+        const { container } = renderPanel();
+        await waitFor(() => expect(turns).toHaveLength(1));
+        act(() => { turns[0].onQuestions(questions, { id: 'q1' }).catch(() => undefined); });
+        await screen.findByRole('region', { name: 'Questions of the agent' });
+        expect(container.querySelector('textarea')).toBeNull();
+        expect(screen.queryByRole('menuitem')).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+        await act(async () => { turns[0].fail(new Error('aborted')); });
     });
 });
