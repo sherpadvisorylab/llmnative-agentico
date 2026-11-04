@@ -568,6 +568,11 @@ export function useAgent<TParams, TContext, TResult>(
 
                 if (result.type === 'text') {
                     setEntryStatus(thinkingId, 'done', result.text);
+                    // A conversational agent (CR-007): the reply is a message of the chat, a text
+                    // part of the turn like that of a remote agent, not a detail under "response received".
+                    if (definition.conversational && result.text.trim()) {
+                        setActivity((prev) => prev.map((a) => (a.id === thinkingId ? { ...a, parts: [{ type: 'text', id: 'text', text: result.text }] } : a)));
+                    }
                     session.history = [
                         ...history,
                         ...(promptText ? [{ role: 'user' as const, content: promptText + attachmentsHistoryText }] : []),

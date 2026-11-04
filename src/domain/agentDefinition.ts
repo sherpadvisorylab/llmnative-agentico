@@ -93,6 +93,11 @@ export interface AgentDefinition<TParams, TContext, TResult> {
      * agente: qui si dichiara solo QUALI si vogliono, mai il loro testo. Assente o [] =
      * nessuno. */
     microPromptIds?: string[];
+    /** true = the replies of the model are messages of a chat (CR-007): each is a text part of its
+     * turn (Markdown), and the subagent keeps no result to apply (no preview, no destinations).
+     * For an agent that talks and uses tools, with nothing to save at the end. `parseResponse`
+     * still runs on each reply (what `run` and `sendMessage` resolve to). */
+    conversational?: boolean;
     /** Present = the turns of this agent are answered by the host, not by the AI provider of
      * Agentico (CR-003): a remote agent with its own memory, for example an opencode session on
      * a server. `useAgent` then builds no prompt, needs no model and never falls back: it gives

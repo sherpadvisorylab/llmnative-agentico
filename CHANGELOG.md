@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-04
+
+### Added
+- Conversational subagents (CR-007, GH issue #7): `AgentDefinition.conversational?: boolean`. Each
+  text reply of the model is a text part of its turn (`parts`, rendered with `ChatMarkdown` like the
+  reply of a remote agent) instead of a detail under "Response received", and `SubagentRunner` keeps no
+  result for it: no preview and no destinations ("Save result to… / Export as JSON") under the chat, on
+  the first turn, on follow-ups and on Retry. `parseResponse` still runs (what `run`/`sendMessage`
+  resolve to). For an agent that talks and uses tools with nothing to apply at the end. Agents without
+  the flag are unchanged.
+
 ## [0.5.0] - 2026-10-27
 
 ### Added

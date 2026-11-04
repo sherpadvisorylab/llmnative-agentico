@@ -36,7 +36,9 @@
 
 ## AgentDefinition
 
-buildContext (always runs) · buildPrompt · buildFollowUpPrompt · parseResponse (null → fallback) · fallback (required) · describeFallback? · getTools? · microPromptIds? · executor?
+buildContext (always runs) · buildPrompt · buildFollowUpPrompt · parseResponse (null → fallback) · fallback (required) · describeFallback? · getTools? · microPromptIds? · conversational? · executor?
+
+`conversational: true` (0.6.0): each text reply of the model is a text part of its turn (a message of the chat), and the subagent keeps no result: no preview, no destinations under the chat. For a chat with tools and nothing to apply.
 
 `executor.turn({ params, context, text, first, signal, model?, onText(whole reply so far), onStep({ id, label, status }) }) → { text, result? }`; `executor.models(params)` / `defaultModel(params)` put the models of the executor in the composer: the turns go to the host instead of the AI provider; `text` is what the person typed (opening message on the first turn). The conversation is `remote: true`: no attachments, no fallback; the picker shows `remoteModels`.
 

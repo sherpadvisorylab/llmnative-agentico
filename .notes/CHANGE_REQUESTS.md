@@ -15,6 +15,38 @@
 | [CR-004](#cr-004--messaggi-a-parti-testo-ragionamento-passi-domande) | Messaggi a parti: testo, ragionamento, passi, domande | Alta | CR-109 (framework) | ✅ |
 | [CR-005](#cr-005--pannello-ridimensionabile-e-domande-ancorate-in-fondo) | Pannello ridimensionabile e domande ancorate in fondo alla chat | Alta | CR-004 | ✅ |
 | [CR-006](#cr-006--comandi-slash-del-subagent-nel-prompt) | Comandi slash del subagent nel prompt | Alta | CR-003 | ✅ |
+| [CR-007](#cr-007--subagent-conversazionali) | Subagent conversazionali: la risposta è un messaggio della chat | Alta | CR-004 | ✅ |
+
+---
+
+## CR-007 — Subagent conversazionali
+
+**Stato:** ✅ done (0.6.0)
+**Issue:** [#7](https://github.com/sherpadvisorylab/llmnative-agentico/issues/7)
+**Priorità:** Alta
+**Dipende da:** CR-004 (messaggi a parti)
+
+### Motivazione
+
+Emersa nel Playbook il 04/11/2026 (orchestratore del progetto in chat). Un subagent non remoto che
+conversa con il modello e usa dei tool, senza un risultato da applicare, mostrava ogni risposta come un
+risultato: "Risposta ricevuta", anteprima JSON e "Salva il risultato in… / Esporta come JSON".
+
+### Scope
+
+- `AgentDefinition.conversational?: boolean`.
+- `useAgent`: la risposta di testo di un agente conversazionale è una parte `text` del turno (resa con
+  `ChatMarkdown`, salvata con la chat), non un dettaglio sotto "Risposta ricevuta".
+- `SubagentRunner`: nessun risultato tenuto (niente anteprima né destinazioni), al primo turno, ai
+  successivi e al Riprova. `parseResponse` gira comunque (ciò che risolvono `run`/`sendMessage`).
+- Gli agenti senza il flag non cambiano.
+
+### Checklist
+
+- [x] `AgentDefinition.conversational`, parte di testo in `useAgent`, nessun risultato in `SubagentRunner`
+- [x] Test (risposta come parte di testo al primo turno e al seguito; agenti senza flag invariati): 12 file / 56 test
+- [x] README, llms.txt, CHANGELOG, versione 0.6.0
+- [x] Verificato nel Playbook (typecheck, test e build con 0.6.0)
 
 ---
 

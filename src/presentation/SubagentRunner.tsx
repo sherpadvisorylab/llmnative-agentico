@@ -67,7 +67,10 @@ export function SubagentRunner({
     const scope = sidebar.scope;
     const proxyFetch = useProxy();
     const taskId = useRef(taskIdProp ?? `subagent-${manifest.id}-${crypto.randomUUID()}`).current;
-    const [result, setResult] = useState<unknown>(null);
+    const [result, setKeptResult] = useState<unknown>(null);
+    // A conversational subagent (CR-007) keeps no result: its replies are messages of the chat,
+    // with no preview and no destinations under them.
+    const setResult = (next: unknown) => { if (!manifest.definition.conversational) setKeptResult(next); };
     const [appliedIds, setAppliedIds] = useState<string[]>([]);
     const [autoApplyError, setAutoApplyError] = useState<string | null>(null);
     const reportModule = getSubagentReport(manifest.id);
