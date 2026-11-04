@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-05
+
+### Added
+- Approval of the person for a tool (CR-008, GH issue #8): `AgentTool.needsApproval?: boolean |
+  ((input) => boolean)` and `describeApproval?(input)`. Before a tool that needs it runs, the turn stops
+  on a question of its own message (`approval-<call id>`, part `approval`), docked at the bottom of the
+  chat like the other questions: "Approve? <action>" with Approve / Reject and a free-text reason; the
+  calls of one round are asked one at a time, before any of them runs. Approved, the tool runs;
+  rejected, it does not and the model reads `toolRejected` of the prompt pack (with the reason). A stop
+  while waiting ends the turn. The answer stays in the chat. i18n: `approvalHeader`, `approve`,
+  `reject`, `approveQuestion`.
+
 ## [0.6.0] - 2026-11-04
 
 ### Added

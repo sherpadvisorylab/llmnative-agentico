@@ -1,22 +1,23 @@
 # Project status
 
 > Snapshot verified against the real codebase.
-> Last reviewed: 2026-11-04
+> Last reviewed: 2026-11-05
 
 ## General state
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.6.0 published. Peers: `@llmnative/react` ^1.34, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.7.0 ready (published by the person). Peers: `@llmnative/react` ^1.34, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 12 files / 56 tests (Vitest, happy-dom). | — |
+| Tests | 13 files / 60 tests (Vitest, happy-dom). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-008 | Done | Approval of the person for a tool: `AgentTool.needsApproval`, `describeApproval`; a docked question Approve / Reject with a reason before it runs; rejected, the model reads why. 60 tests. Version 0.7.0, verified in Playbook. Issue #8. |
 | CR-007 | Done | Conversational subagents: `AgentDefinition.conversational`, each reply a text part of its turn, no result panel (preview, destinations). 56 tests. Version 0.6.0, verified in Playbook. Issue #7. |
 | CR-006 | Done | Slash commands of a subagent: `SubagentControls.commands` (`EditorCommand[]`) given to the task's `Chatbot`; the command reaches the executor as plain text; none while questions are docked. 54 tests. Version 0.5.0 (Playbook verification and npm publish by the main session). Issue #6. |
 | CR-005 | Done | Resizable panel (drag, keyboard separator, double click reset, width per browser, `defaultWidth`/`minWidth`/`maxWidth`/`onWidthChange`); questions of the latest agent message docked at the bottom in place of the composer, person's message unpinned meanwhile, back inline read-only once answered; reloaded chats answerable. 52 tests. Version 0.4.0 (Playbook verification and npm publish by the main session). Issue #5. |

@@ -50,6 +50,13 @@ export interface AgentTool {
      * scritta due volte una sopra l'altra. Assente = ripiega su describeInvocation (meglio
      * di niente, ma con la ripetizione). */
     describeIntent?: string;
+    /** true (or true for this input) = the tool runs only once the person approves it (CR-008): the turn
+     * stops on a question docked at the bottom of the chat, Approve / Reject with a reason. Rejected,
+     * the tool does not run and the model is told why. For what stops work, spends or cannot be undone. */
+    needsApproval?: boolean | ((input: Record<string, unknown>) => boolean);
+    /** What the tool is about to do, said to the person in the approval (e.g. "Close #141: duplicate of
+     * #139"). Absent = `describeInvocation`, else the name of the tool. */
+    describeApproval?: (input: Record<string, unknown>) => string;
 }
 
 export interface AgentDefinition<TParams, TContext, TResult> {

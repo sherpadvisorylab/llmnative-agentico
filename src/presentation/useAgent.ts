@@ -26,6 +26,7 @@ import { extractErrorMessage } from '../domain/extractErrorMessage';
 import { applyMicroPrompts } from '../domain/microPrompts';
 import { toJsonSchema } from '../domain/mcpTool';
 import { useAIModelCatalog } from './useAIModelCatalog';
+import { APPROVAL_PART_ID, approvalOf, needsApproval, type ApprovalDecision } from '../domain/approval';
 import { getAgenticoPrompts } from '../domain/prompts';
 import { useAgenticoI18n } from '../i18n';
 
@@ -478,6 +479,36 @@ export function useAgent<TParams, TContext, TResult>(
         // come ogni function-calling API: questo è l'unico punto in cui la forma serializzata
         // serve davvero (vedi mcpTool.ts).
         const toolDefs = session.tools.map((t) => ({ name: t.name, description: t.description, inputSchema: toJsonSchema(t.inputSchema) }));
+
+        /** The approval of the person for one call (CR-008): a question in a message of its own, docked at
+         * the bottom of the chat until they answer; a stop rejects it. */
+        const askApproval = (callId: string, tool: AgentTool, input: Record<string, unknown>, signal: AbortSignal): Promise<ApprovalDecision> => {
+            const t = labelsRef.current;
+            const entryId = `approval-${callId}`;
+            const action = tool.describeApproval?.(input) ?? tool.describeInvocation?.(input) ?? tool.name;
+            setActivity((prev) => [...prev, {
+                id: entryId, kind: 'thinking', label: t.approvalHeader, status: 'running',
+                parts: [{ type: 'questions', id: APPROVAL_PART_ID, questions: [{ header: t.approvalHeader, question: t.approveQuestion.replace('{action}', action), options: [{ label: t.approve }, { label: t.reject }], custom: true }] }],
+            }]);
+            const key = `${entryId}:${APPROVAL_PART_ID}`;
+            return new Promise<ApprovalDecision>((resolve, reject) => {
+                const stopped = () => {
+                    pendingQuestionsRef.current.delete(key);
+                    setEntryStatus(entryId, 'stopped');
+                    reject(new DOMException('The turn was stopped.', 'AbortError'));
+                };
+                if (signal.aborted) { stopped(); return; }
+                signal.addEventListener('abort', stopped, { once: true });
+                pendingQuestionsRef.current.set(key, {
+                    resolve: (answers) => {
+                        signal.removeEventListener('abort', stopped);
+                        setEntryStatus(entryId, 'done');
+                        resolve(approvalOf(answers, t.approve, t.reject));
+                    },
+                    reject,
+                });
+            });
+        };
         const toolsByName = new Map(session.tools.map((t) => [t.name, t]));
 
         const controller = new AbortController();
@@ -619,9 +650,28 @@ export function useAgent<TParams, TContext, TResult>(
                 });
                 setEntryStatus(thinkingId, 'done', result.text || undefined, result.text ? undefined : toolIntentLabels);
 
+                // The tools that need the approval of the person (CR-008): asked one at a time, before
+                // any tool of this round runs. A stop while waiting ends the turn like any other.
+                const decisions = new Map<string, ApprovalDecision>();
+                for (const call of result.toolCalls) {
+                    const tool = toolsByName.get(call.name);
+                    if (!tool || !needsApproval(tool, call.input)) continue;
+                    try {
+                        decisions.set(call.id, await askApproval(call.id, tool, call.input, controller.signal));
+                    } catch {
+                        return definition.fallback(session.params, session.context);
+                    }
+                }
+
                 const toolResults: AIToolResult[] = await Promise.all(result.toolCalls.map(async (call) => {
                     const tool = toolsByName.get(call.name);
                     const label = tool?.describeInvocation?.(call.input) ?? `Chiamata: ${call.name}`;
+                    const decision = decisions.get(call.id);
+                    if (decision && !decision.approved) {
+                        setActivity((prev) => [...prev, { id: call.id, kind: 'tool', label, status: 'stopped' }]);
+                        const output = getAgenticoPrompts().toolRejected.replace('{reason}', decision.reason ? ` (${decision.reason})` : '');
+                        return { toolCallId: call.id, name: call.name, output, isError: true };
+                    }
                     setActivity((prev) => [...prev, { id: call.id, kind: 'tool', label, status: 'running' }]);
 
                     if (!tool) {

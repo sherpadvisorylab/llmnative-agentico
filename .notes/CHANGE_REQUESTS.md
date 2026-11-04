@@ -16,6 +16,40 @@
 | [CR-005](#cr-005--pannello-ridimensionabile-e-domande-ancorate-in-fondo) | Pannello ridimensionabile e domande ancorate in fondo alla chat | Alta | CR-004 | ✅ |
 | [CR-006](#cr-006--comandi-slash-del-subagent-nel-prompt) | Comandi slash del subagent nel prompt | Alta | CR-003 | ✅ |
 | [CR-007](#cr-007--subagent-conversazionali) | Subagent conversazionali: la risposta è un messaggio della chat | Alta | CR-004 | ✅ |
+| [CR-008](#cr-008--approvazione-della-persona-per-i-tool-rischiosi) | Approvazione della persona per i tool rischiosi | Alta | CR-005 | ✅ |
+
+---
+
+## CR-008 — Approvazione della persona per i tool rischiosi
+
+**Stato:** ✅ done (0.7.0)
+**Issue:** [#8](https://github.com/sherpadvisorylab/llmnative-agentico/issues/8)
+**Priorità:** Alta
+**Dipende da:** CR-005 (domande ancorate)
+
+### Motivazione
+
+Emersa nel Playbook il 05/11/2026: l'orchestratore del progetto in chat agisce per la persona (chiude CR,
+mette in pausa, rilascia). La conferma di un'azione rischiosa era affidata al modello (un parametro
+`confirmed` dichiarato da lui): niente garantiva che la persona avesse detto sì a quell'azione.
+
+### Scope
+
+- `AgentTool.needsApproval?: boolean | ((input) => boolean)`, `describeApproval?(input)`.
+- `useAgent`: prima di eseguire un tool che la chiede, il turno si ferma su una domanda in un messaggio
+  suo (`approval-<id della chiamata>`, parte `approval`), ancorata in fondo come le altre (CR-005):
+  "Approvi? <azione>", Approva / Rifiuta e un motivo libero. Le chiamate di un round: una alla volta,
+  prima che ne giri una.
+- Approvato: il tool gira. Rifiutato: non gira, il modello riceve `toolRejected` (pacchetto di prompt)
+  con il motivo. Stop durante l'attesa: il turno si ferma.
+- La risposta resta nella chat.
+
+### Checklist
+
+- [x] `needsApproval`, `describeApproval`, `src/domain/approval.ts`, domanda in `useAgent`, `toolRejected`, i18n en/it/de
+- [x] Test (attesa e approvazione, rifiuto con motivo, stop, tool senza approvazione invariati): 13 file / 60 test
+- [x] README, llms.txt, CHANGELOG, versione 0.7.0
+- [x] Verificato nel Playbook (typecheck, test e build con 0.7.0)
 
 ---
 

@@ -20,6 +20,8 @@ export interface AgenticoPrompts {
     noToolsAvailable: string;
     /** Sent to the model when it keeps calling tools past the round-trip limit. */
     stopCallingTools: string;
+    /** Returned to the model for a tool the person rejected (CR-008). `{reason}` = their reason, or empty. */
+    toolRejected: string;
     /** Returned to the model by a handoff tool: the work is queued, not done. `{label}` = subagent. */
     handoffQueued: string;
     /** Closing-summary micro-prompt (see microPrompts.ts). */
@@ -48,6 +50,7 @@ export const agenticoPromptsEn: AgenticoPrompts = {
     userRequestHeading: '## User request',
     noToolsAvailable: 'No tools available.',
     stopCallingTools: 'Stop calling tools. Answer NOW with the final result, in the required format, using everything collected so far.',
+    toolRejected: 'Not done: the person rejected this action{reason}. Do not call it again unless they ask for it.',
     handoffQueued: '{label} has been queued for the real execution — the result is not available in this conversation yet.',
     closingSummary: [
         'When you are done answering (with or without tools in this turn),',
@@ -79,6 +82,7 @@ export const agenticoPromptsIt: AgenticoPrompts = {
     userRequestHeading: '## Richiesta dell\'utente',
     noToolsAvailable: 'Nessun tool disponibile.',
     stopCallingTools: 'Basta chiamare tool. Rispondi ORA con il risultato finale, nel formato richiesto, usando tutte le informazioni raccolte finora.',
+    toolRejected: 'Non fatto: la persona ha rifiutato questa azione{reason}. Non richiamarla se non te lo chiede.',
     handoffQueued: '{label} è stato messo in coda per l\'esecuzione reale — il risultato non è ancora disponibile in questa conversazione.',
     closingSummary: [
         'Quando hai finito di rispondere (con o senza aver usato dei tool in questo turno),',

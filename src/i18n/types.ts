@@ -32,6 +32,10 @@ export interface AgenticoDict {
     modelRequestError: string;
     noProviderResponse: string;
     noActiveSession: string;
+    approvalHeader: string;
+    approve: string;
+    reject: string;
+    approveQuestion: string;
     requestInProgress: string;
     invalidResponse: string;
     responseReceived: string;
