@@ -168,12 +168,26 @@ export interface AgentExecutorPartOptions {
     done?: boolean;
 }
 
+/** A badge on the right of the header of a group of models (CR-009, CR-121 of the framework). */
+export type AgentModelGroupBadge = { label: string; variant?: 'info' | 'success' | 'warning' | 'danger' | 'primary' | 'secondary' | 'light' | 'dark' };
+
+/** A model an executor offers in the composer. */
+export type AgentExecutorModel = { label: string; value: string; group?: string; groupBadge?: AgentModelGroupBadge };
+
 /** The host side of a remote agent: one call per turn, resolved when its reply is complete. */
 export interface AgentExecutor<TParams, TContext, TResult> {
     turn(turn: AgentExecutorTurn<TParams, TContext>): Promise<{ text: string; result?: TResult }>;
     /** The models the person can pick in the composer, at any time: what one means is the host's
      * (e.g. the model of the remote session from the next message). Absent = no picker. */
-    models?(params: TParams): Array<{ label: string; value: string; group?: string }>;
+    models?(params: TParams): AgentExecutorModel[];
     /** The model picked at first, e.g. the one the remote session runs with. */
     defaultModel?(params: TParams): string | undefined;
+    /**
+     * CR-009: the agent stays an agent of the AI catalog of the app (its prompts, its tools, its approvals)
+     * and the executor answers only the turns whose model is one of its own; the composer offers both.
+     * `first` of a turn of the executor: its first turn in the chat.
+     */
+    alongside?: boolean;
+    /** CR-009: the group (and its badge) the models of the AI catalog are listed under, next to the executor's. */
+    catalogGroup?(provider: string, label: string): { group: string; badge?: AgentModelGroupBadge };
 }

@@ -8,7 +8,7 @@
 import './i18n/types';
 
 // ── Adapter contract (see subagentManifest.ts for the two halves) ─────────────────────────────
-export type { AgentDefinition, AgentTool, LatestAttachmentsRef, AgentExecutor, AgentExecutorTurn, AgentExecutorStep, AgentExecutorPartOptions } from './domain/agentDefinition';
+export type { AgentDefinition, AgentTool, LatestAttachmentsRef, AgentExecutor, AgentExecutorTurn, AgentExecutorStep, AgentExecutorPartOptions, AgentExecutorModel, AgentModelGroupBadge } from './domain/agentDefinition';
 export {
     DEFAULT_TEXT_PART_ID,
     DEFAULT_REASONING_PART_ID,

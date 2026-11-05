@@ -109,4 +109,37 @@ describe('a remote agent', () => {
         expect(turns[1].model).toBe('opencode/sonnet');
         await act(async () => { turns[1].reply('Q2'); });
     });
+
+    it('answers only the turns of its own models when it runs alongside the AI catalog (CR-009)', async () => {
+        const { definition, turns } = remoteDefinition();
+        definition.executor!.alongside = true;
+        definition.executor!.models = () => [{ label: 'Claude Opus 5.5', value: 'h:opus', group: 'Claude Code', groupBadge: { label: 'Subscription', variant: 'info' } }];
+        definition.executor!.catalogGroup = (_provider, label) => ({ group: `API · ${label}`, badge: { label: 'Pay as you go' } });
+        const { result } = renderHook(() => useAgent(definition), { wrapper });
+        // An agent of the AI catalog: not remote.
+        expect(result.current.remote).toBe(false);
+        expect(result.current.alongside).toBe(true);
+        expect(result.current.catalogGroup?.('opencode', 'OpenCode Zen')).toEqual({ group: 'API · OpenCode Zen', badge: { label: 'Pay as you go' } });
+
+        // Started on a model of the executor: its first turn.
+        let run!: Promise<string | null>;
+        act(() => { run = result.current.run({ project: 'shop' }, { openingMessage: 'How does login work?', model: 'h:opus' }); });
+        await waitFor(() => expect(turns).toHaveLength(1));
+        expect(turns[0]).toMatchObject({ text: 'How does login work?', first: true, model: 'h:opus' });
+        await act(async () => { turns[0].reply('It checks the session.'); await run; });
+        expect(result.current.remoteModels[0].groupBadge).toEqual({ label: 'Subscription', variant: 'info' });
+
+        act(() => result.current.setSelectedModel('h:opus'));
+        expect(result.current.selectedModel).toBe('h:opus');
+        act(() => { void result.current.sendMessage('And logout?', { model: 'h:opus' }); });
+        await waitFor(() => expect(turns).toHaveLength(2));
+        expect(turns[1]).toMatchObject({ text: 'And logout?', first: false });
+        await act(async () => { turns[1].reply('It clears it.'); });
+
+        // A model of the catalog: the executor answers nothing.
+        act(() => result.current.setSelectedModel('opencode/deepseek'));
+        expect(result.current.selectedModel).not.toBe('h:opus');
+        await act(async () => { await result.current.sendMessage('Open a CR', { model: 'opencode/deepseek' }); });
+        expect(turns).toHaveLength(2);
+    });
 });

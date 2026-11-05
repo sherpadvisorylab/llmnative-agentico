@@ -17,6 +17,7 @@
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-009 | Done | An executor alongside the AI catalog: `executor.alongside`, `catalogGroup`, `groupBadge`; one picker with the executor's models and the catalog's; turns of the executor's models only to it. 61 tests. Version 0.8.0. Issue #9. |
 | CR-008 | Done | Approval of the person for a tool: `AgentTool.needsApproval`, `describeApproval`; a docked question Approve / Reject with a reason before it runs; rejected, the model reads why. 60 tests. Version 0.7.0, verified in Playbook. Issue #8. |
 | CR-007 | Done | Conversational subagents: `AgentDefinition.conversational`, each reply a text part of its turn, no result panel (preview, destinations). 56 tests. Version 0.6.0, verified in Playbook. Issue #7. |
 | CR-006 | Done | Slash commands of a subagent: `SubagentControls.commands` (`EditorCommand[]`) given to the task's `Chatbot`; the command reaches the executor as plain text; none while questions are docked. 54 tests. Version 0.5.0 (Playbook verification and npm publish by the main session). Issue #6. |

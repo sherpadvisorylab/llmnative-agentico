@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Icon, interpolate, useI18n } from '@llmnative/react';
 import type { AIModelDescriptor, ChatbotModelOption } from '@llmnative/react';
+import type { AgentModelGroupBadge } from '../domain/agentDefinition';
 import { useAgentico } from './AgenticoContext';
 import { AgentActivityLog, QuestionsPart, findDockedQuestions, type AgentActivityLogQuestions } from './AgentActivityLog';
 import { AgenticoResizeHandle } from './AgenticoResizeHandle';
@@ -36,13 +37,19 @@ export interface AgenticoProps {
  * in usePromptCapabilities per il proprio model picker (Prompt.tsx). `group` = nome del provider
  * (header sticky nel picker), quindi `label` è solo il modello. `pricing: null` = prezzo
  * cercato ma non trovato: il picker lo segnala sulla riga invece di tacere. */
-function flattenModelOptions(modelsByProvider: Record<string, AIModelDescriptor[]>): ChatbotModelOption[] {
-    return Object.values(modelsByProvider).flat().map((m) => ({
-        label: m.model,
-        value: m.id,
-        pricing: m.pricing ?? null,
-        group: m.providerLabel ?? m.provider,
-    }));
+function flattenModelOptions(modelsByProvider: Record<string, AIModelDescriptor[]>, catalogGroup?: (provider: string, label: string) => { group: string; badge?: AgentModelGroupBadge }): ChatbotModelOption[] {
+    return Object.values(modelsByProvider).flat().map((m) => {
+        // Next to the models of an executor (CR-009): the group and badge it gives the catalog.
+        const named = catalogGroup?.(m.provider, m.providerLabel ?? m.provider);
+        const option = {
+            label: m.model,
+            value: m.id,
+            pricing: m.pricing ?? null,
+            group: named?.group ?? m.providerLabel ?? m.provider,
+            ...(named?.badge ? { groupBadge: named.badge } : {}),
+        };
+        return option;
+    });
 }
 
 /** Composer del follow-up — monta `Chatbot` (CR-071, `@llmnative/react`): stesso widget di
@@ -81,8 +88,12 @@ function AgenticoComposer({ task }: { task: AgenticoTask }) {
     // A remote task (CR-003) answers with its own agent: no attachments, and its models are the
     // ones its executor offers (none = no picker), never required.
     const noModel = Boolean(manualEntry) || (agent.remote && agent.remoteModels.length === 0);
-    const modelRequired = !noModel && !agent.remote && agent.hasProviders && !agent.selectedModel;
-    const models = noModel ? [] : agent.remote ? agent.remoteModels : flattenModelOptions(agent.modelsByProvider);
+    // Alongside the AI catalog (CR-009): the models of the executor first, then the catalog's.
+    const onExecutor = agent.alongside && agent.remoteModels.some((option) => option.value === agent.selectedModel);
+    const modelRequired = !noModel && !agent.remote && !onExecutor && agent.hasProviders && !agent.selectedModel;
+    const models: ChatbotModelOption[] = noModel ? [] : agent.remote ? agent.remoteModels
+        : agent.alongside ? [...agent.remoteModels, ...flattenModelOptions(agent.modelsByProvider, agent.catalogGroup)]
+        : flattenModelOptions(agent.modelsByProvider);
 
     return (
         <Chatbot
@@ -93,7 +104,7 @@ function AgenticoComposer({ task }: { task: AgenticoTask }) {
             onStop={agent.stop}
             disabled={!text.trim() || modelRequired}
             onSubmit={handleSubmit}
-            attachments={!manualEntry && !agent.remote}
+            attachments={!manualEntry && !agent.remote && !onExecutor}
             models={models}
             selectedModel={noModel ? '' : agent.selectedModel}
             actions={task.composerActions}

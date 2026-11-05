@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-06
+
+### Added
+- An executor alongside the AI catalog (CR-009, GH issue #9): with `executor.alongside: true` a subagent stays
+  an agent of the AI catalog (its prompts, its tools, its approvals) and its executor answers only the turns
+  whose model is one of `executor.models` (`first` on its first turn of the chat). The composer offers the
+  models of the executor and those of the catalog together; `executor.catalogGroup(provider, label)` gives the
+  group and badge the catalog models are listed under, and an executor model may carry `groupBadge` (shown on
+  the right of its group header with `@llmnative/react` 1.45.0, CR-121). Attachments only on catalog models.
+  `useAgent` exposes `alongside` and `catalogGroup`. Without `alongside` nothing changes.
+
 ## [0.7.0] - 2026-11-05
 
 ### Added

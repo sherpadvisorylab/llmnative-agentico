@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseAIModelRef, PromptUtils, useAIProviderRegistry } from '@llmnative/react';
 import type { AIAttachment, AIConversationTurn, AIModelDescriptor, AIProviderAdapter, AIToolResult } from '@llmnative/react';
-import type { AgentDefinition, AgentExecutorPartOptions, AgentExecutorStep, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
+import type { AgentDefinition, AgentExecutorModel, AgentExecutorPartOptions, AgentExecutorStep, AgentModelGroupBadge, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
 import {
     DEFAULT_REASONING_PART_ID, DEFAULT_TEXT_PART_ID, formatQuestionAnswers, messagePartsText, upsertMessagePart,
     type AgentMessagePart, type AgentQuestion, type AgentQuestionAnswer, type AgentQuestionsAnswers, type AgentReasoningPart,
@@ -117,7 +117,11 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
      * deterministic fallback; the models are the executor's (`remoteModels`), not the catalog. */
     remote: boolean;
     /** The models a remote executor offers (`AgentExecutor.models`); `selectedModel` is one of them. */
-    remoteModels: Array<{ label: string; value: string; group?: string }>;
+    remoteModels: AgentExecutorModel[];
+    /** CR-009: the executor answers only the turns of its own models, next to the AI catalog. */
+    alongside: boolean;
+    /** CR-009: the group and badge of a model of the AI catalog, as the executor names them. */
+    catalogGroup?: (provider: string, label: string) => { group: string; badge?: AgentModelGroupBadge };
     /** Log delle tool call della sessione corrente, più recenti in fondo — azzerato a ogni
      * run(), accumulato attraverso i sendMessage() successivi. */
     activity: AgentActivityEntry[];
@@ -192,7 +196,7 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
 /** Solo la fetta di UseAgentResult che serve a un consumer del pannello globale (Agentico.tsx)
  * per continuare una conversazione già avviata da run() — TParams non compare in nessuno dei
  * membri qui sotto, quindi `never` è innocuo. */
-export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions'>;
+export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions'>;
 
 export function useAgent<TParams, TContext, TResult>(
     definition: AgentDefinition<TParams, TContext, TResult>,
@@ -249,7 +253,14 @@ export function useAgent<TParams, TContext, TResult>(
     const ref = enabled && selectedModel ? parseAIModelRef(selectedModel) : null;
     const provider = ref ? registry[ref.provider] : null;
     const executor = definition.executor;
-    const remote = Boolean(executor);
+    // An executor alongside the AI catalog (CR-009) answers only the turns of its own models.
+    const alongside = Boolean(executor?.alongside);
+    const remote = Boolean(executor) && !alongside;
+    /** Whether a model is one of the executor's: its turn goes to the executor. */
+    const remoteModelsRef = useRef<AgentExecutorModel[]>([]);
+    const isRemoteModel = (model: string | undefined) => Boolean(model) && remoteModelsRef.current.some((option) => option.value === model);
+    /** Whether the executor answered a turn of this chat already (`first` of its next turn). */
+    const remoteStartedRef = useRef(false);
     // The model of a remote executor, picked among its own options: a ref too, so a turn reads the
     // last pick even within the same render.
     const [remoteModels, setRemoteModels] = useState<UseAgentResult<TParams, TResult>['remoteModels']>([]);
@@ -260,7 +271,9 @@ export function useAgent<TParams, TContext, TResult>(
         setRemoteModelState(model);
     };
     const offerRemoteModels = (params: TParams) => {
-        setRemoteModels(executor?.models?.(params) ?? []);
+        const offered = executor?.models?.(params) ?? [];
+        remoteModelsRef.current = offered;
+        setRemoteModels(offered);
         setRemoteModel(executor?.defaultModel?.(params) ?? '');
     };
 
@@ -770,6 +783,16 @@ export function useAgent<TParams, TContext, TResult>(
                 offerRemoteModels(params);
                 return await runRemoteTurn(opts?.openingMessage ?? '', true);
             }
+            if (alongside) {
+                offerRemoteModels(params);
+                remoteStartedRef.current = false;
+                const picked = opts?.model || remoteModelRef.current;
+                if (isRemoteModel(picked)) {
+                    setCanContinue(true);
+                    remoteStartedRef.current = true;
+                    return await runRemoteTurn(opts?.openingMessage ?? '', true, picked);
+                }
+            }
 
             const overrideModel = opts?.model || undefined;
             const hasProvider = overrideModel ? Boolean(registry[parseAIModelRef(overrideModel)?.provider ?? '']) : Boolean(provider);
@@ -819,8 +842,10 @@ export function useAgent<TParams, TContext, TResult>(
             const attachmentsRef: LatestAttachmentsRef = { current: undefined };
             const tools = definition.getTools?.(params, context, attachmentsRef) ?? [];
             sessionRef.current = { params, context, tools, history: seed.history, logId: crypto.randomUUID(), attachmentsRef };
-            if (remote) offerRemoteModels(params);
-            setCanContinue(remote || (enabled && Boolean(provider)));
+            if (remote || alongside) offerRemoteModels(params);
+            // A chat reopened: the executor of an alongside agent starts again at its next turn.
+            remoteStartedRef.current = false;
+            setCanContinue(remote || alongside || (enabled && Boolean(provider)));
         } catch (err) {
             setError(extractErrorMessage(err));
         } finally {
@@ -846,6 +871,13 @@ export function useAgent<TParams, TContext, TResult>(
         }]);
         try {
             if (remote) return await runRemoteTurn(text, false, opts?.model || undefined);
+            // Alongside the AI catalog (CR-009): a model of the executor sends the turn to it.
+            const picked = opts?.model || (alongside ? remoteModelRef.current : '');
+            if (alongside && isRemoteModel(picked)) {
+                const first = !remoteStartedRef.current;
+                remoteStartedRef.current = true;
+                return await runRemoteTurn(text, first, picked);
+            }
             const aiAttachments = opts?.attachments?.length
                 ? await Promise.all(opts.attachments.map((file) => PromptUtils.fileToAttachment(file)))
                 : undefined;
@@ -890,9 +922,20 @@ export function useAgent<TParams, TContext, TResult>(
 
     return {
         enabled, setEnabled, hasProviders,
-        // A remote executor picks among its own models, not the AI catalog of the app.
-        selectedModel: remote ? remoteModel : selectedModel,
-        setSelectedModel: remote ? setRemoteModel : setSelectedModel,
-        modelsByProvider, modelsLoading, running, error, canContinue, remote, remoteModels, activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions,
+        // A remote executor picks among its own models, not the AI catalog of the app; alongside the
+        // catalog (CR-009), a model of either.
+        selectedModel: remote ? remoteModel : alongside && remoteModel ? remoteModel : selectedModel,
+        setSelectedModel: remote ? setRemoteModel : alongside
+            ? (id: string) => {
+                if (isRemoteModel(id)) setRemoteModel(id);
+                else {
+                    setRemoteModel('');
+                    setSelectedModel(id);
+                }
+            }
+            : setSelectedModel,
+        modelsByProvider, modelsLoading, running, error, canContinue, remote, remoteModels, alongside,
+        ...(executor?.catalogGroup ? { catalogGroup: executor.catalogGroup } : {}),
+        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions,
     };
 }

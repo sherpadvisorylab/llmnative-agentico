@@ -17,6 +17,35 @@
 | [CR-006](#cr-006--comandi-slash-del-subagent-nel-prompt) | Comandi slash del subagent nel prompt | Alta | CR-003 | ✅ |
 | [CR-007](#cr-007--subagent-conversazionali) | Subagent conversazionali: la risposta è un messaggio della chat | Alta | CR-004 | ✅ |
 | [CR-008](#cr-008--approvazione-della-persona-per-i-tool-rischiosi) | Approvazione della persona per i tool rischiosi | Alta | CR-005 | ✅ |
+| [CR-009](#cr-009--esecutore-accanto-al-catalogo-ai) | Esecutore accanto al catalogo AI: un subagente sceglie per turno dove gira | Alta | CR-003, CR-121 (framework) | ✅ |
+
+---
+
+## CR-009 — Esecutore accanto al catalogo AI
+
+**Stato:** ✅ done (0.8.0)
+**Issue:** [#9](https://github.com/sherpadvisorylab/llmnative-agentico/issues/9)
+**Priorità:** Alta
+**Dipende da:** CR-003 (subagent remoti), CR-121 del framework (badge del gruppo)
+
+### Motivazione
+
+Emersa nel Playbook il 06/11/2026: l'orchestratore del progetto in chat gira via API (con i suoi tool) o su un
+harness sul server (Claude Code, opencode), scelto con il modello; un solo agente, un solo menu.
+
+### Scope
+
+- `AgentExecutor.alongside`: l'agente resta del catalogo AI; solo i turni con un modello dell'esecutore vanno a
+  `executor.turn` (`first` al primo dei suoi turni nella chat, di nuovo dopo una riapertura).
+- Il composer mostra i modelli dell'esecutore e poi quelli del catalogo; `catalogGroup(provider, label)` dà
+  gruppo e badge ai modelli del catalogo; `groupBadge` sui modelli dell'esecutore. Allegati solo sul catalogo.
+- `useAgent`: `alongside`, `catalogGroup`; `selectedModel` è un modello dell'uno o dell'altro.
+
+### Checklist
+
+- [x] `alongside`, `catalogGroup`, `AgentExecutorModel`, `AgentModelGroupBadge`; `useAgent`, composer
+- [x] Test (turni all'esecutore solo con i suoi modelli, `first`, gruppi e badge): 13 file / 61 test
+- [x] README, llms.txt, CHANGELOG, versione 0.8.0
 
 ---
 
