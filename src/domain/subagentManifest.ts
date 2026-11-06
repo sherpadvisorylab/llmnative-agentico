@@ -171,6 +171,13 @@ export interface SubagentManifest<TParams = any, TContext = any, TResult = any> 
      * entityChatStore), so it is in the history and can be resumed on that entity (CR-003).
      * Absent = saved only when the host commits it (commitEntityChat), as before. */
     chatEntityId?(params: Record<string, unknown>): string | undefined;
+    /**
+     * CR-011: its saved chats get a title of their own from the model, read from the whole chat (after a
+     * turn; once per session for those saved before), and a conversational one where the person never
+     * wrote is not kept. The person may rename them (history, `renameEntityChat`). Absent: the title of
+     * `deriveHistoryTitle`, as before.
+     */
+    autoTitle?: boolean;
     /** true = the orchestrator offers this subagent only when the conversation is scoped to it,
      * i.e. a component anchored to it is on the page (CR-003): a subagent that makes sense on
      * one page only (e.g. the design of the project open there). Absent = offered everywhere. */

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Icon, interpolate, useI18n } from '@llmnative/react';
+import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Form, Icon, Input, Modal, interpolate, useFormController, useI18n } from '@llmnative/react';
 import type { AIModelDescriptor, ChatbotModelOption } from '@llmnative/react';
 import type { AgentModelGroupBadge } from '../domain/agentDefinition';
 import { useAgentico } from './AgenticoContext';
@@ -16,7 +16,8 @@ import { useAgenticoI18n } from '../i18n';
 import { useAIModelCatalog } from './useAIModelCatalog';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
 import { findSubagentManifest } from '../domain/subagentRegistry';
-import { chatStartedAt, entityChatTaskId, listEntityChats, removeEntityChat } from '../domain/entityChatStore';
+import { chatStartedAt, chatTitle, entityChatTaskId, listEntityChats, onEntityChatsChange, removeEntityChat, renameEntityChat } from '../domain/entityChatStore';
+import { useChatTitles } from './chatTitles';
 
 export { AGENTICO_WIDTH };
 
@@ -160,6 +161,26 @@ function AgenticoStarterComposer() {
     );
 }
 
+/** CR-011: renames a saved chat; an empty title gives it back the automatic one. */
+function RenameChatModal({ chat, onClose }: { chat: ReturnType<typeof listEntityChats>[number]; onClose: () => void }) {
+    const t = useAgenticoI18n();
+    const form = useFormController();
+    // What the field holds now: saved by the button of the modal, changed or not.
+    const rename = () => {
+        renameEntityChat(chat.scopeId, chat.subagentId, chat.entityId, String(form.record?.title ?? chatTitle(chat)), 'person');
+        onClose();
+        return Promise.resolve(true);
+    };
+    return (
+        <Modal title={t.renameChat} size="sm" onClose={onClose} onSave={rename}>
+            <Form appearance="empty" controller={form} defaultValues={{ title: chatTitle(chat) }} footer={false}>
+                <Input name="title" label={t.chatTitleLabel} placeholder={chat.title} />
+                <p className="text-xs text-muted-foreground">{t.chatTitleHint}</p>
+            </Form>
+        </Modal>
+    );
+}
+
 /** "2 h ago": how long ago, in the language of the app (CR-003). */
 function relativeTime(at: number, locale: string, now = Date.now()): string {
     const seconds = Math.round((at - now) / 1000);
@@ -260,9 +281,12 @@ function AgenticoHistoryDropdown({
     const t = useAgenticoI18n();
     const { locale } = useI18n();
     const [search, setSearch] = useState('');
-    // Bumped when a chat is archived, to read the list again.
+    // Bumped when a chat is archived, renamed or titled (CR-011), to read the list again.
     const [version, setVersion] = useState(0);
+    useEffect(() => onEntityChatsChange(() => setVersion((value) => value + 1)), []);
     const entries = useMemo(() => (open ? listEntityChats(scopeId) : []), [scopeId, open, version]);
+    // CR-011: the chat being renamed, in a modal of its own (the menu closes).
+    const [renaming, setRenaming] = useState<ReturnType<typeof listEntityChats>[number] | null>(null);
 
     /** Archives a chat (CR-003): the host first (e.g. it closes a remote session, with its own
      * question if it has one), then off the history. A refusal of the host keeps the chat. */
@@ -284,11 +308,12 @@ function AgenticoHistoryDropdown({
         if (!q) return entries;
         return entries.filter((e) => {
             const label = findSubagentManifest(e.subagentId)?.label ?? e.subagentId;
-            return e.title.toLowerCase().includes(q) || label.toLowerCase().includes(q);
+            return chatTitle(e).toLowerCase().includes(q) || label.toLowerCase().includes(q);
         });
     }, [entries, search]);
 
     return (
+        <>
         <Dropdown
             trigger={{ icon: 'history', title: t.chatHistory }}
             // Il default del tema per un trigger Dropdown è pensato per un select-like button
@@ -328,7 +353,10 @@ function AgenticoHistoryDropdown({
                             // The chat open in the panel is marked: the person sees where they are.
                             icon={current ? 'check' : manifest?.icon ?? 'bot'}
                             className={current ? 'bg-accent font-medium' : undefined}
-                            actions={[{ icon: 'archive', label: t.archiveChat, onClick: () => void archive(entry) }]}
+                            actions={[
+                                { icon: 'pencil', label: t.renameChat, onClick: () => { onOpenChange(false); setRenaming(entry); } },
+                                { icon: 'archive', label: t.archiveChat, onClick: () => void archive(entry) },
+                            ]}
                             onClick={() => onSelect(entry.subagentId, entry.entityId, entry)}
                         >
                             <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
@@ -337,7 +365,7 @@ function AgenticoHistoryDropdown({
                                         (localStorage non si aggiorna da solo con lo schema — bug segnalato: la riga
                                         mostrava "Theme extractor ·" senza nulla dopo) — ripiega sull'id dell'entità
                                         invece di un vuoto silenzioso. */}
-                                    <span className="text-muted-foreground">{manifest?.label ?? entry.subagentId}</span> · {entry.title || entry.entityId}
+                                    <span className="text-muted-foreground">{manifest?.label ?? entry.subagentId}</span> · {chatTitle(entry)}
                                 </span>
                                 {/* CR-010: when it started (how the person knows it again); its last message in the tooltip. */}
                                 <span
@@ -352,6 +380,8 @@ function AgenticoHistoryDropdown({
                 })
             )}
         </Dropdown>
+        {renaming && <RenameChatModal chat={renaming} onClose={() => setRenaming(null)} />}
+        </>
     );
 }
 
@@ -385,6 +415,8 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
     const t = useAgenticoI18n();
     const bodyRef = useRef<HTMLDivElement | null>(null);
     const [historyOpen, setHistoryOpen] = useState(false);
+    // CR-011: once per scope and session, the saved chats without a title get one.
+    useChatTitles(scope?.id);
     const panelWidth = usePanelWidth({ defaultWidth, minWidth, maxWidth, onWidthChange });
 
     // "Nuova chat" — congeda il task corrente (se c'è) e torna al composer "starter" del

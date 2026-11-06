@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-06
+
+### Added
+- Titles of the saved chats (CR-011, GH issue #11): with `SubagentManifest.autoTitle`, a chat with a message of
+  the person and no title of its own gets one from the model after a turn, read from the whole chat (3-6 words
+  in its language, prompt `chatTitle` en/it), with a model of the AI catalog the chat may run on (the one
+  picked, else the first allowed by `executor.catalogProviders`; none: the title stays). Once per scope and
+  session the chats saved before get one the same way, and a conversational one where the person never wrote
+  is removed; such a chat is no longer saved at all.
+- `EntityChatSnapshot.name` and `namedBy` (`'model' | 'person'`), kept across saves; `chatTitle(snapshot)`,
+  `chatHasPersonMessage(snapshot)`, `renameEntityChat(scopeId, subagentId, entityId, title, by?)` (a title of
+  the person is never replaced by the model's; empty: back to the automatic one) and
+  `onEntityChatsChange(listener)`. The history shows `chatTitle` and has a Rename action.
+
 ## [0.9.0] - 2026-11-06
 
 ### Added

@@ -28,6 +28,8 @@ export interface AgenticoPrompts {
     closingSummary: string;
     /** Page context preamble when several subagents are anchored on the same page. */
     multipleCandidates: string;
+    /** CR-011: asks a title for a saved chat; `{chat}` = the chat, who wrote what. */
+    chatTitle: string;
 }
 
 export const agenticoPromptsEn: AgenticoPrompts = {
@@ -60,6 +62,7 @@ export const agenticoPromptsEn: AgenticoPrompts = {
         'block requested above, never before it and never instead of it.',
     ].join(' '),
     multipleCandidates: 'Several subagents are candidates on this page — ask the user which one they mean if their message does not make it clear, before going on.',
+    chatTitle: 'Write a title for this chat, as a list of chats shows it: 3 to 6 words saying what it is about, in the language the person writes in. Answer with the title only: no quotes, no final period.\n\n{chat}',
 };
 
 export const agenticoPromptsIt: AgenticoPrompts = {
@@ -92,6 +95,7 @@ export const agenticoPromptsIt: AgenticoPrompts = {
         'richiesto sopra, mai prima e mai al posto suo.',
     ].join(' '),
     multipleCandidates: 'Più subagent sono candidati su questa pagina — chiedi all\'utente quale intende se non è chiaro dal suo messaggio, prima di procedere.',
+    chatTitle: 'Scrivi un titolo per questa chat, come lo mostra un elenco di chat: da 3 a 6 parole che dicono di cosa parla, nella lingua in cui scrive la persona. Rispondi solo con il titolo: niente virgolette, niente punto finale.\n\n{chat}',
 };
 
 let activePrompts: AgenticoPrompts = agenticoPromptsEn;

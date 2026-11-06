@@ -19,6 +19,40 @@
 | [CR-008](#cr-008--approvazione-della-persona-per-i-tool-rischiosi) | Approvazione della persona per i tool rischiosi | Alta | CR-005 | ✅ |
 | [CR-009](#cr-009--esecutore-accanto-al-catalogo-ai) | Esecutore accanto al catalogo AI: un subagente sceglie per turno dove gira | Alta | CR-003, CR-121 (framework) | ✅ |
 | [CR-010](#cr-010--data-dinizio-di-una-chat-e-catalogo-ai-limitato-per-chat) | Data d'inizio di una chat, e catalogo AI limitato per chat | Alta | CR-003, CR-009 | ✅ |
+| [CR-011](#cr-011--titoli-delle-chat-scritti-dal-modello-modificabili) | Titoli delle chat scritti dal modello, modificabili; chat vuote non tenute | Alta | CR-010 | ✅ |
+
+---
+
+## CR-011 — Titoli delle chat scritti dal modello, modificabili
+
+**Stato:** ✅ done (0.10.0)
+**Issue:** [#11](https://github.com/sherpadvisorylab/llmnative-agentico/issues/11)
+**Priorità:** Alta
+**Dipende da:** CR-010 (catalogo limitato per chat)
+
+### Motivazione
+
+Emersa nel Playbook il 06/11/2026: lo storico (e le liste dell'host) chiamano una chat con i parametri con cui è
+partita ("crm · Jonny"): molte chat sembrano uguali; una chat in cui la persona non ha mai scritto resta lo stesso.
+
+### Scope
+
+- `SubagentManifest.autoTitle`: dopo un turno una chat con un messaggio della persona e senza un titolo suo ne
+  riceve uno dal modello, letto dalla chat intera (3-6 parole nella sua lingua, prompt `chatTitle` en/it), con un
+  modello del catalogo che la chat può usare (quello scelto, altrimenti il primo ammesso); senza, il titolo resta.
+- Una volta per scope e sessione: le chat salvate prima senza titolo lo ricevono; quelle conversazionali senza
+  messaggi della persona sono tolte, e non si salvano più.
+- `name`/`namedBy` nello snapshot, conservati; `chatTitle`, `chatHasPersonMessage`, `renameEntityChat` (il titolo
+  della persona non è mai sostituito; vuoto: torna automatico), `onEntityChatsChange`.
+- Storico: mostra `chatTitle`, azione Rinomina (modale del framework).
+
+### Checklist
+
+- [x] Store: name, namedBy, chatTitle, renameEntityChat, onEntityChatsChange
+- [x] Titolo dopo un turno, passaggio una volta per sessione, prompt en/it
+- [x] Storico: titolo, rinomina
+- [x] Test: 15 file / 68 test; verificato sul Playbook con la build locale
+- [x] README, llms.txt, CHANGELOG, versione 0.10.0
 
 ---
 

@@ -58,7 +58,7 @@ configureAgenticoPrompts({                                    // optional: langu
 | **Reports** — custom result views per subagent | `registerSubagentReports` |
 | **Scope** — the host's current tenant/company: id + data and storage providers | `<AgenticoProvider scope>` |
 | **Page context** — what the user is looking at, for the orchestrator prompt | `useAgenticoPageContext`, `useSubagentComponentContext` |
-| **Saved chats** — one chat per saved entity, resumable, known by when it started | `configureEntityChatStore`, `getEntityChat`, `listEntityChats`, `chatStartedAt` (CR-010) |
+| **Saved chats** — one chat per saved entity, resumable, known by when it started | `configureEntityChatStore`, `getEntityChat`, `listEntityChats`, `chatStartedAt` (CR-010); titles written by the model and renamed by the person: `autoTitle`, `chatTitle`, `renameEntityChat`, `onEntityChatsChange` (CR-011) |
 | **Approval of tools** — a tool that stops work, spends or cannot be undone runs only after the person approves it, on a question docked at the bottom of the chat (Approve / Reject with a reason) | `AgentTool.needsApproval`, `describeApproval` |
 | **Conversational subagents** — a chat with the model and its tools, nothing to apply at the end: each reply a message of the chat, no result preview or destinations | `AgentDefinition.conversational` |
 | **Remote subagents** — turns answered by the host (a remote agent with its own memory, e.g. an opencode session), streamed with its steps; its own models in the composer, no fallback | `AgentDefinition.executor` (`AgentExecutor`, `models`, `defaultModel`) |

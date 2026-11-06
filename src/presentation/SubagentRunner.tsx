@@ -12,7 +12,8 @@ import { GenericResultPreview } from './reports/GenericResultPreview';
 import { deriveHistoryTitle } from './deriveHistoryTitle';
 import { buildLiveAnchorDestination } from './liveAnchorDestination';
 import { getSubagentControls, type UseSubagentControls } from './subagentControls';
-import { saveEntityChat } from '../domain/entityChatStore';
+import { chatHasPersonMessage, saveEntityChat } from '../domain/entityChatStore';
+import { useChatTitles } from './chatTitles';
 
 /** Monta il vero subagent (useAgent(manifest.definition)) e lo esegue una volta al mount con i
  * parametri già raccolti dall'orchestratore Agentico — nessun passo utente aggiuntivo, la
@@ -224,6 +225,7 @@ export function SubagentRunner({
     // A subagent whose chats belong to an entity (CR-003) saves the chat after every turn: it is in
     // the history and is resumed on that entity, without the host having to commit it.
     const chatEntityId = manifest.chatEntityId?.(params);
+    const titleChat = useChatTitles(scope?.id);
     const wasRunningRef = useRef(false);
     useEffect(() => {
         const ended = wasRunningRef.current && !agent.running;
@@ -231,11 +233,16 @@ export function SubagentRunner({
         if (!ended || !chatEntityId || !scope) return;
         const snap = agent.snapshot();
         if (!snap) return;
+        const activity = [...(precedingActivity ?? []), ...snap.activity];
+        // CR-011: a chat the person never wrote in is not kept.
+        if (manifest.autoTitle && manifest.definition.conversational && !chatHasPersonMessage({ activity })) return;
         saveEntityChat({
             scopeId: scope.id, subagentId: manifest.id, entityId: chatEntityId, params, title: deriveHistoryTitle(manifest, params),
             history: snap.history,
-            activity: [...(precedingActivity ?? []), ...snap.activity],
+            activity,
         });
+        // CR-011: its title, from the whole chat, once it has none (the model of the chat when it is one of the catalog).
+        if (manifest.autoTitle) void titleChat(manifest.id, chatEntityId, agent.selectedModel);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [agent.running]);
 

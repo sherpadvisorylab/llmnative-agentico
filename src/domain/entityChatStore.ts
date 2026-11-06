@@ -46,6 +46,11 @@ export interface EntityChatSnapshot {
     /** CR-010: when it started (its first save), kept by every later save. Absent on a chat saved
      * before 0.9.0: read it with `chatStartedAt`. */
     startedAt?: number;
+    /** CR-011: its own title, written by the model from the chat or by the person; kept by every
+     * later save. Absent: `title` (from its params). Read it with `chatTitle`. */
+    name?: string;
+    /** Who wrote `name`: a title of the person is never replaced by one of the model. */
+    namedBy?: 'model' | 'person';
     /** Etichetta human-friendly dell'entità (es. il nome del tema) — usata dallo storico chat
      * di Agentico (vedi Agentico.tsx) per mostrare "cosa" senza dover rileggere l'entità stessa
      * dal suo DataProviderAdapter (che questo store, domain-side, non possiede). */
@@ -81,10 +86,19 @@ function readAll(): EntityChatSnapshot[] {
     }
 }
 
+const listeners = new Set<() => void>();
+
+/** CR-011: called when a chat is saved, renamed or removed (e.g. a list of the host reads them again). */
+export function onEntityChatsChange(listener: () => void): () => void {
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+}
+
 function writeAll(entries: EntityChatSnapshot[]): void {
     try {
         localStorage.setItem(storageKey, JSON.stringify(entries));
     } catch { /* quota superata o localStorage non disponibile — non fatale, è un extra */ }
+    for (const listener of [...listeners]) listener();
 }
 
 const key = (scopeId: string, subagentId: string, entityId: string) => `${scopeId}:${subagentId}:${entityId}`;
@@ -98,14 +112,42 @@ export function getEntityChat(scopeId: string, subagentId: string, entityId: str
 
 /** Sovrascrive (o crea) la chat associata a questa entità — vedi il commento in testa al file
  * per perché è sempre un overwrite, mai un accumulo. Its start (CR-010) stays the one of its first save. */
-export function saveEntityChat(snapshot: Omit<EntityChatSnapshot, 'savedAt' | 'startedAt'>): void {
+export function saveEntityChat(snapshot: Omit<EntityChatSnapshot, 'savedAt' | 'startedAt' | 'name' | 'namedBy'>): void {
     const k = key(snapshot.scopeId, snapshot.subagentId, snapshot.entityId);
     const all = readAll();
     const previous = all.find((e) => key(e.scopeId, e.subagentId, e.entityId) === k);
     const now = Date.now();
     const next = all.filter((e) => e !== previous);
-    next.push({ ...snapshot, savedAt: now, startedAt: previous ? chatStartedAt(previous) : now });
+    next.push({
+        ...snapshot, savedAt: now, startedAt: previous ? chatStartedAt(previous) : now,
+        // CR-011: its own title stays.
+        ...(previous?.name ? { name: previous.name, namedBy: previous.namedBy } : {}),
+    });
     writeAll(next);
+}
+
+/** CR-011: the title of a chat: its own (of the model or of the person), else the one of its params. */
+export const chatTitle = (snapshot: Pick<EntityChatSnapshot, 'title' | 'name' | 'entityId'>): string => snapshot.name || snapshot.title || snapshot.entityId;
+
+/** CR-011: whether the person wrote in a chat (an opening message counts). */
+export const chatHasPersonMessage = (snapshot: Pick<EntityChatSnapshot, 'activity'>): boolean =>
+    snapshot.activity.some((entry) => entry.kind === 'user' && Boolean(entry.detail?.trim()));
+
+/**
+ * CR-011: gives a chat its own title. The person's (`by: 'person'`) replaces any, and an empty one gives
+ * it back the automatic title; the model's never replaces the person's. False when the chat is gone or
+ * the title was not taken. Its last save (`savedAt`) does not change: a rename is no message.
+ */
+export function renameEntityChat(scopeId: string, subagentId: string, entityId: string, title: string, by: 'model' | 'person' = 'person'): boolean {
+    const k = key(scopeId, subagentId, entityId);
+    const all = readAll();
+    const chat = all.find((e) => key(e.scopeId, e.subagentId, e.entityId) === k);
+    if (!chat || (by === 'model' && chat.namedBy === 'person')) return false;
+    const name = title.trim().replace(/\s+/g, ' ').slice(0, 120);
+    const { name: _name, namedBy: _namedBy, ...rest } = chat;
+    const renamed: EntityChatSnapshot = name ? { ...rest, name, namedBy: by } : rest;
+    writeAll(all.map((e) => (e === chat ? renamed : e)));
+    return true;
 }
 
 /** CR-010: when a chat started; a chat saved before 0.9.0, which does not know it: its last save. */
