@@ -39,6 +39,8 @@ export const agenticoDe: AgenticoDict = {
     stepsLabel: 'Schritte des Agenten',
     newInstance: 'Neue Instanz von "{label}"',
     chatHistory: 'Chatverlauf',
+    chatStarted: 'Begonnen am {at}',
+    chatLastMessage: 'letzte Nachricht am {at}',
     newChat: 'Neuer Chat',
     searchChats: 'Chats durchsuchen…',
     messagePlaceholder: 'Nachricht schreiben…',

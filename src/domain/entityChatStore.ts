@@ -41,7 +41,11 @@ export interface EntityChatSnapshot {
     params:     Record<string, unknown>;
     history:    AIConversationTurn[];
     activity:   EntityChatActivityEntry[];
+    /** When it was last saved: its last message. */
     savedAt:    number;
+    /** CR-010: when it started (its first save), kept by every later save. Absent on a chat saved
+     * before 0.9.0: read it with `chatStartedAt`. */
+    startedAt?: number;
     /** Etichetta human-friendly dell'entità (es. il nome del tema) — usata dallo storico chat
      * di Agentico (vedi Agentico.tsx) per mostrare "cosa" senza dover rileggere l'entità stessa
      * dal suo DataProviderAdapter (che questo store, domain-side, non possiede). */
@@ -93,13 +97,19 @@ export function getEntityChat(scopeId: string, subagentId: string, entityId: str
 }
 
 /** Sovrascrive (o crea) la chat associata a questa entità — vedi il commento in testa al file
- * per perché è sempre un overwrite, mai un accumulo. */
-export function saveEntityChat(snapshot: Omit<EntityChatSnapshot, 'savedAt'>): void {
+ * per perché è sempre un overwrite, mai un accumulo. Its start (CR-010) stays the one of its first save. */
+export function saveEntityChat(snapshot: Omit<EntityChatSnapshot, 'savedAt' | 'startedAt'>): void {
     const k = key(snapshot.scopeId, snapshot.subagentId, snapshot.entityId);
-    const next = readAll().filter((e) => key(e.scopeId, e.subagentId, e.entityId) !== k);
-    next.push({ ...snapshot, savedAt: Date.now() });
+    const all = readAll();
+    const previous = all.find((e) => key(e.scopeId, e.subagentId, e.entityId) === k);
+    const now = Date.now();
+    const next = all.filter((e) => e !== previous);
+    next.push({ ...snapshot, savedAt: now, startedAt: previous ? chatStartedAt(previous) : now });
     writeAll(next);
 }
+
+/** CR-010: when a chat started; a chat saved before 0.9.0, which does not know it: its last save. */
+export const chatStartedAt = (snapshot: Pick<EntityChatSnapshot, 'savedAt' | 'startedAt'>): number => snapshot.startedAt ?? snapshot.savedAt;
 
 /** Rimuove la chat di un'entità — chiamata quando l'entità stessa viene eliminata, altrimenti
  * resterebbe un'entry orfana senza nulla a cui riattaccarsi. */
@@ -108,11 +118,10 @@ export function removeEntityChat(scopeId: string, subagentId: string, entityId: 
     writeAll(readAll().filter((e) => key(e.scopeId, e.subagentId, e.entityId) !== k));
 }
 
-/** Tutte le chat salvate di uno scope, più recenti prima — per lo storico di Agentico
- * (Agentico.tsx), che le mescola across subagent (theme, redirects, html-to-liquid) in un'unica
- * lista ordinata per data. */
+/** Tutte le chat salvate di uno scope, le ultime iniziate prima (CR-010: riaprirne una non la sposta)
+ * — per lo storico di Agentico (Agentico.tsx), che le mescola across subagent in un'unica lista. */
 export function listEntityChats(scopeId: string): EntityChatSnapshot[] {
-    return readAll().filter((e) => e.scopeId === scopeId).sort((a, b) => b.savedAt - a.savedAt);
+    return readAll().filter((e) => e.scopeId === scopeId).sort((a, b) => chatStartedAt(b) - chatStartedAt(a));
 }
 
 /** The id of the Agentico task of the chat of an entity: the same when the chat is resumed from

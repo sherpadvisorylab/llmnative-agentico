@@ -49,6 +49,7 @@ export { registerDestinations, getDestinationRegistry } from './domain/destinati
 export {
     configureEntityChatStore,
     saveEntityChat,
+    chatStartedAt,
     getEntityChat,
     listEntityChats,
     removeEntityChat,

@@ -54,6 +54,9 @@ export interface AgenticoDict {
     /** `{label}` = subagent label */
     newInstance: string;
     chatHistory: string;
+    /** CR-010: the tooltip of a chat of the history, `{at}` its start and its last message. */
+    chatStarted: string;
+    chatLastMessage: string;
     newChat: string;
     searchChats: string;
     messagePlaceholder: string;

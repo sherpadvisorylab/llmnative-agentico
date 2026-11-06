@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-06
+
+### Added
+- The start of a saved chat (CR-010, GH issue #10): `EntityChatSnapshot.startedAt`, set at its first save and
+  kept by every later one, read with `chatStartedAt(snapshot)` (a chat saved before: its `savedAt`).
+  `listEntityChats` lists the last started first, and the history shows the time since the start, its start
+  and its last message in the tooltip: reopening an old chat no longer moves it to now.
+- The AI catalog limited per chat (CR-010): `executor.catalogProviders(params)` gives the providers of the
+  catalog the chat may run on (absent: all). `useAgent().modelsByProvider` lists only their models, and a
+  model of another provider is never used: the first model of the executor is picked instead (when the
+  executor names no default), else the first allowed model of the catalog.
+
 ## [0.8.0] - 2026-11-06
 
 ### Added

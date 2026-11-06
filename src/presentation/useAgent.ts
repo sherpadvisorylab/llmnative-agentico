@@ -14,7 +14,7 @@
 // "riprova con questo markup") e il modello può invocare i tool dell'agente (getTools) con i
 // parametri che l'utente ha suggerito, invece di dover essere ririchiamato da zero dal
 // chiamante. Il loop tool_use → execute → continua è interamente interno a questo hook.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseAIModelRef, PromptUtils, useAIProviderRegistry } from '@llmnative/react';
 import type { AIAttachment, AIConversationTurn, AIModelDescriptor, AIProviderAdapter, AIToolResult } from '@llmnative/react';
 import type { AgentDefinition, AgentExecutorModel, AgentExecutorPartOptions, AgentExecutorStep, AgentModelGroupBadge, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
@@ -250,7 +250,24 @@ export function useAgent<TParams, TContext, TResult>(
     // sessione useAgent. Qui serve solo il registry grezzo per risolvere provider/ref.
     const registry: Record<string, AIProviderAdapter> = useAIProviderRegistry()?.registry ?? {};
 
-    const ref = enabled && selectedModel ? parseAIModelRef(selectedModel) : null;
+    // CR-010: the providers of the AI catalog the chat may run on (`executor.catalogProviders`); absent: all.
+    // A ref too, so a turn reads them within the render that set them.
+    const [catalogProviders, setCatalogProvidersState] = useState<readonly string[] | undefined>(undefined);
+    const catalogProvidersRef = useRef<readonly string[] | undefined>(undefined);
+    const allowedIn = (allowed: readonly string[] | undefined, model: string | undefined) => {
+        if (!model) return false;
+        if (!allowed) return true;
+        const parsed = parseAIModelRef(model);
+        return Boolean(parsed) && allowed.includes(parsed!.provider);
+    };
+    const offeredCatalog = useMemo((): Record<string, AIModelDescriptor[]> => (catalogProviders
+        ? Object.fromEntries(Object.entries(modelsByProvider)
+            .map(([key, models]) => [key, models.filter((model) => catalogProviders.includes(model.provider))] as const)
+            .filter(([, models]) => models.length))
+        : modelsByProvider), [catalogProviders, modelsByProvider]);
+    // The model of the catalog a turn runs with: the one picked when the chat allows it, else its first allowed one.
+    const catalogModel = allowedIn(catalogProviders, selectedModel) ? selectedModel : (Object.values(offeredCatalog).flat()[0]?.id ?? '');
+    const ref = enabled && catalogModel ? parseAIModelRef(catalogModel) : null;
     const provider = ref ? registry[ref.provider] : null;
     const executor = definition.executor;
     // An executor alongside the AI catalog (CR-009) answers only the turns of its own models.
@@ -274,7 +291,12 @@ export function useAgent<TParams, TContext, TResult>(
         const offered = executor?.models?.(params) ?? [];
         remoteModelsRef.current = offered;
         setRemoteModels(offered);
-        setRemoteModel(executor?.defaultModel?.(params) ?? '');
+        const allowed = executor?.catalogProviders?.(params);
+        catalogProvidersRef.current = allowed;
+        setCatalogProvidersState(allowed);
+        // A model of the catalog the chat does not allow is not the one it starts with: the executor's first.
+        const fallback = alongside && !allowedIn(allowed, selectedModel) ? offered[0]?.value : undefined;
+        setRemoteModel(executor?.defaultModel?.(params) ?? fallback ?? '');
     };
 
     /** A turn of a remote agent (CR-003): the text of the person goes to the executor as typed and
@@ -443,7 +465,13 @@ export function useAgent<TParams, TContext, TResult>(
      * di allegato persistente per round-trip successivi, ed è comunque lì che vive il vero
      * messaggio dell'utente. `overrideModel` — vedi run()/sendMessage(): risolto localmente
      * qui (mai da `selectedModel` di stato, che potrebbe non aver ancora fatto commit). */
-    const runTurn = async (userText: string, aiAttachments?: AIAttachment[], overrideModel?: string): Promise<TResult | null> => {
+    const runTurn = async (userText: string, aiAttachments?: AIAttachment[], requestedModel?: string): Promise<TResult | null> => {
+        // CR-010: a model of a provider the chat does not allow is never used: its first allowed one instead
+        // (read from the ref: the first turn runs before the render that knows the providers of the chat).
+        const allowed = catalogProvidersRef.current;
+        const firstAllowed = Object.values(modelsByProvider).flat().find((model) => !allowed || allowed.includes(model.provider))?.id;
+        const overrideModel = requestedModel && allowedIn(allowed, requestedModel) ? requestedModel
+            : !allowedIn(allowed, catalogModel) ? firstAllowed : undefined;
         const session = sessionRef.current;
         if (!session) { setError(labelsRef.current.noActiveSession); return null; }
         const effectiveRef = overrideModel ? parseAIModelRef(overrideModel) : ref;
@@ -924,7 +952,7 @@ export function useAgent<TParams, TContext, TResult>(
         enabled, setEnabled, hasProviders,
         // A remote executor picks among its own models, not the AI catalog of the app; alongside the
         // catalog (CR-009), a model of either.
-        selectedModel: remote ? remoteModel : alongside && remoteModel ? remoteModel : selectedModel,
+        selectedModel: remote ? remoteModel : alongside && remoteModel ? remoteModel : catalogModel,
         setSelectedModel: remote ? setRemoteModel : alongside
             ? (id: string) => {
                 if (isRemoteModel(id)) setRemoteModel(id);
@@ -934,7 +962,7 @@ export function useAgent<TParams, TContext, TResult>(
                 }
             }
             : setSelectedModel,
-        modelsByProvider, modelsLoading, running, error, canContinue, remote, remoteModels, alongside,
+        modelsByProvider: offeredCatalog, modelsLoading, running, error, canContinue, remote, remoteModels, alongside,
         ...(executor?.catalogGroup ? { catalogGroup: executor.catalogGroup } : {}),
         activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions,
     };

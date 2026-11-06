@@ -1,22 +1,23 @@
 # Project status
 
 > Snapshot verified against the real codebase.
-> Last reviewed: 2026-11-05
+> Last reviewed: 2026-11-06
 
 ## General state
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.7.0 ready (published by the person). Peers: `@llmnative/react` ^1.34, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.9.0 ready (published by the person). Peers: `@llmnative/react` ^1.34, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 13 files / 60 tests (Vitest, happy-dom). | — |
+| Tests | 14 files / 65 tests (Vitest, happy-dom). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-010 | Done | Start of a chat: `startedAt` kept across saves (`chatStartedAt`), history shown and sorted by it, last message in the tooltip; `executor.catalogProviders(params)` limits the AI catalog of a chat (composer and turns). 65 tests. Version 0.9.0, verified in Playbook (typecheck, tests, build against the local build). Issue #10. |
 | CR-009 | Done | An executor alongside the AI catalog: `executor.alongside`, `catalogGroup`, `groupBadge`; one picker with the executor's models and the catalog's; turns of the executor's models only to it. 61 tests. Version 0.8.0. Issue #9. |
 | CR-008 | Done | Approval of the person for a tool: `AgentTool.needsApproval`, `describeApproval`; a docked question Approve / Reject with a reason before it runs; rejected, the model reads why. 60 tests. Version 0.7.0, verified in Playbook. Issue #8. |
 | CR-007 | Done | Conversational subagents: `AgentDefinition.conversational`, each reply a text part of its turn, no result panel (preview, destinations). 56 tests. Version 0.6.0, verified in Playbook. Issue #7. |

@@ -190,4 +190,10 @@ export interface AgentExecutor<TParams, TContext, TResult> {
     alongside?: boolean;
     /** CR-009: the group (and its badge) the models of the AI catalog are listed under, next to the executor's. */
     catalogGroup?(provider: string, label: string): { group: string; badge?: AgentModelGroupBadge };
+    /**
+     * CR-010: the providers of the AI catalog this chat may run on (absent: all). The composer lists only
+     * their models; a model of another provider is never used: the first model of the executor is picked
+     * instead, else the first allowed model of the catalog.
+     */
+    catalogProviders?(params: TParams): readonly string[] | undefined;
 }

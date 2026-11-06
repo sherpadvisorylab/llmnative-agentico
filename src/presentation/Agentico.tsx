@@ -16,7 +16,7 @@ import { useAgenticoI18n } from '../i18n';
 import { useAIModelCatalog } from './useAIModelCatalog';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
 import { findSubagentManifest } from '../domain/subagentRegistry';
-import { entityChatTaskId, listEntityChats, removeEntityChat } from '../domain/entityChatStore';
+import { chatStartedAt, entityChatTaskId, listEntityChats, removeEntityChat } from '../domain/entityChatStore';
 
 export { AGENTICO_WIDTH };
 
@@ -339,7 +339,13 @@ function AgenticoHistoryDropdown({
                                         invece di un vuoto silenzioso. */}
                                     <span className="text-muted-foreground">{manifest?.label ?? entry.subagentId}</span> · {entry.title || entry.entityId}
                                 </span>
-                                <span className="shrink-0 text-xs text-muted-foreground" title={new Date(entry.savedAt).toLocaleString(locale)}>{relativeTime(entry.savedAt, locale)}</span>
+                                {/* CR-010: when it started (how the person knows it again); its last message in the tooltip. */}
+                                <span
+                                    className="shrink-0 text-xs text-muted-foreground"
+                                    title={`${t.chatStarted.replace('{at}', new Date(chatStartedAt(entry)).toLocaleString(locale))} · ${t.chatLastMessage.replace('{at}', new Date(entry.savedAt).toLocaleString(locale))}`}
+                                >
+                                    {relativeTime(chatStartedAt(entry), locale)}
+                                </span>
                             </span>
                         </DropdownItem>
                     );

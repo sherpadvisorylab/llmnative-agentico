@@ -18,6 +18,39 @@
 | [CR-007](#cr-007--subagent-conversazionali) | Subagent conversazionali: la risposta è un messaggio della chat | Alta | CR-004 | ✅ |
 | [CR-008](#cr-008--approvazione-della-persona-per-i-tool-rischiosi) | Approvazione della persona per i tool rischiosi | Alta | CR-005 | ✅ |
 | [CR-009](#cr-009--esecutore-accanto-al-catalogo-ai) | Esecutore accanto al catalogo AI: un subagente sceglie per turno dove gira | Alta | CR-003, CR-121 (framework) | ✅ |
+| [CR-010](#cr-010--data-dinizio-di-una-chat-e-catalogo-ai-limitato-per-chat) | Data d'inizio di una chat, e catalogo AI limitato per chat | Alta | CR-003, CR-009 | ✅ |
+
+---
+
+## CR-010 — Data d'inizio di una chat, e catalogo AI limitato per chat
+
+**Stato:** ✅ done (0.9.0)
+**Issue:** [#10](https://github.com/sherpadvisorylab/llmnative-agentico/issues/10)
+**Priorità:** Alta
+**Dipende da:** CR-003 (chat per entità, storico), CR-009 (esecutore accanto al catalogo)
+
+### Motivazione
+
+Emersa nel Playbook il 06/11/2026. (1) Una chat salvata tiene solo `savedAt`, riscritto a ogni turno: riaperta,
+una chat di ore prima sale in cima allo storico come "adesso" e la persona non riconosce più quale fosse.
+(2) L'host può ammettere in una chat solo alcuni provider (nel Playbook: quelli di un progetto), ma accanto a un
+esecutore il composer offre ogni modello del catalogo.
+
+### Scope
+
+- `EntityChatSnapshot.startedAt`: messo al primo salvataggio, conservato da ogni salvataggio successivo (una chat
+  salvata prima: il suo `savedAt`). `listEntityChats` ordina per inizio, il più recente prima.
+- Storico: il tempo dall'inizio; nel tooltip inizio e ultimo messaggio (i18n en/it/de).
+- `AgentExecutor.catalogProviders(params)`: i provider del catalogo AI su cui la chat può girare (assente: tutti).
+  Il composer elenca solo i loro modelli; un modello scelto di un altro provider non si usa: il primo modello
+  dell'esecutore, altrimenti il primo ammesso del catalogo.
+
+### Checklist
+
+- [x] `startedAt` nello store (`chatStartedAt`), storico (mostrato, ordinato, tooltip), i18n en/it/de
+- [x] `catalogProviders`: modelli offerti, modello usato (anche al primo turno, prima del render)
+- [x] Test: 14 file / 65 test; verificato sul Playbook (typecheck, 599 test, build) con la build locale
+- [x] README, llms.txt, CHANGELOG, versione 0.9.0
 
 ---
 
