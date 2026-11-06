@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-11-06
+
+### Fixed
+- The actions of a card on one row: View and the secondary actions with an icon as icons (their name on hover and for screen readers), the primary one with its label on the right; what came of an action on a line under them.
+
 ## [0.13.1] - 2026-11-06
 
 ### Fixed

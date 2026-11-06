@@ -301,25 +301,42 @@ export function CardPart({ entry, part, questions }: { entry: AgentActivityEntry
                 </>
             )}
             footer={(
-                <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-                    {part.details && <ActionButton icon="eye" label={t.cardView} variant="outline-secondary" onClick={() => setViewing(true)} />}
-                    {(part.actions ?? []).map((action) => (
-                        <LoadingButton
-                            key={action.id}
-                            {...(action.icon ? { icon: action.icon } : {})}
-                            label={action.label}
-                            variant={action.variant ?? 'outline-primary'}
-                            disabled={!actionable}
-                            onClick={() => questions!.onCardAction!(entry.id, part.id, action.id)}
-                        />
-                    ))}
+                <div className="space-y-1.5 px-3 py-2">
+                    {/* One row: the secondary actions as icons (their name on hover and for screen readers),
+                        the primary one with its label on the right; what came of an action under it. */}
+                    <div className="flex items-center gap-1">
+                        {part.details && <ActionButton icon="eye" ariaLabel={t.cardView} title={t.cardView} variant="outline-secondary" onClick={() => setViewing(true)} />}
+                        {(part.actions ?? []).filter((action) => action.variant !== 'primary' && action.icon).map((action) => (
+                            <LoadingButton
+                                key={action.id}
+                                icon={action.icon!}
+                                ariaLabel={action.label}
+                                title={action.label}
+                                variant={action.variant ?? 'outline-secondary'}
+                                disabled={!actionable}
+                                onClick={() => questions!.onCardAction!(entry.id, part.id, action.id)}
+                            />
+                        ))}
+                        <span className="ms-auto flex items-center gap-1">
+                            {(part.actions ?? []).filter((action) => action.variant === 'primary' || !action.icon).map((action) => (
+                                <LoadingButton
+                                    key={action.id}
+                                    {...(action.icon ? { icon: action.icon } : {})}
+                                    label={action.label}
+                                    variant={action.variant ?? 'outline-primary'}
+                                    disabled={!actionable}
+                                    onClick={() => questions!.onCardAction!(entry.id, part.id, action.id)}
+                                />
+                            ))}
+                        </span>
+                    </div>
                     {part.outcome && (
-                        <span className={`text-xs ${outcomeVariant}`}>
+                        <p className={`text-xs ${outcomeVariant}`}>
                             {part.outcome.text}
                             {part.outcome.link && (
                                 <> <a className="underline" href={part.outcome.link.url} target="_blank" rel="noopener noreferrer">{part.outcome.link.label}</a></>
                             )}
-                        </span>
+                        </p>
                     )}
                 </div>
             )}
