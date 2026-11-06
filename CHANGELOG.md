@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-11-06
+
+### Fixed
+- While a turn of a remote executor runs, the spinner stays under what arrived (reasoning, steps, text), with the time it has been at it from 10 s on: a long reasoning or a slow tool is no longer mistaken for a turn that stopped.
+
 ## [0.13.0] - 2026-11-06
 
 ### Added

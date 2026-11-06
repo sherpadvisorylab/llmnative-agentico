@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActionButton, Badge, Card, ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, LoadingButton, Modal, Tree, interpolate } from '@llmnative/react';
 import type { AgentActivityEntry } from './useAgent';
 import type { AgentCardPart, AgentMessagePart, AgentQuestionAnswer, AgentQuestionsPart, AgentToolPart } from '../domain/messageParts';
@@ -112,6 +112,19 @@ function DetailContent({ text, tone }: { text: string; tone?: 'default' | 'muted
 /** Icona di stato di una voce di attività — icon-system del framework (Lucide), mai emoji.
  * "running" resta lo spinner a bordo rotante già usato da LoadingButton in tutto il CMS,
  * non un'icona Lucide: stessa identica animazione di ogni altro stato di caricamento. */
+/** How long the turn has been running, from 10 s on (" · 1:05"), updated every second. */
+function Elapsed() {
+    const [started] = useState(() => Date.now());
+    const [now, setNow] = useState(started);
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+    const seconds = Math.floor((now - started) / 1000);
+    if (seconds < 10) return null;
+    return <span className="tabular-nums"> · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</span>;
+}
+
 function ActivityStatusIcon({ status }: { status: AgentActivityEntry['status'] }) {
     if (status === 'running') {
         return <span className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />;
@@ -404,14 +417,16 @@ function ActivityRow({ entry, questions, hiddenPartId }: { entry: AgentActivityE
     // A message in parts (remote agent, CR-004): the parts say it all; a status line only while
     // nothing arrived yet, or when the turn stopped or failed.
     if (entry.kind === 'thinking' && entry.parts) {
-        const showStatus = entry.status === 'error' || entry.status === 'stopped' || (entry.status === 'running' && entry.parts.length === 0);
+        // While the turn runs the spinner stays under what arrived, with the time it has been at it: a long
+        // reasoning or a slow tool is seen to go on, not mistaken for a turn that stopped.
+        const showStatus = entry.status === 'error' || entry.status === 'stopped' || entry.status === 'running';
         return (
             <li className="text-xs text-muted-foreground">
                 {entry.parts.length > 0 && <MessageParts entry={entry} questions={questions} hiddenPartId={hiddenPartId} />}
                 {showStatus && (
                     <div className={`flex items-start gap-1.5 ${entry.parts.length > 0 ? 'mt-1' : ''}`}>
                         <span className="pt-px"><ActivityStatusIcon status={entry.status} /></span>
-                        <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{thinkingDisplayLabel(entry, t)}</span>
+                        <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{thinkingDisplayLabel(entry, t)}{entry.status === 'running' && <Elapsed />}</span>
                     </div>
                 )}
             </li>
