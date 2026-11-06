@@ -39,6 +39,8 @@ export const agenticoDe: AgenticoDict = {
     stepsLabel: 'Schritte des Agenten',
     newInstance: 'Neue Instanz von "{label}"',
     chatHistory: 'Chatverlauf',
+    cardView: 'Ansehen',
+    cardClose: 'Schließen',
     renameChat: 'Umbenennen',
     chatTitleLabel: 'Titel',
     chatTitleHint: 'Leer: der aus dem Chat geschriebene Titel.',

@@ -55,6 +55,9 @@ export interface AgenticoDict {
     newInstance: string;
     chatHistory: string;
     /** CR-011: renaming a saved chat. */
+    /** CR-014: the whole text of a card, and closing it. */
+    cardView: string;
+    cardClose: string;
     renameChat: string;
     chatTitleLabel: string;
     chatTitleHint: string;

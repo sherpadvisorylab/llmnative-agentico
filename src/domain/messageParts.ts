@@ -76,7 +76,43 @@ export interface AgentQuestionsPart {
     answers?: AgentQuestionAnswer[];
 }
 
-export type AgentMessagePart = AgentTextPart | AgentReasoningPart | AgentToolPart | AgentQuestionsPart;
+/** An action of a card (CR-014), run by the host (`AgentDefinition.onCardAction`). */
+export interface AgentCardAction {
+    id: string;
+    label: string;
+    icon?: string;
+    variant?: 'primary' | 'outline-primary' | 'outline-secondary' | 'outline-danger';
+}
+
+/** What came of an action of a card: its buttons are then off. */
+export interface AgentCardOutcome {
+    status: 'done' | 'dismissed' | 'error';
+    text: string;
+    link?: { label: string; url: string };
+}
+
+/**
+ * A card in a message (CR-014): what the agent prepared for the person (e.g. a draft of a CR) with the actions
+ * of the host. `details`: the whole text, opened by Agentico (View) in a side modal; `data`: of the host, given
+ * back with an action. Saved with the chat, outcome included.
+ */
+export interface AgentCardPart {
+    type: 'card';
+    id: string;
+    title: string;
+    badge?: { label: string; variant?: 'info' | 'light' | 'success' | 'warning' | 'danger' };
+    /** Markdown: what to read at once. */
+    body?: string;
+    details?: string;
+    actions?: AgentCardAction[];
+    data?: Record<string, unknown>;
+    outcome?: AgentCardOutcome;
+}
+
+/** A card as a tool or an executor gives it. */
+export type AgentCard = Omit<AgentCardPart, 'type'>;
+
+export type AgentMessagePart = AgentTextPart | AgentReasoningPart | AgentToolPart | AgentQuestionsPart | AgentCardPart;
 
 /** The id of the text part of an executor that calls `onText` without an id (the reply of CR-003). */
 export const DEFAULT_TEXT_PART_ID = 'text';

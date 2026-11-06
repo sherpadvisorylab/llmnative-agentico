@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-06
+
+### Added
+- Cards in the messages of a chat (CR-014, GH issue #14): a message part `card` (`AgentCardPart`: title, badge,
+  body in Markdown, `details` opened with View in a side modal, the actions of the host, `data` of the host, its
+  `outcome` once an action ran), saved with the chat. `AgentTool.card(input, output)` shows one after the tool ran;
+  `AgentExecutorTurn.onCard(card)` for a remote executor; `AgentDefinition.onCardAction(params, card, actionId)`
+  runs an action, its outcome goes into the card and its buttons are then off (also on a chat reopened);
+  `useAgent().cardAction(entryId, partId, actionId)`. Rendered with Card, Badge, ChatMarkdown, LoadingButton and
+  Modal of the framework; i18n `cardView`, `cardClose`.
+
 ## [0.12.0] - 2026-11-06
 
 ### Added

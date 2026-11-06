@@ -22,6 +22,34 @@
 | [CR-011](#cr-011--titoli-delle-chat-scritti-dal-modello-modificabili) | Titoli delle chat scritti dal modello, modificabili; chat vuote non tenute | Alta | CR-010 | ✅ |
 | [CR-012](#cr-012--livello-di-ragionamento-dei-turni-sul-catalogo-ai) | Livello di ragionamento dei turni sul catalogo AI | Alta | CR-010, CR-122 (framework) | ✅ |
 | [CR-013](#cr-013--chat-salvate-tenute-anche-dallhost) | Chat salvate tenute anche dall'host (backend dello store) | Alta | CR-003 | ✅ |
+| [CR-014](#cr-014--card-nei-messaggi-della-chat) | Card nei messaggi della chat, con le azioni dell'host | Alta | CR-004 | ✅ |
+
+---
+
+## CR-014 — Card nei messaggi della chat
+
+**Stato:** ✅ done (0.13.0)
+**Issue:** [#14](https://github.com/sherpadvisorylab/llmnative-agentico/issues/14)
+**Priorità:** Alta
+**Dipende da:** CR-004 (messaggi a parti)
+
+### Motivazione
+
+Emersa nel Playbook il 06/11/2026: ciò che un agente prepara per la persona (la bozza di una CR) si mostra meglio
+dove nasce nella chat, come card con le sue azioni, che come avviso sopra il prompt.
+
+### Scope
+
+- Parte `card` (titolo, badge, corpo, `details` con Vedi in una modale laterale, azioni dell'host, `data`, `outcome`),
+  salvata con la chat. `AgentTool.card`, `turn.onCard`, `AgentDefinition.onCardAction` (esito nella card, pulsanti
+  spenti, anche su una chat riaperta), `useAgent().cardAction`. Componenti del framework.
+
+### Checklist
+
+- [x] Parte, agganci per strumento ed esecutore, azione
+- [x] Resa, Vedi, i18n en/it/de
+- [x] Test: 17 file / 73 test; verificato sul Playbook con la build locale
+- [x] README, llms.txt, CHANGELOG, versione 0.13.0
 
 ---
 

@@ -58,6 +58,7 @@ configureAgenticoPrompts({                                    // optional: langu
 | **Reports** — custom result views per subagent | `registerSubagentReports` |
 | **Scope** — the host's current tenant/company: id + data and storage providers | `<AgenticoProvider scope>` |
 | **Page context** — what the user is looking at, for the orchestrator prompt | `useAgenticoPageContext`, `useSubagentComponentContext` |
+| **Cards in the chat** — what an agent prepared (e.g. a draft), with View and the actions of the host, their outcome kept | `AgentTool.card`, `executor.turn` `onCard`, `AgentDefinition.onCardAction` (CR-014) |
 | **Saved chats** — one chat per saved entity, resumable, known by when it started, kept by the host too (`backend`, `syncEntityChats`, CR-013) | `configureEntityChatStore`, `getEntityChat`, `listEntityChats`, `chatStartedAt` (CR-010); titles written by the model and renamed by the person: `autoTitle`, `chatTitle`, `renameEntityChat`, `onEntityChatsChange` (CR-011) |
 | **Approval of tools** — a tool that stops work, spends or cannot be undone runs only after the person approves it, on a question docked at the bottom of the chat (Approve / Reject with a reason) | `AgentTool.needsApproval`, `describeApproval` |
 | **Conversational subagents** — a chat with the model and its tools, nothing to apply at the end: each reply a message of the chat, no result preview or destinations | `AgentDefinition.conversational` |

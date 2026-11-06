@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, Tree, interpolate } from '@llmnative/react';
+import { ActionButton, Badge, Card, ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, LoadingButton, Modal, Tree, interpolate } from '@llmnative/react';
 import type { AgentActivityEntry } from './useAgent';
-import type { AgentMessagePart, AgentQuestionAnswer, AgentQuestionsPart, AgentToolPart } from '../domain/messageParts';
+import type { AgentCardPart, AgentMessagePart, AgentQuestionAnswer, AgentQuestionsPart, AgentToolPart } from '../domain/messageParts';
 import { useAgenticoI18n, type AgenticoDict } from '../i18n';
 
 /** Un blocco ```lang ... ``` dentro al testo, o testo semplice attorno — il modello spesso
@@ -264,6 +264,61 @@ function StepsGroup({ steps }: { steps: AgentToolPart[] }) {
 export interface AgentActivityLogQuestions {
     canAnswer: (entryId: string) => boolean;
     onAnswer: (entryId: string, partId: string, answers: AgentQuestionAnswer[]) => Promise<unknown>;
+    /** CR-014: an action of a card, run by the host. Without it the actions of the cards are off. */
+    onCardAction?: (entryId: string, partId: string, actionId: string) => Promise<unknown>;
+}
+
+/**
+ * A card of the host in a message (CR-014): its title and badge, what to read at once, View for the whole text
+ * (a side modal), the actions of the host in its footer; once one ran, what came of it and the buttons off.
+ */
+export function CardPart({ entry, part, questions }: { entry: AgentActivityEntry; part: AgentCardPart; questions?: AgentActivityLogQuestions }) {
+    const t = useAgenticoI18n();
+    const [viewing, setViewing] = useState(false);
+    const actionable = Boolean(questions?.onCardAction && questions.canAnswer(entry.id) && !part.outcome);
+    const outcomeVariant = part.outcome?.status === 'done' ? 'text-success' : part.outcome?.status === 'error' ? 'text-destructive' : 'text-muted-foreground';
+    return (
+        <Card
+            headerClassName="flex items-center justify-between gap-2 px-3 py-2"
+            bodyClassName="px-3 py-2"
+            header={(
+                <>
+                    <span className="min-w-0 text-xs font-semibold text-foreground">{part.title}</span>
+                    {part.badge && <Badge variant={part.badge.variant ?? 'info'}>{part.badge.label}</Badge>}
+                </>
+            )}
+            footer={(
+                <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+                    {part.details && <ActionButton icon="eye" label={t.cardView} variant="outline-secondary" onClick={() => setViewing(true)} />}
+                    {(part.actions ?? []).map((action) => (
+                        <LoadingButton
+                            key={action.id}
+                            {...(action.icon ? { icon: action.icon } : {})}
+                            label={action.label}
+                            variant={action.variant ?? 'outline-primary'}
+                            disabled={!actionable}
+                            onClick={() => questions!.onCardAction!(entry.id, part.id, action.id)}
+                        />
+                    ))}
+                    {part.outcome && (
+                        <span className={`text-xs ${outcomeVariant}`}>
+                            {part.outcome.text}
+                            {part.outcome.link && (
+                                <> <a className="underline" href={part.outcome.link.url} target="_blank" rel="noopener noreferrer">{part.outcome.link.label}</a></>
+                            )}
+                        </span>
+                    )}
+                </div>
+            )}
+        >
+            {part.body ? <ChatMarkdown content={part.body} className="break-words text-xs leading-relaxed text-foreground" /> : null}
+            {viewing && part.details && (
+                <Modal title={part.title} position="right" size="lg" onClose={() => setViewing(false)} footer={<ActionButton label={t.cardClose} variant="outline-secondary" onClick={() => setViewing(false)} />}>
+                    <ChatMarkdown content={part.details} className="break-words text-sm leading-relaxed text-foreground" />
+                </Modal>
+            )}
+        </Card>
+    );
 }
 
 /** The questions part shown docked at the bottom of the panel instead of in the thread (CR-005). */
@@ -336,6 +391,7 @@ function MessageParts({ entry, questions, hiddenPartId }: { entry: AgentActivity
                 if (part.type === 'reasoning') {
                     return <ChatReasoning key={block.key} content={part.text} streaming={part.streaming} duration={part.duration} className="my-0" />;
                 }
+                if (part.type === 'card') return <CardPart key={block.key} entry={entry} part={part} questions={questions} />;
                 return <QuestionsPart key={block.key} entry={entry} part={part} questions={questions} />;
             })}
         </div>

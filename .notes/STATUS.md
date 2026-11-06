@@ -7,16 +7,17 @@
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.12.0 ready (published by the person). Peers: `@llmnative/react` ^1.34, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.13.0 ready (published by the person). Peers: `@llmnative/react` ^1.34, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 16 files / 71 tests (Vitest, happy-dom). | — |
+| Tests | 17 files / 73 tests (Vitest, happy-dom). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-014 | Done | Cards in the messages of a chat: part `card` with View and the actions of the host, `AgentTool.card`, `turn.onCard`, `onCardAction` (outcome kept in the card). 73 tests. Version 0.13.0, verified in Playbook against the local build. Issue #14. |
 | CR-013 | Done | Saved chats kept by the host too: `EntityChatBackend` (load, save, remove), writes sent in the background, `syncEntityChats` on scope change (later copy wins, gone ones dropped, unsent ones sent). 71 tests. Version 0.12.0. Issue #13. |
 | CR-012 | Done | Reasoning level of the turns on the AI catalog: `executor.catalogReasoning(params, provider)`, sent as `reasoning` on every request of a turn (@llmnative/react 1.46, CR-122). 68 tests. Version 0.11.0. Issue #12. |
 | CR-011 | Done | Titles of the saved chats: `autoTitle` (written by the model from the whole chat after a turn and once per session for older ones, with a model the chat may use), empty conversational chats not kept, `name`/`namedBy`, `chatTitle`, `renameEntityChat` (the person's wins), `onEntityChatsChange`, Rename in the history. 68 tests. Version 0.10.0, verified in Playbook against the local build. Issue #11. |

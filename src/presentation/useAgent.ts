@@ -20,7 +20,7 @@ import type { AIAttachment, AIConversationTurn, AIModelDescriptor, AIProviderAda
 import type { AgentDefinition, AgentExecutorModel, AgentExecutorPartOptions, AgentExecutorStep, AgentModelGroupBadge, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
 import {
     DEFAULT_REASONING_PART_ID, DEFAULT_TEXT_PART_ID, formatQuestionAnswers, messagePartsText, upsertMessagePart,
-    type AgentMessagePart, type AgentQuestion, type AgentQuestionAnswer, type AgentQuestionsAnswers, type AgentReasoningPart,
+    type AgentCard, type AgentCardOutcome, type AgentCardPart, type AgentMessagePart, type AgentQuestion, type AgentQuestionAnswer, type AgentQuestionsAnswers, type AgentReasoningPart,
 } from '../domain/messageParts';
 import { extractErrorMessage } from '../domain/extractErrorMessage';
 import { applyMicroPrompts } from '../domain/microPrompts';
@@ -193,12 +193,14 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
      * answers and shows them read-only. Resolves with the result of that new turn, if any; rejects
      * (leaving the form open) when another turn is running or the entry is not of this conversation. */
     answerQuestions: (entryId: string, partId: string, answers: AgentQuestionAnswer[]) => Promise<TResult | null>;
+    /** CR-014: an action of a card of the chat, run by the host; its outcome goes into the card. */
+    cardAction: (entryId: string, partId: string, actionId: string) => Promise<void>;
 }
 
 /** Solo la fetta di UseAgentResult che serve a un consumer del pannello globale (Agentico.tsx)
  * per continuare una conversazione già avviata da run() — TParams non compare in nessuno dei
  * membri qui sotto, quindi `never` è innocuo. */
-export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions'>;
+export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction'>;
 
 export function useAgent<TParams, TContext, TResult>(
     definition: AgentDefinition<TParams, TContext, TResult>,
@@ -347,6 +349,8 @@ export function useAgent<TParams, TContext, TResult>(
             });
         };
         const onStep = (step: AgentExecutorStep) => upsert({ type: 'tool', id: step.id, label: step.label, status: step.status });
+        // CR-014: a card of the host in the message.
+        const onCard = (card: AgentCard) => upsert({ ...card, type: 'card' });
 
         // The questions of this turn still waiting for their answers.
         const turnQuestions = new Set<string>();
@@ -396,7 +400,7 @@ export function useAgent<TParams, TContext, TResult>(
                 params: session.params, context: session.context, text, first, signal: controller.signal,
                 ...((model || remoteModelRef.current) ? { model: model || remoteModelRef.current } : {}),
                 ...(answers ? { answers: { id: answers.id, answers: answers.answers } } : {}),
-                onText, onReasoning, onStep, onQuestions,
+                onText, onReasoning, onStep, onQuestions, onCard,
             });
             finish('done', reply.text);
             session.history = [
@@ -417,6 +421,27 @@ export function useAgent<TParams, TContext, TResult>(
         } finally {
             abortControllerRef.current = null;
         }
+    };
+
+    /**
+     * CR-014: an action of a card, run by the host (`definition.onCardAction`); its outcome goes into the card
+     * (saved with the chat). A rejection is the outcome `error` with its message.
+     */
+    const cardAction = async (entryId: string, partId: string, actionId: string): Promise<void> => {
+        const entry = activityRef.current.find((a) => a.id === entryId);
+        const part = entry?.parts?.find((p): p is AgentCardPart => p.type === 'card' && p.id === partId);
+        const session = sessionRef.current;
+        if (!part || !session || !definition.onCardAction) return;
+        let outcome: AgentCardOutcome | undefined;
+        try {
+            outcome = await definition.onCardAction(session.params, part, actionId);
+        } catch (err) {
+            outcome = { status: 'error', text: extractErrorMessage(err) };
+        }
+        if (!outcome) return;
+        setActivity((prev) => prev.map((a) => (a.id !== entryId ? a : {
+            ...a, parts: a.parts?.map((p) => (p.type === 'card' && p.id === partId ? { ...p, outcome } : p)),
+        })));
     };
 
     const answerQuestions = async (entryId: string, partId: string, answers: AgentQuestionAnswer[]): Promise<TResult | null> => {
@@ -729,6 +754,9 @@ export function useAgent<TParams, TContext, TResult>(
                     try {
                         const output = await tool.execute(call.input);
                         setEntryStatus(call.id, 'done');
+                        // CR-014: what the tool prepared, as a card of the chat with its actions.
+                        const card = tool.card?.(call.input, output);
+                        if (card) setActivity((prev) => [...prev, { id: `card-${call.id}`, kind: 'thinking', label: '', status: 'done', parts: [{ ...card, type: 'card' }] }]);
                         return { toolCallId: call.id, name: call.name, output };
                     } catch (err) {
                         setEntryStatus(call.id, 'error');
@@ -974,6 +1002,6 @@ export function useAgent<TParams, TContext, TResult>(
             : setSelectedModel,
         modelsByProvider: offeredCatalog, modelsLoading, running, error, canContinue, remote, remoteModels, alongside,
         ...(executor?.catalogGroup ? { catalogGroup: executor.catalogGroup } : {}),
-        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions,
+        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions, cardAction,
     };
 }

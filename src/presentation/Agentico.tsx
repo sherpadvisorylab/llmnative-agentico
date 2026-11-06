@@ -454,6 +454,8 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
         onAnswer: (entryId, partId, answers) => task.agent.answerQuestions(entryId, partId, answers).then((result) => {
             if (result) task.onApplied(result);
         }),
+        // CR-014: the actions of the cards of the host.
+        onCardAction: (entryId, partId, actionId) => task.agent.cardAction(entryId, partId, actionId),
     } : undefined;
     // Questions waiting in the latest message of the agent (CR-005) are docked at the bottom of the
     // panel, in place of the composer, as Claude Code and Cursor do; the message of the person no

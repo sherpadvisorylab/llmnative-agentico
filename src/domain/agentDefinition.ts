@@ -9,7 +9,7 @@
 
 import type { z } from 'zod';
 import type { AIAttachment } from '@llmnative/react';
-import type { AgentQuestion, AgentQuestionAnswer, AgentQuestionsAnswers } from './messageParts';
+import type { AgentCard, AgentCardOutcome, AgentCardPart, AgentQuestion, AgentQuestionAnswer, AgentQuestionsAnswers } from './messageParts';
 
 /** Rif mutabile, sempre aggiornato da useAgent.ts all'inizio di ogni turno (roundTrip 0) con
  * gli allegati grezzi (base64) di QUESTO turno — mai un valore statico catturato una volta:
@@ -57,6 +57,8 @@ export interface AgentTool {
     /** What the tool is about to do, said to the person in the approval (e.g. "Close #141: duplicate of
      * #139"). Absent = `describeInvocation`, else the name of the tool. */
     describeApproval?: (input: Record<string, unknown>) => string;
+    /** CR-014: a card in the chat once the tool ran (e.g. the draft it wrote, with its actions); none: nothing shown. */
+    card?: (input: Record<string, unknown>, output: unknown) => AgentCard | undefined;
 }
 
 export interface AgentDefinition<TParams, TContext, TResult> {
@@ -105,6 +107,11 @@ export interface AgentDefinition<TParams, TContext, TResult> {
      * For an agent that talks and uses tools, with nothing to save at the end. `parseResponse`
      * still runs on each reply (what `run` and `sendMessage` resolve to). */
     conversational?: boolean;
+    /**
+     * CR-014: runs an action of a card of the chat (the host's: open what it drafted, discard it…); its outcome
+     * goes into the card, whose buttons are then off. A rejection is shown as an error of the card.
+     */
+    onCardAction?(params: TParams, card: AgentCardPart, actionId: string): Promise<AgentCardOutcome | undefined>;
     /** Present = the turns of this agent are answered by the host, not by the AI provider of
      * Agentico (CR-003): a remote agent with its own memory, for example an opencode session on
      * a server. `useAgent` then builds no prompt, needs no model and never falls back: it gives
@@ -152,6 +159,8 @@ export interface AgentExecutorTurn<TParams, TContext> {
     /** A step of the agent: added the first time its id is seen, updated after. Consecutive steps
      * are shown as one collapsible group. */
     onStep(step: AgentExecutorStep): void;
+    /** CR-014: a card in the message (e.g. what a tool of the host prepared), with its actions. */
+    onCard?(card: AgentCard): void;
     /** Questions to the person, answered with a click (CR-004). The promise resolves with the
      * answers if they come while this turn is still running (e.g. the session waits for them);
      * once the turn has ended (or the chat was reloaded), the answers arrive as a new turn with
