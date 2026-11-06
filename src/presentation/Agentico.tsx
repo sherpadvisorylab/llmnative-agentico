@@ -352,7 +352,8 @@ function AgenticoHistoryDropdown({
                             key={`${entry.subagentId}:${entry.entityId}`}
                             // The chat open in the panel is marked: the person sees where they are.
                             icon={current ? 'check' : manifest?.icon ?? 'bot'}
-                            className={current ? 'bg-accent font-medium' : undefined}
+                            // The chat open in the panel stands out (its title in the color of the theme).
+                            className={current ? 'bg-accent font-semibold text-primary' : undefined}
                             actions={[
                                 { icon: 'pencil', label: t.renameChat, onClick: () => { onOpenChange(false); setRenaming(entry); } },
                                 { icon: 'archive', label: t.archiveChat, onClick: () => void archive(entry) },
@@ -360,12 +361,10 @@ function AgenticoHistoryDropdown({
                             onClick={() => onSelect(entry.subagentId, entry.entityId, entry)}
                         >
                             <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                                <span className="min-w-0 truncate">
-                                    {/* `entry.title` è assente su una chat salvata PRIMA che questo campo esistesse
-                                        (localStorage non si aggiorna da solo con lo schema — bug segnalato: la riga
-                                        mostrava "Theme extractor ·" senza nulla dopo) — ripiega sull'id dell'entità
-                                        invece di un vuoto silenzioso. */}
-                                    <span className="text-muted-foreground">{manifest?.label ?? entry.subagentId}</span> · {chatTitle(entry)}
+                                {/* Its title only (CR-011: written by the model, by the person, else its first
+                                    message); which agent it is, on hover and in its icon. */}
+                                <span className="min-w-0 truncate" title={`${manifest?.label ?? entry.subagentId} · ${chatTitle(entry)}`}>
+                                    {chatTitle(entry)}
                                 </span>
                                 {/* CR-010: when it started (how the person knows it again); its last message in the tooltip. */}
                                 <span

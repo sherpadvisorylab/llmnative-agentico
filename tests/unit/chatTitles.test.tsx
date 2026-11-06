@@ -69,7 +69,9 @@ describe('the title of a saved chat (CR-011)', () => {
         const changes = vi.fn();
         const stop = onEntityChatsChange(changes);
         saveEntityChat(chat('a1', [{ kind: 'user', detail: 'Why are some CRs blocked?' }]));
-        expect(agentico.chatTitle(getEntityChat('acme', 'project-chat', 'a1')!)).toBe('crm · Jonny');
+        // No title written yet: the first message of the person; without one, the title of its params.
+        expect(agentico.chatTitle(getEntityChat('acme', 'project-chat', 'a1')!)).toBe('Why are some CRs blocked?');
+        expect(agentico.chatTitle(chat('a0', [{ kind: 'thinking', detail: 'Hi!' }]))).toBe('crm · Jonny');
         expect(renameEntityChat('acme', 'project-chat', 'a1', 'Blocked CRs', 'model')).toBe(true);
         saveEntityChat(chat('a1', [{ kind: 'user', detail: 'Why are some CRs blocked?' }, { kind: 'thinking', detail: 'Two wait for you.' }]));
         expect(getEntityChat('acme', 'project-chat', 'a1')).toMatchObject({ name: 'Blocked CRs', namedBy: 'model' });

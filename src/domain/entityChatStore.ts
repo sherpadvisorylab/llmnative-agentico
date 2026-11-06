@@ -126,8 +126,19 @@ export function saveEntityChat(snapshot: Omit<EntityChatSnapshot, 'savedAt' | 's
     writeAll(next);
 }
 
-/** CR-011: the title of a chat: its own (of the model or of the person), else the one of its params. */
-export const chatTitle = (snapshot: Pick<EntityChatSnapshot, 'title' | 'name' | 'entityId'>): string => snapshot.name || snapshot.title || snapshot.entityId;
+/** The first message of the person in a chat, on one line; empty when they never wrote. */
+const firstMessage = (snapshot: Pick<EntityChatSnapshot, 'activity'>): string => {
+    const text = snapshot.activity.find((entry) => entry.kind === 'user' && entry.detail?.trim())?.detail ?? '';
+    const line = text.trim().split('\n')[0].trim();
+    return line.length > 80 ? `${line.slice(0, 80).trimEnd()}…` : line;
+};
+
+/**
+ * CR-011: the title of a chat: its own (of the model or of the person), else the first message of the
+ * person (no model could write one, e.g. none the chat may use), else the one of its params.
+ */
+export const chatTitle = (snapshot: Pick<EntityChatSnapshot, 'title' | 'name' | 'entityId' | 'activity'>): string =>
+    snapshot.name || firstMessage(snapshot) || snapshot.title || snapshot.entityId;
 
 /** CR-011: whether the person wrote in a chat (an opening message counts). */
 export const chatHasPersonMessage = (snapshot: Pick<EntityChatSnapshot, 'activity'>): boolean =>

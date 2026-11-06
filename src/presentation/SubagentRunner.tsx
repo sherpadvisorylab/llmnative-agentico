@@ -107,6 +107,8 @@ export function SubagentRunner({
         if (startedRef.current || !readyToStart) return;
         startedRef.current = true;
         if (resumeSeed) {
+            // Reopened, not written to: the end of the resume is no turn, the chat is not saved again.
+            resumingRef.current = true;
             void agent.resume(manifest.toParams(params), resumeSeed);
         } else {
             // Same reasoning as OrchestratorRunner.tsx: `model` overrides `selectedModel` for
@@ -227,10 +229,16 @@ export function SubagentRunner({
     const chatEntityId = manifest.chatEntityId?.(params);
     const titleChat = useChatTitles(scope?.id);
     const wasRunningRef = useRef(false);
+    const resumingRef = useRef(false);
     useEffect(() => {
         const ended = wasRunningRef.current && !agent.running;
         wasRunningRef.current = agent.running;
         if (!ended || !chatEntityId || !scope) return;
+        // The end of a resume (the chat reopened): nothing new to save, its last message stays when it was.
+        if (resumingRef.current) {
+            resumingRef.current = false;
+            return;
+        }
         const snap = agent.snapshot();
         if (!snap) return;
         const activity = [...(precedingActivity ?? []), ...snap.activity];

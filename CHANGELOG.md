@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-06
+
+### Fixed
+- A chat reopened from the history is no longer saved again by the reopening: its last message stays when it was.
+- `chatTitle`: without a title written (no model the chat may use), the first message of the person, before the title of its params.
+- History: each chat shows its title only (which agent: its icon and the tooltip), and the chat open in the panel stands out.
+
 ## [0.10.0] - 2026-11-06
 
 ### Added
