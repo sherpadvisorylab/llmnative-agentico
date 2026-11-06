@@ -21,6 +21,33 @@
 | [CR-010](#cr-010--data-dinizio-di-una-chat-e-catalogo-ai-limitato-per-chat) | Data d'inizio di una chat, e catalogo AI limitato per chat | Alta | CR-003, CR-009 | ✅ |
 | [CR-011](#cr-011--titoli-delle-chat-scritti-dal-modello-modificabili) | Titoli delle chat scritti dal modello, modificabili; chat vuote non tenute | Alta | CR-010 | ✅ |
 | [CR-012](#cr-012--livello-di-ragionamento-dei-turni-sul-catalogo-ai) | Livello di ragionamento dei turni sul catalogo AI | Alta | CR-010, CR-122 (framework) | ✅ |
+| [CR-013](#cr-013--chat-salvate-tenute-anche-dallhost) | Chat salvate tenute anche dall'host (backend dello store) | Alta | CR-003 | ✅ |
+
+---
+
+## CR-013 — Chat salvate tenute anche dall'host
+
+**Stato:** ✅ done (0.12.0)
+**Issue:** [#13](https://github.com/sherpadvisorylab/llmnative-agentico/issues/13)
+**Priorità:** Alta
+**Dipende da:** CR-003 (chat per entità)
+
+### Motivazione
+
+Emersa nel Playbook il 06/11/2026: una chat è una sorgente del progetto dalla nascita; la devono vedere gli altri
+dell'organizzazione e non deve perdersi cambiando browser. Lo store viveva nel localStorage di un browser.
+
+### Scope
+
+- `EntityChatBackend` (`load`, `save`, `remove`) in `configureEntityChatStore`; scritture anche al backend in
+  background; `syncEntityChats(scopeId)` all'apertura dello scope (più recente vince per `changedAt`, tolte le chat
+  sparite dal backend, mandate quelle mai mandate); una rimozione rifiutata torna con la sync.
+
+### Checklist
+
+- [x] Backend, sync, provider
+- [x] Test: 16 file / 71 test
+- [x] README, llms.txt, CHANGELOG, versione 0.12.0
 
 ---
 

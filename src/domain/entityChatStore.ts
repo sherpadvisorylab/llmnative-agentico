@@ -56,6 +56,10 @@ export interface EntityChatSnapshot {
     name?: string;
     /** Who wrote `name`: a title of the person is never replaced by one of the model. */
     namedBy?: 'model' | 'person';
+    /** CR-013: when it last changed (a save, a rename): of two copies, the later one wins. */
+    changedAt?: number;
+    /** CR-013: the backend of the host has had it (kept in this browser only, never sent). */
+    synced?: boolean;
     /** Etichetta human-friendly dell'entità (es. il nome del tema) — usata dallo storico chat
      * di Agentico (vedi Agentico.tsx) per mostrare "cosa" senza dover rileggere l'entità stessa
      * dal suo DataProviderAdapter (che questo store, domain-side, non possiede). */
@@ -64,9 +68,67 @@ export interface EntityChatSnapshot {
 
 let storageKey = 'llmnative.agentico.entityChat';
 
-/** Sets the localStorage key of the chat store — call once at startup, before any read. */
-export function configureEntityChatStore(options: { storageKey: string }): void {
+/**
+ * CR-013: where the host keeps the chats besides this browser (its server): the other people of the scope
+ * see them, and they survive a change of browser. Calls are made in the background; a failure leaves the
+ * local copy as it is, sent again by the next sync.
+ */
+export interface EntityChatBackend {
+    /** Every chat of a scope the host keeps. */
+    load(scopeId: string): Promise<EntityChatSnapshot[]>;
+    save(snapshot: EntityChatSnapshot): Promise<void> | void;
+    /** A rejection keeps the chat there (e.g. the host does not let go a chat that gave work): it comes back with the next sync. */
+    remove(scopeId: string, subagentId: string, entityId: string): Promise<void> | void;
+}
+
+let backend: EntityChatBackend | undefined;
+
+/** Sets the localStorage key of the chat store, and the backend of the host (CR-013) — call once at startup, before any read. */
+export function configureEntityChatStore(options: { storageKey: string; backend?: EntityChatBackend }): void {
     storageKey = options.storageKey;
+    backend = options.backend;
+}
+
+/** CR-013: whether the host keeps the chats too. */
+export const hasEntityChatBackend = (): boolean => Boolean(backend);
+
+/** What the backend is given: the chat without what only this browser knows. */
+const forBackend = ({ synced: _synced, ...snapshot }: EntityChatSnapshot): EntityChatSnapshot => snapshot;
+
+/** Sends a chat to the backend; once it took it, marked as there. */
+function push(snapshot: EntityChatSnapshot): void {
+    if (!backend) return;
+    const k = key(snapshot.scopeId, snapshot.subagentId, snapshot.entityId);
+    void Promise.resolve(backend.save(forBackend(snapshot))).then(() => {
+        const all = readAll();
+        const current = all.find((e) => key(e.scopeId, e.subagentId, e.entityId) === k);
+        if (current && !current.synced) writeAll(all.map((e) => (e === current ? { ...e, synced: true } : e)));
+    }, () => undefined);
+}
+
+/**
+ * CR-013: the chats of a scope as the backend has them: a copy there newer than the one here replaces it; a
+ * chat that was there and is gone is removed here; a chat never sent is sent (those of this browser from
+ * before the backend). Nothing without a backend.
+ */
+export async function syncEntityChats(scopeId: string): Promise<void> {
+    if (!backend) return;
+    const remote = (await backend.load(scopeId)).map(normalize).filter((e): e is EntityChatSnapshot => e !== null && e.scopeId === scopeId);
+    const changed = (e: EntityChatSnapshot) => e.changedAt ?? e.savedAt;
+    const all = readAll();
+    const others = all.filter((e) => e.scopeId !== scopeId);
+    const local = all.filter((e) => e.scopeId === scopeId);
+    const kept: EntityChatSnapshot[] = remote.map((theirs) => {
+        const mine = local.find((e) => key(e.scopeId, e.subagentId, e.entityId) === key(theirs.scopeId, theirs.subagentId, theirs.entityId));
+        if (mine && changed(mine) > changed(theirs)) {
+            push(mine);
+            return mine;
+        }
+        return { ...theirs, synced: true };
+    });
+    const unsent = local.filter((mine) => !mine.synced && !remote.some((theirs) => key(theirs.scopeId, theirs.subagentId, theirs.entityId) === key(mine.scopeId, mine.subagentId, mine.entityId)));
+    writeAll([...others, ...kept, ...unsent]);
+    for (const mine of unsent) push(mine);
 }
 
 // Snapshots written before the scope rename carry `tenantId`: read them as `scopeId`.
@@ -123,12 +185,16 @@ export function saveEntityChat(snapshot: Omit<EntityChatSnapshot, 'savedAt' | 's
     const previous = all.find((e) => key(e.scopeId, e.subagentId, e.entityId) === k);
     const now = Date.now();
     const next = all.filter((e) => e !== previous);
-    next.push({
-        ...snapshot, savedAt: now, startedAt: previous ? chatStartedAt(previous) : now,
+    const saved: EntityChatSnapshot = {
+        ...snapshot, savedAt: now, changedAt: now, startedAt: previous ? chatStartedAt(previous) : now,
         // CR-011: its own title stays.
         ...(previous?.name ? { name: previous.name, namedBy: previous.namedBy } : {}),
-    });
+        // CR-013: on the backend once it was.
+        ...(previous?.synced ? { synced: true } : {}),
+    };
+    next.push(saved);
     writeAll(next);
+    push(saved);
 }
 
 /** What the Retry button sends, in every language of Agentico: chats saved before `retry` was marked. */
@@ -171,8 +237,9 @@ export function renameEntityChat(scopeId: string, subagentId: string, entityId: 
     if (!chat || (by === 'model' && chat.namedBy === 'person')) return false;
     const name = title.trim().replace(/\s+/g, ' ').slice(0, 120);
     const { name: _name, namedBy: _namedBy, ...rest } = chat;
-    const renamed: EntityChatSnapshot = name ? { ...rest, name, namedBy: by } : rest;
+    const renamed: EntityChatSnapshot = name ? { ...rest, name, namedBy: by, changedAt: Date.now() } : { ...rest, changedAt: Date.now() };
     writeAll(all.map((e) => (e === chat ? renamed : e)));
+    push(renamed);
     return true;
 }
 
@@ -184,6 +251,8 @@ export const chatStartedAt = (snapshot: Pick<EntityChatSnapshot, 'savedAt' | 'st
 export function removeEntityChat(scopeId: string, subagentId: string, entityId: string): void {
     const k = key(scopeId, subagentId, entityId);
     writeAll(readAll().filter((e) => key(e.scopeId, e.subagentId, e.entityId) !== k));
+    // CR-013: off the backend too; refused there, it comes back with the next sync.
+    if (backend) void Promise.resolve(backend.remove(scopeId, subagentId, entityId)).catch(() => undefined);
 }
 
 /** Tutte le chat salvate di uno scope, le ultime iniziate prima (CR-010: riaprirne una non la sposta)

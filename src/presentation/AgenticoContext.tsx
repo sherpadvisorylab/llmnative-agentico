@@ -4,7 +4,7 @@ import type { AgentActivityEntry, AgentConversation } from './useAgent';
 import type { ResultDestination } from '../domain/resultDestination';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
 import { findSubagentManifest } from '../domain/subagentRegistry';
-import { saveEntityChat, type EntityChatSnapshot } from '../domain/entityChatStore';
+import { saveEntityChat, syncEntityChats, type EntityChatSnapshot } from '../domain/entityChatStore';
 import { getAgenticoPrompts } from '../domain/prompts';
 
 /** Where results are saved and chats are kept: the host's current tenant, company, workspace…
@@ -314,6 +314,11 @@ export function AgenticoProvider({ children, scope = null }: { children: React.R
     const taskRef = useRef<AgenticoTask | null>(null);
     useEffect(() => { taskRef.current = task; }, [task]);
     const [isOpen, setIsOpen] = useState(false);
+    // CR-013: the chats of the scope as the backend of the host has them, each time the scope changes.
+    const scopeId = scope?.id;
+    useEffect(() => {
+        if (scopeId) void syncEntityChats(scopeId).catch(() => undefined);
+    }, [scopeId]);
 
     const openTask = useCallback(<TResult,>(next: AgenticoTask<TResult>) => {
         const current = taskRef.current;

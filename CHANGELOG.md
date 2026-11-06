@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-06
+
+### Added
+- Saved chats kept by the host too (CR-013, GH issue #13): `configureEntityChatStore({ storageKey, backend })` with
+  an `EntityChatBackend` (`load(scopeId)`, `save(snapshot)`, `remove(...)`). The browser keeps its copy (reads stay
+  synchronous); every save, rename and removal also goes to the backend in the background. `syncEntityChats(scopeId)`
+  (run by `AgenticoProvider` when its scope changes) takes a newer copy from the backend, drops a chat gone from
+  it, and sends the chats of the browser never sent (those from before the backend); a removal the backend refuses
+  comes back with the next sync. `snapshot.changedAt` (the later copy wins), `hasEntityChatBackend()`.
+
 ## [0.11.0] - 2026-11-06
 
 ### Added
