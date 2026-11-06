@@ -49,6 +49,8 @@ const definition = (models: Array<{ label: string; value: string }> = []): Defin
         alongside: true,
         models: () => models,
         catalogProviders: (params) => (params.project === 'crm' ? ['allowed'] : undefined),
+        // CR-012: how much it reasons on each provider of the catalog.
+        catalogReasoning: (_params, provider) => (provider === 'allowed' ? 'high' : undefined),
         turn: async () => ({ text: 'from the executor' }),
     },
 });
@@ -67,6 +69,8 @@ describe('the AI catalog of a chat (CR-010)', () => {
         // Asked by name for a model of another provider: never used.
         await act(async () => { await result.current.sendMessage('And now?', { model: 'other/x' }); });
         expect(calls.map((call) => call.provider)).toEqual(['allowed', 'allowed']);
+        // Every request of the turns on that provider with its reasoning level.
+        expect(calls.map((call) => (call.request as { reasoning?: string }).reasoning)).toEqual(['high', 'high']);
     });
 
     it('starts on the first model of the executor when the model picked is not allowed', async () => {

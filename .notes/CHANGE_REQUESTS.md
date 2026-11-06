@@ -20,6 +20,32 @@
 | [CR-009](#cr-009--esecutore-accanto-al-catalogo-ai) | Esecutore accanto al catalogo AI: un subagente sceglie per turno dove gira | Alta | CR-003, CR-121 (framework) | ✅ |
 | [CR-010](#cr-010--data-dinizio-di-una-chat-e-catalogo-ai-limitato-per-chat) | Data d'inizio di una chat, e catalogo AI limitato per chat | Alta | CR-003, CR-009 | ✅ |
 | [CR-011](#cr-011--titoli-delle-chat-scritti-dal-modello-modificabili) | Titoli delle chat scritti dal modello, modificabili; chat vuote non tenute | Alta | CR-010 | ✅ |
+| [CR-012](#cr-012--livello-di-ragionamento-dei-turni-sul-catalogo-ai) | Livello di ragionamento dei turni sul catalogo AI | Alta | CR-010, CR-122 (framework) | ✅ |
+
+---
+
+## CR-012 — Livello di ragionamento dei turni sul catalogo AI
+
+**Stato:** ✅ done (0.11.0)
+**Issue:** [#12](https://github.com/sherpadvisorylab/llmnative-agentico/issues/12)
+**Priorità:** Alta
+**Dipende da:** CR-010, CR-122 del framework (`reasoning` sulla richiesta)
+
+### Motivazione
+
+Emersa nel Playbook il 06/11/2026: l'app imposta per provider quanto ragiona il modello delle sue chat; un turno sul
+catalogo AI non mandava nulla.
+
+### Scope
+
+- `AgentExecutor.catalogReasoning(params, provider)`: il livello dei turni della chat su quel provider; ogni
+  richiesta del turno (i suoi giri e quella di chiusura) lo porta come `reasoning`. Peer del framework invariato.
+
+### Checklist
+
+- [x] `catalogReasoning`, mandato su ogni richiesta di un turno sul catalogo
+- [x] Test: 15 file / 68 test
+- [x] README, llms.txt, CHANGELOG, versione 0.11.0
 
 ---
 

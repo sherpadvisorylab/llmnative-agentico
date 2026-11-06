@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-06
+
+### Added
+- How much the model reasons on the turns of a chat on the AI catalog (CR-012, GH issue #12):
+  `executor.catalogReasoning(params, provider)` gives the level (`low`, `medium`, `high`, `max`); every request
+  of the turn (its rounds and the closing one) carries it as `reasoning`, which `@llmnative/react` 1.46 (CR-122)
+  sends in the format of each provider. An older framework ignores it.
+
 ## [0.10.3] - 2026-11-06
 
 ### Fixed

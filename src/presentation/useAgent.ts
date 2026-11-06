@@ -474,6 +474,10 @@ export function useAgent<TParams, TContext, TResult>(
         const firstAllowed = Object.values(modelsByProvider).flat().find((model) => !allowed || allowed.includes(model.provider))?.id;
         const overrideModel = requestedModel && allowedIn(allowed, requestedModel) ? requestedModel
             : !allowedIn(allowed, catalogModel) ? firstAllowed : undefined;
+        // CR-012: how much the model reasons on this provider, on every request of the turn.
+        const turnRef = overrideModel ? parseAIModelRef(overrideModel) : ref;
+        const level = turnRef && sessionRef.current ? executor?.catalogReasoning?.(sessionRef.current.params, turnRef.provider) : undefined;
+        const reasoning = level ? { reasoning: level } : {};
         const session = sessionRef.current;
         if (!session) { setError(labelsRef.current.noActiveSession); return null; }
         const effectiveRef = overrideModel ? parseAIModelRef(overrideModel) : ref;
@@ -589,6 +593,7 @@ export function useAgent<TParams, TContext, TResult>(
                     result = await effectiveProvider.complete({
                         prompt: promptText,
                         model: effectiveRef.model,
+                        ...reasoning,
                         history,
                         tools: toolDefs.length ? toolDefs : undefined,
                         signal: controller.signal,
@@ -749,6 +754,7 @@ export function useAgent<TParams, TContext, TResult>(
             let closingResult;
             try {
                 closingResult = await effectiveProvider.complete({
+                    ...reasoning,
                     // Anche questo turno passa dai micro-prompt (vedi run()/sendMessage() sopra)
                     // — altrimenti un run che esaurisce il budget di round-trip (tanti tool_calls
                     // di fila, es. molti URL di font/asset da ricontrollare) salta il riepilogo

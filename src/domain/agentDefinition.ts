@@ -196,4 +196,9 @@ export interface AgentExecutor<TParams, TContext, TResult> {
      * instead, else the first allowed model of the catalog.
      */
     catalogProviders?(params: TParams): readonly string[] | undefined;
+    /**
+     * CR-012: how much the model reasons on the turns of this chat on a provider of the AI catalog (sent as
+     * `reasoning` on each of its requests, @llmnative/react 1.46); absent: the default of the model.
+     */
+    catalogReasoning?(params: TParams, provider: string): 'low' | 'medium' | 'high' | 'max' | undefined;
 }
