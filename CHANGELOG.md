@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-11-06
+
+### Fixed
+- A chat saved while a turn ran (the page reloaded, the server went away) shows that turn as stopped when it is reopened, its running steps stopped and its streaming text done, instead of a turn still at work (`settleActivity`).
+
 ## [0.13.2] - 2026-11-06
 
 ### Fixed

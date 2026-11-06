@@ -69,6 +69,28 @@ describe('a card in a chat (CR-014)', () => {
         expect(cardOf(result.current.activity).part.outcome).toEqual({ status: 'done', text: 'CR #12 opened', link: { label: '#12', url: 'https://github.com/acme/crm/issues/12' } });
     });
 
+    it('shows a turn left half way (the chat saved while it ran) as stopped when the chat is reopened', async () => {
+        const { result } = renderHook(() => useAgent(definition(), { defaultEnabled: true }), { wrapper });
+        await act(async () => {
+            await result.current.resume({ project: 'crm' }, {
+                history: [],
+                activity: [
+                    { id: 'u', kind: 'user', label: 'You', status: 'done', detail: 'Login?' },
+                    { id: 'm', kind: 'thinking', label: '', status: 'running', parts: [
+                        { type: 'tool', id: 'start', label: 'Starting the chat', status: 'running' },
+                        { type: 'text', id: 'text', text: 'Half', streaming: true },
+                    ] },
+                ],
+            });
+        });
+        const message = result.current.activity.find((entry) => entry.id === 'm')!;
+        expect(message.status).toBe('stopped');
+        expect(message.parts).toEqual([
+            { type: 'tool', id: 'start', label: 'Starting the chat', status: 'stopped' },
+            { type: 'text', id: 'text', text: 'Half', streaming: false },
+        ]);
+    });
+
     it('takes a card of a remote executor in its message', async () => {
         const remote: Definition = {
             ...definition(),

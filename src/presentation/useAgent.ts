@@ -202,6 +202,18 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
  * membri qui sotto, quindi `never` è innocuo. */
 export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction'>;
 
+/** The entries of a reopened chat: what was still running stopped, what was streaming done. */
+export function settleActivity(activity: AgentActivityEntry[]): AgentActivityEntry[] {
+    return activity.map((entry) => (entry.status !== 'running' && !entry.parts?.some((part) => (part.type === 'tool' && part.status === 'running') || ((part.type === 'text' || part.type === 'reasoning') && part.streaming)) ? entry : {
+        ...entry,
+        status: entry.status === 'running' ? 'stopped' : entry.status,
+        ...(entry.parts ? {
+            parts: entry.parts.map((part) => (part.type === 'tool' && part.status === 'running' ? { ...part, status: 'stopped' as const }
+                : (part.type === 'text' || part.type === 'reasoning') && part.streaming ? { ...part, streaming: false } : part)),
+        } : {}),
+    }));
+}
+
 export function useAgent<TParams, TContext, TResult>(
     definition: AgentDefinition<TParams, TContext, TResult>,
     options: { defaultEnabled?: boolean } = {},
@@ -894,7 +906,9 @@ export function useAgent<TParams, TContext, TResult>(
         if (runningRef.current) { setError(labelsRef.current.requestInProgress); return; }
         runningRef.current = true;
         setError(null);
-        setActivity(seed.activity);
+        // A chat saved while a turn ran (and left: the page reloaded, the server went away) shows that turn as
+        // stopped, not as one still at work: nothing runs it any more.
+        setActivity(settleActivity(seed.activity));
         // `running`, come in run() — buildContext() per theme rifà una vera fetch di rete
         // (extractSiteSnapshot): senza, `task.agent.running` resterebbe falsamente `false` per
         // tutta quella finestra, e qualunque logica che vi si affida (spinner del composer,
