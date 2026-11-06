@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-11-06
+
+### Fixed
+- A chat of a subagent with `chatEntityId` is saved when the person writes (the start of a turn) as well as when the reply ends: it is in the history and in the lists of the host while a long reply is being written, not only after it.
+
 ## [0.10.2] - 2026-11-06
 
 ### Fixed

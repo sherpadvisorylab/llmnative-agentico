@@ -231,12 +231,13 @@ export function SubagentRunner({
     const wasRunningRef = useRef(false);
     const resumingRef = useRef(false);
     useEffect(() => {
+        const started = !wasRunningRef.current && agent.running;
         const ended = wasRunningRef.current && !agent.running;
         wasRunningRef.current = agent.running;
-        if (!ended || !chatEntityId || !scope) return;
-        // The end of a resume (the chat reopened): nothing new to save, its last message stays when it was.
+        if ((!started && !ended) || !chatEntityId || !scope) return;
+        // A resume (the chat reopened): nothing new to save, its last message stays when it was.
         if (resumingRef.current) {
-            resumingRef.current = false;
+            if (ended) resumingRef.current = false;
             return;
         }
         const snap = agent.snapshot();
@@ -249,8 +250,10 @@ export function SubagentRunner({
             history: snap.history,
             activity,
         });
+        // Saved as the person writes too (the start of a turn): the chat is in the history (and in the lists of
+        // the host) while its reply is being written, however long. Its title, once the reply is there.
         // CR-011: its title, from the whole chat, once it has none (the model of the chat when it is one of the catalog).
-        if (manifest.autoTitle) void titleChat(manifest.id, chatEntityId, agent.selectedModel);
+        if (ended && manifest.autoTitle) void titleChat(manifest.id, chatEntityId, agent.selectedModel);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [agent.running]);
 
