@@ -91,6 +91,11 @@ describe('a card in a chat (CR-014)', () => {
         ]);
     });
 
+    it('offers Continue without AI unless the agent says it has nothing without a model (CR-015)', () => {
+        expect(renderHook(() => useAgent(definition()), { wrapper }).result.current.offersFallback).toBe(true);
+        expect(renderHook(() => useAgent({ ...definition(), offersFallback: false }), { wrapper }).result.current.offersFallback).toBe(false);
+    });
+
     it('takes a card of a remote executor in its message', async () => {
         const remote: Definition = {
             ...definition(),

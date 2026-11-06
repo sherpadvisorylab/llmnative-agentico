@@ -193,6 +193,8 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
      * answers and shows them read-only. Resolves with the result of that new turn, if any; rejects
      * (leaving the form open) when another turn is running or the entry is not of this conversation. */
     answerQuestions: (entryId: string, partId: string, answers: AgentQuestionAnswer[]) => Promise<TResult | null>;
+    /** CR-015: the agent has a result of its own without a model ("Continue without AI"). */
+    offersFallback: boolean;
     /** CR-014: an action of a card of the chat, run by the host; its outcome goes into the card. */
     cardAction: (entryId: string, partId: string, actionId: string) => Promise<void>;
 }
@@ -200,7 +202,7 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
 /** Solo la fetta di UseAgentResult che serve a un consumer del pannello globale (Agentico.tsx)
  * per continuare una conversazione già avviata da run() — TParams non compare in nessuno dei
  * membri qui sotto, quindi `never` è innocuo. */
-export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction'>;
+export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction' | 'offersFallback'>;
 
 /** The entries of a reopened chat: what was still running stopped, what was streaming done. */
 export function settleActivity(activity: AgentActivityEntry[]): AgentActivityEntry[] {
@@ -1017,5 +1019,7 @@ export function useAgent<TParams, TContext, TResult>(
         modelsByProvider: offeredCatalog, modelsLoading, running, error, canContinue, remote, remoteModels, alongside,
         ...(executor?.catalogGroup ? { catalogGroup: executor.catalogGroup } : {}),
         activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions, cardAction,
+        // CR-015: whether "Continue without AI" is offered when the model fails.
+        offersFallback: definition.offersFallback !== false,
     };
 }

@@ -697,7 +697,8 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                                         deterministico, generico per costruzione a QUALUNQUE
                                         subagent (nessuna label/logica specifica qui). */}
                                     {/* A remote agent has no deterministic result to fall back on. */}
-                                    {!task.agent.remote && <ActionButton
+                                    {/* Nor one that says it has none (CR-015): a chat, without a model, has nothing to give. */}
+                                    {!task.agent.remote && task.agent.offersFallback !== false && <ActionButton
                                         label={t.continueWithoutAi}
                                         variant="secondary"
                                         className="shrink-0"

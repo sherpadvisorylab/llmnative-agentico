@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-06
+
+### Added
+- Continue without AI only for an agent that has a result without a model (CR-015, GH issue #15):
+  `AgentDefinition.offersFallback` (default true); false = when the model fails only Retry is offered (a chat has
+  nothing to give without a model). `useAgent().offersFallback`.
+
 ## [0.13.3] - 2026-11-06
 
 ### Fixed

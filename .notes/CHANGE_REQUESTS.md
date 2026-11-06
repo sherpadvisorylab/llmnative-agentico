@@ -23,6 +23,30 @@
 | [CR-012](#cr-012--livello-di-ragionamento-dei-turni-sul-catalogo-ai) | Livello di ragionamento dei turni sul catalogo AI | Alta | CR-010, CR-122 (framework) | ✅ |
 | [CR-013](#cr-013--chat-salvate-tenute-anche-dallhost) | Chat salvate tenute anche dall'host (backend dello store) | Alta | CR-003 | ✅ |
 | [CR-014](#cr-014--card-nei-messaggi-della-chat) | Card nei messaggi della chat, con le azioni dell'host | Alta | CR-004 | ✅ |
+| [CR-015](#cr-015--continua-senza-ai-solo-se-lagente-ha-un-risultato-senza-modello) | Continua senza AI solo se l'agente ha un risultato senza modello | Media | — | ✅ |
+
+---
+
+## CR-015 — Continua senza AI solo se l'agente ha un risultato senza modello
+
+**Stato:** ✅ done (0.14.0)
+**Issue:** [#15](https://github.com/sherpadvisorylab/llmnative-agentico/issues/15)
+**Priorità:** Media
+
+### Motivazione
+
+Emersa nel Playbook il 06/11/2026: quando il modello fallisce (es. il limite settimanale di un abbonamento) una
+chat offriva "Continua senza AI", che non dà nulla.
+
+### Scope
+
+- `AgentDefinition.offersFallback` (default true); false = solo Riprova. `useAgent().offersFallback`.
+
+### Checklist
+
+- [x] Flag, barra dell'errore
+- [x] Test: 17 file / 75 test
+- [x] README, llms.txt, CHANGELOG, versione 0.14.0
 
 ---
 

@@ -108,6 +108,11 @@ export interface AgentDefinition<TParams, TContext, TResult> {
      * still runs on each reply (what `run` and `sendMessage` resolve to). */
     conversational?: boolean;
     /**
+     * CR-015: false = no "Continue without AI" when the model fails: the agent has no result of its own without a
+     * model (e.g. a chat), so only Retry is offered. Absent: offered, as before.
+     */
+    offersFallback?: boolean;
+    /**
      * CR-014: runs an action of a card of the chat (the host's: open what it drafted, discard it…); its outcome
      * goes into the card, whose buttons are then off. A rejection is shown as an error of the card.
      */
