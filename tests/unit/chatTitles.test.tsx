@@ -72,6 +72,11 @@ describe('the title of a saved chat (CR-011)', () => {
         // No title written yet: the first message of the person; without one, the title of its params.
         expect(agentico.chatTitle(getEntityChat('acme', 'project-chat', 'a1')!)).toBe('Why are some CRs blocked?');
         expect(agentico.chatTitle(chat('a0', [{ kind: 'thinking', detail: 'Hi!' }]))).toBe('crm · Jonny');
+        // What the Retry button sent is no message of the person: the first one they wrote is the title.
+        const retried = chat('a9', [{ kind: 'user', detail: 'Retry.' }, { kind: 'thinking', detail: 'Hello!' }, { kind: 'user', detail: 'Can we add a login?' }]);
+        expect(agentico.chatTitle(retried)).toBe('Can we add a login?');
+        expect(agentico.chatTitle(chat('a8', [{ kind: 'user', detail: 'Riprova.' }]))).toBe('crm · Jonny');
+        expect(agentico.chatHasPersonMessage(chat('a8', [{ kind: 'user', detail: 'Riprova.' }]))).toBe(false);
         expect(renameEntityChat('acme', 'project-chat', 'a1', 'Blocked CRs', 'model')).toBe(true);
         saveEntityChat(chat('a1', [{ kind: 'user', detail: 'Why are some CRs blocked?' }, { kind: 'thinking', detail: 'Two wait for you.' }]));
         expect(getEntityChat('acme', 'project-chat', 'a1')).toMatchObject({ name: 'Blocked CRs', namedBy: 'model' });

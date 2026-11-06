@@ -11,6 +11,9 @@
 // quando non c'è un taskId da cui pescare uno snapshot.
 import type { AIConversationTurn } from '@llmnative/react';
 import type { AgentMessagePart } from './messageParts';
+import { agenticoEn } from '../i18n/en';
+import { agenticoIt } from '../i18n/it';
+import { agenticoDe } from '../i18n/de';
 
 /** Stessa forma di AgentActivityEntry (agentico/presentation/useAgent.ts) — ridefinita qui invece
  * di importata: il domain layer non dipende dal presentation layer, e questi campi sono
@@ -24,6 +27,8 @@ export interface EntityChatActivityEntry {
     detail?: string;
     toolNames?: string[];
     attachmentNames?: string[];
+    /** A message the Retry button sent for the person, not one they wrote (never a title). */
+    retry?: boolean;
     /** The message in parts (CR-004): saved and reloaded as they are. Absent in chats saved before
      * 0.3.0, which show `detail` as before. */
     parts?: AgentMessagePart[];
@@ -126,9 +131,16 @@ export function saveEntityChat(snapshot: Omit<EntityChatSnapshot, 'savedAt' | 's
     writeAll(next);
 }
 
+/** What the Retry button sends, in every language of Agentico: chats saved before `retry` was marked. */
+const RETRY_TEXTS = new Set([agenticoEn, agenticoIt, agenticoDe].map((pack) => pack.retryMessage.trim().toLowerCase()));
+
+/** A message the person wrote: not empty, not one the Retry button sent for them. */
+const writtenByPerson = (entry: EntityChatActivityEntry) =>
+    entry.kind === 'user' && Boolean(entry.detail?.trim()) && !entry.retry && !RETRY_TEXTS.has(entry.detail!.trim().toLowerCase());
+
 /** The first message of the person in a chat, on one line; empty when they never wrote. */
 const firstMessage = (snapshot: Pick<EntityChatSnapshot, 'activity'>): string => {
-    const text = snapshot.activity.find((entry) => entry.kind === 'user' && entry.detail?.trim())?.detail ?? '';
+    const text = snapshot.activity.find(writtenByPerson)?.detail ?? '';
     const line = text.trim().split('\n')[0].trim();
     return line.length > 80 ? `${line.slice(0, 80).trimEnd()}…` : line;
 };
@@ -142,7 +154,10 @@ export const chatTitle = (snapshot: Pick<EntityChatSnapshot, 'title' | 'name' | 
 
 /** CR-011: whether the person wrote in a chat (an opening message counts). */
 export const chatHasPersonMessage = (snapshot: Pick<EntityChatSnapshot, 'activity'>): boolean =>
-    snapshot.activity.some((entry) => entry.kind === 'user' && Boolean(entry.detail?.trim()));
+    snapshot.activity.some(writtenByPerson);
+
+/** Whether a message of a chat is one the Retry button sent (the model reading a chat leaves it out). */
+export const isRetryMessage = (entry: EntityChatActivityEntry): boolean => entry.kind === 'user' && !writtenByPerson(entry) && Boolean(entry.detail?.trim());
 
 /**
  * CR-011: gives a chat its own title. The person's (`by: 'person'`) replaces any, and an empty one gives

@@ -7,14 +7,14 @@ import { parseAIModelRef, useAIProviderRegistry } from '@llmnative/react';
 import type { AIModelDescriptor, AIProviderAdapter } from '@llmnative/react';
 import type { SubagentManifest } from '../domain/subagentManifest';
 import { findSubagentManifest } from '../domain/subagentRegistry';
-import { chatHasPersonMessage, getEntityChat, listEntityChats, removeEntityChat, renameEntityChat, type EntityChatSnapshot } from '../domain/entityChatStore';
+import { chatHasPersonMessage, isRetryMessage, getEntityChat, listEntityChats, removeEntityChat, renameEntityChat, type EntityChatSnapshot } from '../domain/entityChatStore';
 import { getAgenticoPrompts } from '../domain/prompts';
 import { useAIModelCatalog } from './useAIModelCatalog';
 
 /** What the model reads of a chat: who wrote what, in order; the middle of a long one left out. */
 export function chatTranscript(activity: EntityChatSnapshot['activity'], max = 6000): string {
     const text = activity
-        .filter((entry) => (entry.kind === 'user' || entry.kind === 'thinking') && entry.detail?.trim())
+        .filter((entry) => (entry.kind === 'user' || entry.kind === 'thinking') && entry.detail?.trim() && !isRetryMessage(entry))
         .map((entry) => `${entry.kind === 'user' ? 'Person' : 'Agent'}: ${entry.detail!.trim()}`)
         .join('\n\n');
     return text.length > max ? `${text.slice(0, max * 0.7)}\n\n[…]\n\n${text.slice(-max * 0.3)}` : text;

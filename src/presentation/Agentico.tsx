@@ -685,7 +685,7 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                                         label={t.retry}
                                         variant="secondary"
                                         className="shrink-0"
-                                        onClick={() => { void task.agent.sendMessage(t.retryMessage).then((r) => { if (r) task.onApplied(r); }); }}
+                                        onClick={() => { void task.agent.sendMessage(t.retryMessage, { retry: true }).then((r) => { if (r) task.onApplied(r); }); }}
                                     />
                                     {/* Ogni subagent ha un fallback deterministico a costo zero
                                         (vedi AgentDefinition.fallback) — quando la chiamata al

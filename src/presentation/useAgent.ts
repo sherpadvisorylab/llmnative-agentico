@@ -89,6 +89,8 @@ export interface AgentActivityEntry {
      * doveva fidarsi a memoria (bug osservato: un allegato sembrava "sparito" perché non
      * c'era traccia visiva che fosse mai arrivato). */
     attachmentNames?: string[];
+    /** A message the Retry button sent for the person (never the title of the chat). */
+    retry?: boolean;
     /** On the turns of a remote agent (CR-004): the message in parts (text, reasoning, steps,
      * questions), in the order they arrived. `detail` still holds its text. Absent on the turns of
      * the AI provider and on chats saved before 0.3.0, shown from `detail` as before. */
@@ -152,7 +154,7 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
      * può invocare i tool dell'agente con i parametri suggeriti nel messaggio. Richiede che
      * run() sia già stato eseguito con AI abilitata (altrimenti `error` viene impostato).
      * `opts` — stesso trattamento di run(), vedi sopra. */
-    sendMessage: (text: string, opts?: { attachments?: File[]; model?: string }) => Promise<TResult | null>;
+    sendMessage: (text: string, opts?: { attachments?: File[]; model?: string; retry?: boolean }) => Promise<TResult | null>;
     /** Interrompe il turno in corso (run() o sendMessage()) — annulla la chiamata AI
      * attualmente in volo. Nessun effetto se non c'è nulla in corso. Le tool call già in
      * esecuzione in quel momento completano comunque (sono fetch brevi); il turno si ferma
@@ -882,7 +884,7 @@ export function useAgent<TParams, TContext, TResult>(
         }
     };
 
-    const sendMessage = async (text: string, opts?: { attachments?: File[]; model?: string }): Promise<TResult | null> => {
+    const sendMessage = async (text: string, opts?: { attachments?: File[]; model?: string; retry?: boolean }): Promise<TResult | null> => {
         if (runningRef.current) { setError(labelsRef.current.requestInProgress); return null; }
         setError(null);
         if (!text.trim()) { setError('Messaggio vuoto.'); return null; }
@@ -896,6 +898,8 @@ export function useAgent<TParams, TContext, TResult>(
         setActivity((prev) => [...prev, {
             id: crypto.randomUUID(), kind: 'user', label: 'Tu', status: 'done', detail: text,
             ...(opts?.attachments?.length ? { attachmentNames: opts.attachments.map((f) => f.name) } : {}),
+            // Sent by the Retry button, not written by the person: never the title of the chat.
+            ...(opts?.retry ? { retry: true } : {}),
         }]);
         try {
             if (remote) return await runRemoteTurn(text, false, opts?.model || undefined);
