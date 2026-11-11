@@ -78,7 +78,7 @@ describe('going back to a message of the person', () => {
         await act(async () => { turns[5].reply('Anytime.'); await pending; });
     });
 
-    it('is refused while a turn runs, and on a message sent before it was possible', async () => {
+    it('is refused while a turn runs, and on a message the history does not show', async () => {
         const { definition, turns } = remoteDefinition();
         const { result } = renderHook(() => useAgent(definition), { wrapper });
         let pending!: Promise<string | null>;
@@ -90,10 +90,42 @@ describe('going back to a message of the person', () => {
         expect(refused).toBeNull();
         expect(result.current.error).not.toBeNull();
         await act(async () => { turns[0].reply('Hello'); await pending; });
-        // The opening message has no point of the history to go back to.
-        await act(async () => { refused = await result.current.rewind(opening.id); });
+        // Sent without historyAt (the opening, or before 0.15.0): found in the history by its text.
+        expect(opening.historyAt).toBeUndefined();
+        expect(result.current.rewindable(opening.id)).toBe(true);
+
+        // A chat reopened whose history does not have the message: no going back.
+        const reopened = renderHook(() => useAgent(definition), { wrapper }).result;
+        await act(async () => {
+            await reopened.current.resume({ project: 'crm' }, { history: [], activity: [{ id: 'old', kind: 'user', label: 'Tu', status: 'done', detail: 'Lost' }] });
+        });
+        expect(reopened.current.rewindable('old')).toBe(false);
+        await act(async () => { refused = await reopened.current.rewind('old'); });
         expect(refused).toBeNull();
         expect(turns).toHaveLength(1);
+    });
+
+    it('finds the message of an older chat in its history, the same occurrence of the same text', async () => {
+        const { definition, turns } = remoteDefinition();
+        const { result } = renderHook(() => useAgent(definition), { wrapper });
+        await act(async () => {
+            await result.current.resume({ project: 'crm' }, {
+                history: [{ role: 'assistant', content: 'Hi' }, { role: 'user', content: 'Again' }, { role: 'assistant', content: 'One' }, { role: 'user', content: 'Again' }, { role: 'assistant', content: 'Two' }],
+                activity: [
+                    { id: 'a', kind: 'thinking', label: '', status: 'done', detail: 'Hi' },
+                    { id: 'u1', kind: 'user', label: 'Tu', status: 'done', detail: 'Again' },
+                    { id: 'b', kind: 'thinking', label: '', status: 'done', detail: 'One' },
+                    { id: 'u2', kind: 'user', label: 'Tu', status: 'done', detail: 'Again' },
+                    { id: 'c', kind: 'thinking', label: '', status: 'done', detail: 'Two' },
+                ],
+            });
+        });
+        let pending!: Promise<string | null>;
+        act(() => { pending = result.current.rewind('u2'); });
+        await waitFor(() => expect(turns).toHaveLength(1));
+        expect(turns[0].rewound?.activity.map((entry) => entry.id)).toEqual(['a', 'u1', 'b']);
+        await act(async () => { turns[0].reply('Three'); await pending; });
+        expect(result.current.snapshot()?.history.map((turn) => ('content' in turn ? turn.content : ''))).toEqual(['Hi', 'Again', 'One', 'Again', 'Three']);
     });
 });
 

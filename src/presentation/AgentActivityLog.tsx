@@ -205,9 +205,9 @@ function UserMessageBubble({ entry, pinned = true, actions }: { entry: AgentActi
     return (
         // Not pinned while questions are docked at the bottom (CR-005): the thread gets the room.
         <div className={`${pinned ? 'sticky top-0 z-20 border-b border-border/40' : ''} group flex items-start justify-end gap-1 bg-background py-1.5`}>
-            {/* CR-016: Retry from here and Edit, shown on hover (and to the keyboard), beside the message. */}
+            {/* CR-016: Retry from here and Edit beside the message: faint, clear on hover (and to the keyboard). */}
             {actions?.available(entry) && (
-                <span className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                <span className="flex shrink-0 items-center opacity-50 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                     <ActionButton icon="rotate-ccw" ariaLabel={t.retryFromHere} title={t.retryFromHere} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onRetry(entry)} />
                     <ActionButton icon="pencil" ariaLabel={t.editMessage} title={t.editMessage} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onEdit(entry)} />
                 </span>

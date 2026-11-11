@@ -196,6 +196,8 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
     rewind: (entryId: string, text?: string) => Promise<TResult | null>;
     /** CR-016: whether this agent offers going back (always on the AI catalog; with an executor, when it says so). */
     canRewind: boolean;
+    /** CR-016: whether a message of the person can be gone back to (it knows, or the history shows, where it was). */
+    rewindable: (entryId: string) => boolean;
     /** Answers the questions part `partId` of the entry `entryId` (CR-004). If the turn that asked
      * is still waiting, its `onQuestions` promise resolves; otherwise a new turn of the executor
      * carries them (`AgentExecutorTurn.answers`, with empty `text`). Either way the part keeps the
@@ -211,7 +213,7 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
 /** Solo la fetta di UseAgentResult che serve a un consumer del pannello globale (Agentico.tsx)
  * per continuare una conversazione già avviata da run() — TParams non compare in nessuno dei
  * membri qui sotto, quindi `never` è innocuo. */
-export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction' | 'offersFallback' | 'rewind' | 'canRewind'>;
+export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction' | 'offersFallback' | 'rewind' | 'canRewind' | 'rewindable'>;
 
 /** The entries of a reopened chat: what was still running stopped, what was streaming done. */
 export function settleActivity(activity: AgentActivityEntry[]): AgentActivityEntry[] {
@@ -1007,16 +1009,39 @@ export function useAgent<TParams, TContext, TResult>(
     /** CR-016: takes the chat back to a message of the person and sends it again (`text`: edited). Whatever
      * came after it goes, from the chat and from the history of the model; an executor starts again from
      * the chat as it is then. Refused while a turn runs, or on a message without `historyAt`. */
+    /** Where the history goes back to for a message of the person: its `historyAt`; on a message sent before
+     * 0.15.0 (or the opening one), the turn of the person in the history with its text, the same occurrence.
+     * None: no going back. */
+    const rewindPoint = (entryId: string): number | undefined => {
+        const session = sessionRef.current;
+        const index = activity.findIndex((entry) => entry.id === entryId);
+        const entry = activity[index];
+        const text = entry?.detail?.trim();
+        if (!canRewind || !session || !entry || entry.kind !== 'user' || !text) return undefined;
+        if (entry.historyAt !== undefined) return entry.historyAt;
+        const occurrence = activity.slice(0, index).filter((item) => item.kind === 'user' && item.detail?.trim() === text).length;
+        let seen = 0;
+        for (let at = 0; at < session.history.length; at += 1) {
+            const turn = session.history[at];
+            if (turn.role !== 'user' || !turn.content.includes(text)) continue;
+            if (seen === occurrence) return at;
+            seen += 1;
+        }
+        return undefined;
+    };
+    const rewindable = (entryId: string) => rewindPoint(entryId) !== undefined;
+
     const rewind = async (entryId: string, text?: string): Promise<TResult | null> => {
         if (runningRef.current) { setError(labelsRef.current.requestInProgress); return null; }
         const session = sessionRef.current;
         const index = activity.findIndex((entry) => entry.id === entryId);
         const entry = activity[index];
-        if (!canRewind || !session || !entry || entry.kind !== 'user' || entry.historyAt === undefined) return null;
+        const point = rewindPoint(entryId);
+        if (!session || !entry || point === undefined) return null;
         const message = (text ?? entry.detail ?? '').trim();
         if (!message) return null;
         const before = activity.slice(0, index);
-        session.history = session.history.slice(0, entry.historyAt);
+        session.history = session.history.slice(0, point);
         rewoundRef.current = { activity: before, fresh: true };
         setActivity(before);
         // The same model as the message had: a chat on an executor stays there.
@@ -1067,7 +1092,7 @@ export function useAgent<TParams, TContext, TResult>(
             : setSelectedModel,
         modelsByProvider: offeredCatalog, modelsLoading, running, error, canContinue, remote, remoteModels, alongside,
         ...(executor?.catalogGroup ? { catalogGroup: executor.catalogGroup } : {}),
-        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions, cardAction, rewind, canRewind,
+        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions, cardAction, rewind, canRewind, rewindable,
         // CR-015: whether "Continue without AI" is offered when the model fails.
         offersFallback: definition.offersFallback !== false,
     };

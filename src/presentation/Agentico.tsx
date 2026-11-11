@@ -491,7 +491,7 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
     };
     const messageActions: UserMessageActions | undefined = task ? {
         // Only the messages of this conversation (not of a transcript before it), sent with where to go back to.
-        available: (entry) => task.agent.canRewind && entry.historyAt !== undefined && task.agent.activity.some((item) => item.id === entry.id),
+        available: (entry) => task.agent.activity.some((item) => item.id === entry.id) && task.agent.rewindable(entry.id),
         disabled: task.agent.running,
         onRetry: (entry) => askRewind(entry),
         onEdit: (entry) => setEditing(entry),

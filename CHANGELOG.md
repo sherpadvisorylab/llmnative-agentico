@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-11
+
+### Fixed
+- Retry from here and Edit on the messages sent before 0.15.0 and on the opening one (CR-016): their place is the
+  turn of the person in the history with the same text (the same occurrence); `useAgent().rewindable(entryId)`.
+  The actions stay visible, faint, beside each message (clear on hover), so they are found.
+
 ## [0.15.0] - 2026-11-11
 
 ### Added
