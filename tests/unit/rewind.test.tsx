@@ -94,15 +94,45 @@ describe('going back to a message of the person', () => {
         expect(opening.historyAt).toBeUndefined();
         expect(result.current.rewindable(opening.id)).toBe(true);
 
-        // A chat reopened whose history does not have the message: no going back.
+        // A chat reopened whose history does not have an earlier message: no going back to it.
         const reopened = renderHook(() => useAgent(definition), { wrapper }).result;
         await act(async () => {
-            await reopened.current.resume({ project: 'crm' }, { history: [], activity: [{ id: 'old', kind: 'user', label: 'Tu', status: 'done', detail: 'Lost' }] });
+            await reopened.current.resume({ project: 'crm' }, { history: [], activity: [
+                { id: 'old', kind: 'user', label: 'Tu', status: 'done', detail: 'Lost' },
+                { id: 'later', kind: 'user', label: 'Tu', status: 'done', detail: 'Later' },
+            ] });
         });
         expect(reopened.current.rewindable('old')).toBe(false);
         await act(async () => { refused = await reopened.current.rewind('old'); });
         expect(refused).toBeNull();
         expect(turns).toHaveLength(1);
+    });
+
+    it('takes back the last message of the person when the chat was saved while its turn ran, never recorded', async () => {
+        const { definition, turns } = remoteDefinition();
+        const { result } = renderHook(() => useAgent(definition), { wrapper });
+        await act(async () => {
+            await result.current.resume({ project: 'crm' }, {
+                history: [{ role: 'assistant', content: 'Hi, what do you need?' }],
+                activity: [
+                    { id: 'a', kind: 'thinking', label: '', status: 'done', detail: 'Hi, what do you need?' },
+                    { id: 'u', kind: 'user', label: 'Tu', status: 'done', detail: 'Where are we?' },
+                    { id: 'b', kind: 'thinking', label: '', status: 'running' },
+                ],
+            });
+        });
+        expect(result.current.rewindable('u')).toBe(true);
+        let pending!: Promise<string | null>;
+        act(() => { pending = result.current.rewind('u'); });
+        await waitFor(() => expect(turns).toHaveLength(1));
+        expect(turns[0]).toMatchObject({ text: 'Where are we?' });
+        expect(turns[0].rewound?.activity.map((entry) => entry.id)).toEqual(['a']);
+        await act(async () => { turns[0].reply('On #287.'); await pending; });
+        expect(result.current.snapshot()?.history).toEqual([
+            { role: 'assistant', content: 'Hi, what do you need?' },
+            { role: 'user', content: 'Where are we?' },
+            { role: 'assistant', content: 'On #287.' },
+        ]);
     });
 
     it('finds the message of an older chat in its history, the same occurrence of the same text', async () => {

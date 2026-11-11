@@ -1027,7 +1027,10 @@ export function useAgent<TParams, TContext, TResult>(
             if (seen === occurrence) return at;
             seen += 1;
         }
-        return undefined;
+        // The last message of the person, never recorded (the chat was saved while its turn ran, and the turn
+        // was left): nothing after it is in the history either, so the chat goes back to the end of it.
+        const last = activity.map((item) => item.kind === 'user').lastIndexOf(true);
+        return index === last ? session.history.length : undefined;
     };
     const rewindable = (entryId: string) => rewindPoint(entryId) !== undefined;
 

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-11-11
+
+### Fixed
+- Retry from here and Edit on the last message of the person when the chat was saved while its turn ran and the
+  turn was left (the page reloaded, the turn stopped): it was never recorded in the history, nor anything after
+  it, so the chat goes back to the end of the history (CR-016).
+
 ## [0.15.1] - 2026-11-11
 
 ### Fixed
