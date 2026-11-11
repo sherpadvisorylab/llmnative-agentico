@@ -25,6 +25,33 @@
 | [CR-014](#cr-014--card-nei-messaggi-della-chat) | Card nei messaggi della chat, con le azioni dell'host | Alta | CR-004 | ✅ |
 | [CR-015](#cr-015--continua-senza-ai-solo-se-lagente-ha-un-risultato-senza-modello) | Continua senza AI solo se l'agente ha un risultato senza modello | Media | — | ✅ |
 | [CR-016](#cr-016--riprova-e-modifica-di-un-messaggio-della-persona) | Riprova e modifica di un messaggio della persona | Alta | CR-003, CR-009 | ✅ |
+| [CR-017](#cr-017--allegati-per-lesecutore) | Allegati per l'esecutore | Alta | CR-003, CR-124 (framework) | ✅ |
+
+---
+
+## CR-017 — Allegati per l'esecutore
+
+**Stato:** ✅ done (0.16.0)
+**Issue:** [#17](https://github.com/sherpadvisorylab/llmnative-agentico/issues/17)
+**Priorità:** Alta
+**Dipende da:** CR-003 (subagent remoti), CR-124 del framework (allegati incollati)
+
+### Motivazione
+
+Emersa nel Playbook l'11/11/2026: con Claude Code sul server il composer non offriva gli allegati; la persona vuole
+trascinare un file o incollare uno screenshot come negli assistenti degli IDE.
+
+### Scope
+
+- `AgentExecutor.attachments`: il composer offre gli allegati anche sui modelli dell'esecutore; il turno li riceve come
+  `attachments` (`AIAttachment[]`), i nomi sul messaggio. `useAgent().executorAttachments`.
+- Riprova e Modifica rimandano il testo, non i file (non sono tenuti nella chat).
+
+### Checklist
+
+- [x] Contratto, turno, composer
+- [x] Test: 19 file / 83 test
+- [x] README, llms.txt, CHANGELOG, versione 0.16.0
 
 ---
 

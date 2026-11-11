@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-11
+
+### Added
+- Attachments for an executor (CR-017, GH issue #17): `executor.attachments: true` makes the composer offer files on
+  its models too (chosen, dropped, pasted with Ctrl+V from @llmnative/react 1.48); they reach the turn of the
+  message as `attachments` (`AIAttachment[]`: name, type, base64), their names on the message.
+  `useAgent().executorAttachments`. Retry from here and Edit send the text again, not the files.
+
 ## [0.15.3] - 2026-11-11
 
 ### Changed

@@ -124,7 +124,8 @@ function AgenticoComposer({ task, editing, onCancelEdit, onSendEdit }: {
             onStop={agent.stop}
             disabled={!text.trim() || modelRequired}
             onSubmit={handleSubmit}
-            attachments={!manualEntry && !agent.remote && !onExecutor}
+            // On the models of an executor only when it takes files (CR-017).
+            attachments={!manualEntry && (agent.remote || onExecutor ? agent.executorAttachments : true)}
             models={models}
             selectedModel={noModel ? '' : agent.selectedModel}
             actions={task.composerActions}

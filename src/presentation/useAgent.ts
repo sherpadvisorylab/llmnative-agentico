@@ -198,6 +198,8 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
     canRewind: boolean;
     /** CR-016: whether a message of the person can be gone back to (it knows, or the history shows, where it was). */
     rewindable: (entryId: string) => boolean;
+    /** CR-017: whether the executor takes files with a message (the composer offers them on its models). */
+    executorAttachments: boolean;
     /** Answers the questions part `partId` of the entry `entryId` (CR-004). If the turn that asked
      * is still waiting, its `onQuestions` promise resolves; otherwise a new turn of the executor
      * carries them (`AgentExecutorTurn.answers`, with empty `text`). Either way the part keeps the
@@ -213,7 +215,7 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
 /** Solo la fetta di UseAgentResult che serve a un consumer del pannello globale (Agentico.tsx)
  * per continuare una conversazione già avviata da run() — TParams non compare in nessuno dei
  * membri qui sotto, quindi `never` è innocuo. */
-export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction' | 'offersFallback' | 'rewind' | 'canRewind' | 'rewindable'>;
+export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction' | 'offersFallback' | 'rewind' | 'canRewind' | 'rewindable' | 'executorAttachments'>;
 
 /** The entries of a reopened chat: what was still running stopped, what was streaming done. */
 export function settleActivity(activity: AgentActivityEntry[]): AgentActivityEntry[] {
@@ -311,6 +313,11 @@ export function useAgent<TParams, TContext, TResult>(
     const remote = Boolean(executor) && !alongside;
     // CR-016: going back is offered on an agent of the AI catalog, and with an executor that starts again from the chat.
     const canRewind = !executor || Boolean(executor.canRewind);
+    // CR-017: files with a message on the models of the executor.
+    const executorAttachments = Boolean(executor?.attachments);
+    const filesFor = async (files?: File[]) => (executorAttachments && files?.length
+        ? Promise.all(files.map((file) => PromptUtils.fileToAttachment(file)))
+        : undefined);
     /** Whether a model is one of the executor's: its turn goes to the executor. */
     const remoteModelsRef = useRef<AgentExecutorModel[]>([]);
     const isRemoteModel = (model: string | undefined) => Boolean(model) && remoteModelsRef.current.some((option) => option.value === model);
@@ -347,6 +354,7 @@ export function useAgent<TParams, TContext, TResult>(
         first: boolean,
         model?: string,
         answers?: AgentQuestionsAnswers & { historyText: string },
+        attachments?: AIAttachment[],
     ): Promise<TResult | null> => {
         const session = sessionRef.current;
         if (!session || !executor) { setError(labelsRef.current.noActiveSession); return null; }
@@ -438,6 +446,7 @@ export function useAgent<TParams, TContext, TResult>(
             const reply = await executor.turn({
                 params: session.params, context: session.context, text, first, signal: controller.signal,
                 ...(rewound ? { rewound } : {}),
+                ...(attachments?.length ? { attachments } : {}),
                 ...((model || remoteModelRef.current) ? { model: model || remoteModelRef.current } : {}),
                 ...(answers ? { answers: { id: answers.id, answers: answers.answers } } : {}),
                 onText, onReasoning, onStep, onQuestions, onCard,
@@ -885,7 +894,7 @@ export function useAgent<TParams, TContext, TResult>(
             if (remote) {
                 setCanContinue(true);
                 offerRemoteModels(params);
-                return await runRemoteTurn(opts?.openingMessage ?? '', true);
+                return await runRemoteTurn(opts?.openingMessage ?? '', true, undefined, undefined, await filesFor(opts?.attachments));
             }
             if (alongside) {
                 offerRemoteModels(params);
@@ -894,7 +903,7 @@ export function useAgent<TParams, TContext, TResult>(
                 if (isRemoteModel(picked)) {
                     setCanContinue(true);
                     remoteStartedRef.current = true;
-                    return await runRemoteTurn(opts?.openingMessage ?? '', true, picked);
+                    return await runRemoteTurn(opts?.openingMessage ?? '', true, picked, undefined, await filesFor(opts?.attachments));
                 }
             }
 
@@ -982,13 +991,13 @@ export function useAgent<TParams, TContext, TResult>(
             historyAt: session.history.length,
         }]);
         try {
-            if (remote) return await runRemoteTurn(text, false, opts?.model || undefined);
+            if (remote) return await runRemoteTurn(text, false, opts?.model || undefined, undefined, await filesFor(opts?.attachments));
             // Alongside the AI catalog (CR-009): a model of the executor sends the turn to it.
             const picked = opts?.model || (alongside ? remoteModelRef.current : '');
             if (alongside && isRemoteModel(picked)) {
                 const first = !remoteStartedRef.current;
                 remoteStartedRef.current = true;
-                return await runRemoteTurn(text, first, picked);
+                return await runRemoteTurn(text, first, picked, undefined, await filesFor(opts?.attachments));
             }
             // A turn on the AI catalog after a rewind: the executor, when picked again, starts from the log as it is then.
             if (rewoundRef.current) rewoundRef.current = { ...rewoundRef.current, fresh: false };
@@ -1095,7 +1104,7 @@ export function useAgent<TParams, TContext, TResult>(
             : setSelectedModel,
         modelsByProvider: offeredCatalog, modelsLoading, running, error, canContinue, remote, remoteModels, alongside,
         ...(executor?.catalogGroup ? { catalogGroup: executor.catalogGroup } : {}),
-        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions, cardAction, rewind, canRewind, rewindable,
+        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions, cardAction, rewind, canRewind, rewindable, executorAttachments,
         // CR-015: whether "Continue without AI" is offered when the model fails.
         offersFallback: definition.offersFallback !== false,
     };

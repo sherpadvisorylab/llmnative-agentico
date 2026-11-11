@@ -152,6 +152,8 @@ export interface AgentExecutorTurn<TParams, TContext> {
      * (Retry from here, Edit). What the executor keeps of the conversation (a session on a server) is
      * past: it starts again from `activity`, the chat as it is now, before `text`. */
     rewound?: { activity: EntityChatActivityEntry[] };
+    /** CR-017: the files the person sent with this message (`AgentExecutor.attachments`), as the AI providers take them. */
+    attachments?: AIAttachment[];
     /** Present when the person answered questions of an earlier turn (CR-004): the turn carries
      * them, structured, with `text` empty. The executor decides how to forward them (e.g. to the
      * `question` tool of its session). Questions answered while their own turn is still running
@@ -213,6 +215,11 @@ export interface AgentExecutor<TParams, TContext, TResult> {
      * Edit: what the executor keeps of the conversation would not go back with the chat.
      */
     canRewind?: boolean;
+    /**
+     * CR-017: the executor takes files with a message (chosen, dropped or pasted in the composer), which then offers
+     * them on its models too; they reach its turn as `attachments`. Without it, no attachments on its models.
+     */
+    attachments?: boolean;
     /** CR-009: the group (and its badge) the models of the AI catalog are listed under, next to the executor's. */
     catalogGroup?(provider: string, label: string): { group: string; badge?: AgentModelGroupBadge };
     /**

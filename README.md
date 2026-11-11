@@ -58,6 +58,7 @@ configureAgenticoPrompts({                                    // optional: langu
 | **Reports** — custom result views per subagent | `registerSubagentReports` |
 | **Scope** — the host's current tenant/company: id + data and storage providers | `<AgenticoProvider scope>` |
 | **Page context** — what the user is looking at, for the orchestrator prompt | `useAgenticoPageContext`, `useSubagentComponentContext` |
+| **Files for an executor** — what the person attaches (chosen, dropped, pasted) reaches the turn of a remote agent | `executor.attachments`, `AgentExecutorTurn.attachments` (CR-017) |
 | **Going back to a message** — Retry from here and Edit on a message of the person; the chat and the history of the model are cut there | `useAgent().rewind`, `executor.canRewind`, `AgentExecutorTurn.rewound` (CR-016) |
 | **No fallback for a chat** — an agent with no result without a model offers only Retry when the model fails | `AgentDefinition.offersFallback: false` (CR-015) |
 | **Cards in the chat** — what an agent prepared (e.g. a draft), with View and the actions of the host, their outcome kept | `AgentTool.card`, `executor.turn` `onCard`, `AgentDefinition.onCardAction` (CR-014) |
