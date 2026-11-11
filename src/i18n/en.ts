@@ -62,7 +62,6 @@ export const agenticoEn: AgenticoDict = {
     resizePanel: 'Resize the agent panel',
     resizePanelHint: 'Drag to resize, double-click to reset',
     pendingQuestions: 'Questions of the agent',
-    retryFromHere: 'Retry from here',
     editMessage: 'Edit',
     editingMessage: 'Editing a message: sent, the chat goes back to it.',
     cancelEdit: 'Cancel',

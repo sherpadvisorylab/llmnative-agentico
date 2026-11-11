@@ -729,16 +729,17 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                             {!task.agent.running && task.agent.error && (
                                 <div className="mt-2 flex items-center gap-2">
                                     <p className="flex-1 text-xs text-destructive">{task.agent.error}</p>
-                                    {/* Nessun "retry dell'ultimo turno" nativo in useAgent — un
-                                        nuovo messaggio "Riprova." nella STESSA conversazione
-                                        (history/tool-result già raccolti restano disponibili al
-                                        modello) è l'approssimazione più semplice, stesso
-                                        percorso di chi ridigita a mano in chat. */}
+                                    {/* CR-016: the last message of the person sent again from where it was, when the
+                                        chat can go back to it; else a new message "Retry." in the same conversation. */}
                                     <ActionButton
                                         label={t.retry}
                                         variant="secondary"
                                         className="shrink-0"
-                                        onClick={() => { void task.agent.sendMessage(t.retryMessage, { retry: true }).then((r) => { if (r) task.onApplied(r); }); }}
+                                        onClick={() => {
+                                            const last = [...task.agent.activity].reverse().find((entry) => entry.kind === 'user');
+                                            if (last && task.agent.rewindable(last.id)) { askRewind(last); return; }
+                                            void task.agent.sendMessage(t.retryMessage, { retry: true }).then((r) => { if (r) task.onApplied(r); });
+                                        }}
                                     />
                                     {/* Ogni subagent ha un fallback deterministico a costo zero
                                         (vedi AgentDefinition.fallback) — quando la chiamata al

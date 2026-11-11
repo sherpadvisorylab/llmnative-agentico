@@ -76,7 +76,6 @@ export interface AgenticoDict {
     /** User message sent to the model by the retry button */
     retryMessage: string;
     /** CR-016: the actions on a message of the person, the composer while editing one, the confirmation. */
-    retryFromHere: string;
     editMessage: string;
     editingMessage: string;
     cancelEdit: string;

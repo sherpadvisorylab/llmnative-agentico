@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.3] - 2026-11-11
+
+### Changed
+- The actions on a message of the person (CR-016): Edit only, shown on hover of the message, on every message the
+  chat can go back to; Retry only on a message whose answer was cut (stopped, failed), always shown. The Retry of
+  the error bar sends the last message again from where it was (when the chat can go back to it) instead of a new
+  message "Retry.".
+
 ## [0.15.2] - 2026-11-11
 
 ### Fixed

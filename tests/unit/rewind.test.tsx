@@ -163,21 +163,25 @@ describe('the actions on a message of the person', () => {
     const entries: AgentActivityEntry[] = [
         { id: 'u1', kind: 'user', label: 'Tu', status: 'done', detail: 'Where is the CI?', historyAt: 1 },
         { id: 't1', kind: 'thinking', label: '', status: 'done', detail: 'Red.' },
+        { id: 'u2', kind: 'user', label: 'Tu', status: 'done', detail: 'And the standards?', historyAt: 3 },
+        { id: 't2', kind: 'thinking', label: '', status: 'stopped' },
         { id: 'u0', kind: 'user', label: 'Tu', status: 'done', detail: 'An old one' },
     ];
 
-    it('are Retry from here and Edit, on the messages that can go back, off while a turn runs', () => {
+    it('are Edit on every message that can go back, Retry only where the answer was cut, off while a turn runs', () => {
         const onRetry = vi.fn();
         const onEdit = vi.fn();
         const actions = { available: (entry: AgentActivityEntry) => entry.historyAt !== undefined, disabled: false, onRetry, onEdit };
         const { rerender } = render(<I18nProvider><AgentActivityLog activity={entries} messageActions={actions} /></I18nProvider>);
-        expect(screen.getAllByRole('button', { name: 'Retry from here' })).toHaveLength(1);
-        fireEvent.click(screen.getByRole('button', { name: 'Retry from here' }));
-        expect(onRetry).toHaveBeenCalledWith(entries[0]);
-        fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+        expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(2);
+        // Only the message whose answer was stopped.
+        expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(onRetry).toHaveBeenCalledWith(entries[2]);
+        fireEvent.click(screen.getAllByRole('button', { name: 'Edit' })[0]);
         expect(onEdit).toHaveBeenCalledWith(entries[0]);
         rerender(<I18nProvider><AgentActivityLog activity={entries} messageActions={{ ...actions, disabled: true }} /></I18nProvider>);
-        expect(screen.getByRole('button', { name: 'Retry from here' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Retry' })).toBeDisabled();
     });
 });
 
