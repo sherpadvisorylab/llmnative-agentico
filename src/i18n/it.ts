@@ -62,5 +62,11 @@ export const agenticoIt: AgenticoDict = {
     resizePanel: "Ridimensiona il pannello dell'agente",
     resizePanelHint: 'Trascina per ridimensionare, doppio clic per ripristinare',
     pendingQuestions: "Domande dell'agente",
+    retryFromHere: 'Riprova da qui',
+    editMessage: 'Modifica',
+    editingMessage: 'Modifichi un messaggio: inviato, la chat torna a quel punto.',
+    cancelEdit: 'Annulla',
+    rewindTitle: 'Tornare a questo messaggio?',
+    rewindText: 'Ciò che è venuto dopo lascia la chat e la memoria dell\'agente. Ciò che hanno fatto i suoi passi resta fatto:',
     stop: 'Ferma',
 };

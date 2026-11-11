@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-11
+
+### Added
+- Retry from here and Edit on a message of the person (CR-016, GH issue #16): beside each of their messages, on
+  hover. Retry sends it again from there; Edit puts its text back in the composer, and once sent the chat goes back
+  to it with the new text. What came after leaves the chat and the history of the model; when steps were done after
+  it, a confirmation says they stay done. `useAgent().rewind(entryId, text?)`, `canRewind`; each message of the
+  person keeps `historyAt`. An executor that starts again from the chat says so with `executor.canRewind` and gets
+  `rewound: { activity }` on the next turn; without it, an agent with an executor offers no going back.
+
 ## [0.14.0] - 2026-11-06
 
 ### Added

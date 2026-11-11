@@ -62,5 +62,11 @@ export const agenticoEn: AgenticoDict = {
     resizePanel: 'Resize the agent panel',
     resizePanelHint: 'Drag to resize, double-click to reset',
     pendingQuestions: 'Questions of the agent',
+    retryFromHere: 'Retry from here',
+    editMessage: 'Edit',
+    editingMessage: 'Editing a message: sent, the chat goes back to it.',
+    cancelEdit: 'Cancel',
+    rewindTitle: 'Go back to this message?',
+    rewindText: 'What came after it leaves the chat and the memory of the agent. What its steps did stays done:',
     stop: 'Stop',
 };

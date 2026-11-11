@@ -9,6 +9,7 @@
 
 import type { z } from 'zod';
 import type { AIAttachment } from '@llmnative/react';
+import type { EntityChatActivityEntry } from './entityChatStore';
 import type { AgentCard, AgentCardOutcome, AgentCardPart, AgentQuestion, AgentQuestionAnswer, AgentQuestionsAnswers } from './messageParts';
 
 /** Rif mutabile, sempre aggiornato da useAgent.ts all'inizio di ogni turno (roundTrip 0) con
@@ -147,6 +148,10 @@ export interface AgentExecutorTurn<TParams, TContext> {
     signal: AbortSignal;
     /** The model the person picked among `AgentExecutor.models`, if the executor offers any. */
     model?: string;
+    /** CR-016: present on the first turn after the person took the chat back to one of their messages
+     * (Retry from here, Edit). What the executor keeps of the conversation (a session on a server) is
+     * past: it starts again from `activity`, the chat as it is now, before `text`. */
+    rewound?: { activity: EntityChatActivityEntry[] };
     /** Present when the person answered questions of an earlier turn (CR-004): the turn carries
      * them, structured, with `text` empty. The executor decides how to forward them (e.g. to the
      * `question` tool of its session). Questions answered while their own turn is still running
@@ -202,6 +207,12 @@ export interface AgentExecutor<TParams, TContext, TResult> {
      * `first` of a turn of the executor: its first turn in the chat.
      */
     alongside?: boolean;
+    /**
+     * CR-016: the executor starts again from the chat when the person takes it back to one of their messages
+     * (its turn then carries `rewound`). Without it, an agent with an executor offers no Retry from here nor
+     * Edit: what the executor keeps of the conversation would not go back with the chat.
+     */
+    canRewind?: boolean;
     /** CR-009: the group (and its badge) the models of the AI catalog are listed under, next to the executor's. */
     catalogGroup?(provider: string, label: string): { group: string; badge?: AgentModelGroupBadge };
     /**

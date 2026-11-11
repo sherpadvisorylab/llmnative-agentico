@@ -24,6 +24,39 @@
 | [CR-013](#cr-013--chat-salvate-tenute-anche-dallhost) | Chat salvate tenute anche dall'host (backend dello store) | Alta | CR-003 | ✅ |
 | [CR-014](#cr-014--card-nei-messaggi-della-chat) | Card nei messaggi della chat, con le azioni dell'host | Alta | CR-004 | ✅ |
 | [CR-015](#cr-015--continua-senza-ai-solo-se-lagente-ha-un-risultato-senza-modello) | Continua senza AI solo se l'agente ha un risultato senza modello | Media | — | ✅ |
+| [CR-016](#cr-016--riprova-e-modifica-di-un-messaggio-della-persona) | Riprova e modifica di un messaggio della persona | Alta | CR-003, CR-009 | ✅ |
+
+---
+
+## CR-016 — Riprova e modifica di un messaggio della persona
+
+**Stato:** ✅ done (0.15.0)
+**Issue:** [#16](https://github.com/sherpadvisorylab/llmnative-agentico/issues/16)
+**Priorità:** Alta
+**Dipende da:** CR-003 (subagent remoti), CR-009 (esecutore accanto al catalogo)
+
+### Motivazione
+
+Emersa nel Playbook l'11/11/2026: come negli assistenti degli IDE, la persona vuole tornare a un suo messaggio
+(una risposta fermata, una domanda scritta male) e ripartire da lì, invece di aggiungere messaggi in coda.
+
+### Scope
+
+- Riprova da qui e Modifica accanto a ogni messaggio della persona, al passaggio del mouse (e da tastiera), spenti
+  mentre un turno gira. Modifica rimette il testo nel composer ("Modifichi un messaggio · Annulla").
+- `useAgent().rewind(entryId, text?)`: chat e history del modello tagliate al messaggio (`historyAt`, la lunghezza
+  della history quando è stato inviato), poi il messaggio è rimandato. Messaggi senza `historyAt` (prima di 0.15.0,
+  il messaggio d'apertura) senza azioni.
+- Esecutore: `canRewind` per offrire il ritorno; il turno successivo porta `rewound: { activity }`, la chat com'è
+  ora (dopo un turno sul catalogo, il log prima del messaggio inviato). Senza `canRewind`, niente azioni.
+- Conferma quando dopo il messaggio ci sono passi fatti: restano fatti, la conferma li elenca.
+
+### Checklist
+
+- [x] rewind, historyAt, rewound, canRewind
+- [x] Azioni sulla bolla, composer in modifica, conferma, i18n en/it/de
+- [x] Test: 18 file / 79 test
+- [x] README, llms.txt, CHANGELOG, versione 0.15.0
 
 ---
 

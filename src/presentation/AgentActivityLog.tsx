@@ -178,7 +178,18 @@ const USER_BUBBLE_COLLAPSED_MAX_HEIGHT = 96;
  * (prima tutte le bolle erano sticky nella stessa lista, e una bolla più alta spuntava sotto
  * una più bassa, sopra il testo). Sfondo pieno e `z-20`: il testo che scorre sotto (tabelle,
  * codice) non le passa sopra. */
-function UserMessageBubble({ entry, pinned = true }: { entry: AgentActivityEntry; pinned?: boolean }) {
+/** CR-016: what the person can do on one of their messages: send it again from there, or edit it. */
+export interface UserMessageActions {
+    /** Whether the message has them (a message of this conversation, with where the chat goes back to). */
+    available: (entry: AgentActivityEntry) => boolean;
+    /** Off while a turn runs. */
+    disabled: boolean;
+    onRetry: (entry: AgentActivityEntry) => void;
+    onEdit: (entry: AgentActivityEntry) => void;
+}
+
+function UserMessageBubble({ entry, pinned = true, actions }: { entry: AgentActivityEntry; pinned?: boolean; actions?: UserMessageActions }) {
+    const t = useAgenticoI18n();
     const contentRef = useRef<HTMLDivElement>(null);
     const [expanded, setExpanded] = useState(false);
     const [overflowing, setOverflowing] = useState(false);
@@ -193,7 +204,14 @@ function UserMessageBubble({ entry, pinned = true }: { entry: AgentActivityEntry
 
     return (
         // Not pinned while questions are docked at the bottom (CR-005): the thread gets the room.
-        <div className={`${pinned ? 'sticky top-0 z-20 border-b border-border/40' : ''} flex justify-end bg-background py-1.5`}>
+        <div className={`${pinned ? 'sticky top-0 z-20 border-b border-border/40' : ''} group flex items-start justify-end gap-1 bg-background py-1.5`}>
+            {/* CR-016: Retry from here and Edit, shown on hover (and to the keyboard), beside the message. */}
+            {actions?.available(entry) && (
+                <span className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                    <ActionButton icon="rotate-ccw" ariaLabel={t.retryFromHere} title={t.retryFromHere} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onRetry(entry)} />
+                    <ActionButton icon="pencil" ariaLabel={t.editMessage} title={t.editMessage} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onEdit(entry)} />
+                </span>
+            )}
             <div className="max-w-[85%] rounded-lg bg-primary/10 text-xs text-foreground">
                 <div
                     ref={contentRef}
@@ -494,8 +512,10 @@ function ActivityRow({ entry, questions, hiddenPartId }: { entry: AgentActivityE
  * One `<li>` per turn (CR-004): the message of the person, sticky at the top while its turn
  * scrolls, then what the agent did and said. Entries before the first message of the person
  * (an opening without text) form a turn of their own, without a bubble. */
-export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true }: {
+export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true, messageActions }: {
     activity: AgentActivityEntry[];
+    /** CR-016: Retry from here and Edit on the messages of the person. */
+    messageActions?: UserMessageActions;
     questions?: AgentActivityLogQuestions;
     /** Questions docked at the bottom of the panel (CR-005): left out of the thread. */
     docked?: DockedQuestions | null;
@@ -513,7 +533,7 @@ export function AgentActivityLog({ activity, questions, docked, pinUserMessages 
         <ul className="space-y-0.5">
             {turns.map((turn) => (
                 <li key={turn.user?.id ?? turn.entries[0]?.id}>
-                    {turn.user && <UserMessageBubble entry={turn.user} pinned={pinUserMessages} />}
+                    {turn.user && <UserMessageBubble entry={turn.user} pinned={pinUserMessages} actions={messageActions} />}
                     {turn.entries.length > 0 && (
                         <ul className="space-y-0.5">
                             {turn.entries.map((entry) => (

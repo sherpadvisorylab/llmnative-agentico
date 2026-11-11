@@ -91,6 +91,10 @@ export interface AgentActivityEntry {
     attachmentNames?: string[];
     /** A message the Retry button sent for the person (never the title of the chat). */
     retry?: boolean;
+    /** CR-016: on a message of the person, how many turns the history of the model had when it was sent:
+     * where the chat goes back to when the person retries or edits it. Absent on messages sent before
+     * 0.15.0 (no Retry from here on them). */
+    historyAt?: number;
     /** On the turns of a remote agent (CR-004): the message in parts (text, reasoning, steps,
      * questions), in the order they arrived. `detail` still holds its text. Absent on the turns of
      * the AI provider and on chats saved before 0.3.0, shown from `detail` as before. */
@@ -187,6 +191,11 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
      * chiamata (tipicamente un click su Salva, molto dopo l'ultimo turno), mai una chiusura
      * stantia catturata al mount. */
     snapshot: () => { history: AIConversationTurn[]; activity: AgentActivityEntry[] } | null;
+    /** CR-016: back to a message of the person (by its entry id) and sent again, as it was or edited
+     * (`text`). Everything after it goes, from the chat and from the history of the model. */
+    rewind: (entryId: string, text?: string) => Promise<TResult | null>;
+    /** CR-016: whether this agent offers going back (always on the AI catalog; with an executor, when it says so). */
+    canRewind: boolean;
     /** Answers the questions part `partId` of the entry `entryId` (CR-004). If the turn that asked
      * is still waiting, its `onQuestions` promise resolves; otherwise a new turn of the executor
      * carries them (`AgentExecutorTurn.answers`, with empty `text`). Either way the part keeps the
@@ -202,7 +211,7 @@ export interface UseAgentResult<TParams, TResult> extends AgentControlState {
 /** Solo la fetta di UseAgentResult che serve a un consumer del pannello globale (Agentico.tsx)
  * per continuare una conversazione già avviata da run() — TParams non compare in nessuno dei
  * membri qui sotto, quindi `never` è innocuo. */
-export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction' | 'offersFallback'>;
+export type AgentConversation<TResult> = Pick<UseAgentResult<never, TResult>, 'canContinue' | 'remote' | 'remoteModels' | 'alongside' | 'catalogGroup' | 'running' | 'error' | 'activity' | 'sendMessage' | 'stop' | 'runFallback' | 'snapshot' | 'answerQuestions' | 'cardAction' | 'offersFallback' | 'rewind' | 'canRewind'>;
 
 /** The entries of a reopened chat: what was still running stopped, what was streaming done. */
 export function settleActivity(activity: AgentActivityEntry[]): AgentActivityEntry[] {
@@ -258,6 +267,13 @@ export function useAgent<TParams, TContext, TResult>(
     // batch e non è garantito visibile sincronamente a una seconda chiamata di run()/
     // sendMessage() scattata nello stesso tick (es. doppio click prima del re-render).
     const runningRef = useRef(false);
+    // CR-016: the chat as it was when the person took it back to one of their messages, for the next turn
+    // of the executor (it starts again from it); null once that turn has it.
+    // `fresh`: no turn ran since, the chat is `activity`; else (a turn on the AI catalog came first) the log
+    // before the message being sent.
+    const rewoundRef = useRef<{ activity: AgentActivityEntry[]; fresh: boolean } | null>(null);
+    // The id of the message of the person being sent: where the log is cut for a rewound executor.
+    const sendingRef = useRef<string | null>(null);
     // Il turno in corso (se c'è) — stop() lo annulla. Un ref, non state: creato e distrutto
     // dentro runTurn, mai il motivo di un render.
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -291,6 +307,8 @@ export function useAgent<TParams, TContext, TResult>(
     // An executor alongside the AI catalog (CR-009) answers only the turns of its own models.
     const alongside = Boolean(executor?.alongside);
     const remote = Boolean(executor) && !alongside;
+    // CR-016: going back is offered on an agent of the AI catalog, and with an executor that starts again from the chat.
+    const canRewind = !executor || Boolean(executor.canRewind);
     /** Whether a model is one of the executor's: its turn goes to the executor. */
     const remoteModelsRef = useRef<AgentExecutorModel[]>([]);
     const isRemoteModel = (model: string | undefined) => Boolean(model) && remoteModelsRef.current.some((option) => option.value === model);
@@ -410,8 +428,14 @@ export function useAgent<TParams, TContext, TResult>(
 
         const askedText = text || answers?.historyText || '';
         try {
+            const back = rewoundRef.current;
+            rewoundRef.current = null;
+            const logNow = activityRef.current;
+            const sendingAt = logNow.findIndex((entry) => entry.id === sendingRef.current);
+            const rewound = back ? { activity: back.fresh ? back.activity : (sendingAt >= 0 ? logNow.slice(0, sendingAt) : logNow).filter((entry) => entry.id !== thinkingId) } : undefined;
             const reply = await executor.turn({
                 params: session.params, context: session.context, text, first, signal: controller.signal,
+                ...(rewound ? { rewound } : {}),
                 ...((model || remoteModelRef.current) ? { model: model || remoteModelRef.current } : {}),
                 ...(answers ? { answers: { id: answers.id, answers: answers.answers } } : {}),
                 onText, onReasoning, onStep, onQuestions, onCard,
@@ -945,11 +969,15 @@ export function useAgent<TParams, TContext, TResult>(
         // Mostrato subito, prima di aspettare la risposta — è quello che l'utente ha appena
         // scritto, non c'è nulla da attendere per saperlo (a differenza del turno "sto
         // pensando" del modello, che invece parte vuoto e si riempie solo a risposta arrivata).
+        const messageId = crypto.randomUUID();
+        sendingRef.current = messageId;
         setActivity((prev) => [...prev, {
-            id: crypto.randomUUID(), kind: 'user', label: 'Tu', status: 'done', detail: text,
+            id: messageId, kind: 'user', label: 'Tu', status: 'done', detail: text,
             ...(opts?.attachments?.length ? { attachmentNames: opts.attachments.map((f) => f.name) } : {}),
             // Sent by the Retry button, not written by the person: never the title of the chat.
             ...(opts?.retry ? { retry: true } : {}),
+            // CR-016: where the chat goes back to when the person retries or edits this message.
+            historyAt: session.history.length,
         }]);
         try {
             if (remote) return await runRemoteTurn(text, false, opts?.model || undefined);
@@ -960,6 +988,8 @@ export function useAgent<TParams, TContext, TResult>(
                 remoteStartedRef.current = true;
                 return await runRemoteTurn(text, first, picked);
             }
+            // A turn on the AI catalog after a rewind: the executor, when picked again, starts from the log as it is then.
+            if (rewoundRef.current) rewoundRef.current = { ...rewoundRef.current, fresh: false };
             const aiAttachments = opts?.attachments?.length
                 ? await Promise.all(opts.attachments.map((file) => PromptUtils.fileToAttachment(file)))
                 : undefined;
@@ -972,6 +1002,25 @@ export function useAgent<TParams, TContext, TResult>(
             runningRef.current = false;
             setRunning(false);
         }
+    };
+
+    /** CR-016: takes the chat back to a message of the person and sends it again (`text`: edited). Whatever
+     * came after it goes, from the chat and from the history of the model; an executor starts again from
+     * the chat as it is then. Refused while a turn runs, or on a message without `historyAt`. */
+    const rewind = async (entryId: string, text?: string): Promise<TResult | null> => {
+        if (runningRef.current) { setError(labelsRef.current.requestInProgress); return null; }
+        const session = sessionRef.current;
+        const index = activity.findIndex((entry) => entry.id === entryId);
+        const entry = activity[index];
+        if (!canRewind || !session || !entry || entry.kind !== 'user' || entry.historyAt === undefined) return null;
+        const message = (text ?? entry.detail ?? '').trim();
+        if (!message) return null;
+        const before = activity.slice(0, index);
+        session.history = session.history.slice(0, entry.historyAt);
+        rewoundRef.current = { activity: before, fresh: true };
+        setActivity(before);
+        // The same model as the message had: a chat on an executor stays there.
+        return sendMessage(message);
     };
 
     const runFallback = (): TResult | null => {
@@ -1018,7 +1067,7 @@ export function useAgent<TParams, TContext, TResult>(
             : setSelectedModel,
         modelsByProvider: offeredCatalog, modelsLoading, running, error, canContinue, remote, remoteModels, alongside,
         ...(executor?.catalogGroup ? { catalogGroup: executor.catalogGroup } : {}),
-        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions, cardAction,
+        activity, run, resume, sendMessage, stop, runFallback, snapshot, answerQuestions, cardAction, rewind, canRewind,
         // CR-015: whether "Continue without AI" is offered when the model fails.
         offersFallback: definition.offersFallback !== false,
     };

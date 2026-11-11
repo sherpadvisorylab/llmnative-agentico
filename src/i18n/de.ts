@@ -62,5 +62,11 @@ export const agenticoDe: AgenticoDict = {
     resizePanel: 'Agent-Bereich in der Größe ändern',
     resizePanelHint: 'Ziehen zum Ändern der Größe, Doppelklick zum Zurücksetzen',
     pendingQuestions: 'Fragen des Agenten',
+    retryFromHere: 'Ab hier wiederholen',
+    editMessage: 'Bearbeiten',
+    editingMessage: 'Du bearbeitest eine Nachricht: gesendet, geht der Chat dorthin zurück.',
+    cancelEdit: 'Abbrechen',
+    rewindTitle: 'Zu dieser Nachricht zurückgehen?',
+    rewindText: 'Was danach kam, verlässt den Chat und das Gedächtnis des Agenten. Was seine Schritte getan haben, bleibt getan:',
     stop: 'Stoppen',
 };

@@ -58,6 +58,7 @@ configureAgenticoPrompts({                                    // optional: langu
 | **Reports** — custom result views per subagent | `registerSubagentReports` |
 | **Scope** — the host's current tenant/company: id + data and storage providers | `<AgenticoProvider scope>` |
 | **Page context** — what the user is looking at, for the orchestrator prompt | `useAgenticoPageContext`, `useSubagentComponentContext` |
+| **Going back to a message** — Retry from here and Edit on a message of the person; the chat and the history of the model are cut there | `useAgent().rewind`, `executor.canRewind`, `AgentExecutorTurn.rewound` (CR-016) |
 | **No fallback for a chat** — an agent with no result without a model offers only Retry when the model fails | `AgentDefinition.offersFallback: false` (CR-015) |
 | **Cards in the chat** — what an agent prepared (e.g. a draft), with View and the actions of the host, their outcome kept | `AgentTool.card`, `executor.turn` `onCard`, `AgentDefinition.onCardAction` (CR-014) |
 | **Saved chats** — one chat per saved entity, resumable, known by when it started, kept by the host too (`backend`, `syncEntityChats`, CR-013) | `configureEntityChatStore`, `getEntityChat`, `listEntityChats`, `chatStartedAt` (CR-010); titles written by the model and renamed by the person: `autoTitle`, `chatTitle`, `renameEntityChat`, `onEntityChatsChange` (CR-011) |

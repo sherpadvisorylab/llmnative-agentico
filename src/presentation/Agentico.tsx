@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Form, Icon, Input, Modal, interpolate, useFormController, useI18n } from '@llmnative/react';
+import { ActionButton, Badge, Chatbot, Dropdown, DropdownItem, Form, Icon, Input, Modal, ModalYesNo, interpolate, useFormController, useI18n } from '@llmnative/react';
 import type { AIModelDescriptor, ChatbotModelOption } from '@llmnative/react';
 import type { AgentModelGroupBadge } from '../domain/agentDefinition';
 import { useAgentico } from './AgenticoContext';
-import { AgentActivityLog, QuestionsPart, findDockedQuestions, type AgentActivityLogQuestions } from './AgentActivityLog';
+import { AgentActivityLog, QuestionsPart, findDockedQuestions, type AgentActivityLogQuestions, type UserMessageActions } from './AgentActivityLog';
 import { AgenticoResizeHandle } from './AgenticoResizeHandle';
 import { AGENTICO_WIDTH, usePanelWidth, type AgenticoPanelSize } from './panelWidth';
 import { AgenticoToggle } from './AgenticoToggle';
@@ -12,6 +12,7 @@ import { SubagentRunner } from './SubagentRunner';
 import { ManualEntryRunner } from './ManualEntryRunner';
 import { ORCHESTRATOR_TASK_ID } from './AgenticoContext';
 import type { AgenticoTask } from './AgenticoContext';
+import type { AgentActivityEntry } from './useAgent';
 import { useAgenticoI18n } from '../i18n';
 import { useAIModelCatalog } from './useAIModelCatalog';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
@@ -59,14 +60,24 @@ function flattenModelOptions(modelsByProvider: Record<string, AIModelDescriptor[
  * specifica di Prompt). Chatbot si limita a raccogliere testo/allegati/modello e a
  * restituirli via `onSubmit`; la "politica" di cosa farne — chiamare `agent.sendMessage`,
  * accodare il risultato alla history — resta qui, mai responsabilità di Chatbot. */
-function AgenticoComposer({ task }: { task: AgenticoTask }) {
+function AgenticoComposer({ task, editing, onCancelEdit, onSendEdit }: {
+    task: AgenticoTask;
+    /** CR-016: the message of the person being edited: its text in the composer, sent in its place. */
+    editing?: AgentActivityEntry | null;
+    onCancelEdit?: () => void;
+    onSendEdit?: (entry: AgentActivityEntry, text: string) => void;
+}) {
     const t = useAgenticoI18n();
     const [text, setText] = useState('');
     const { agent, onApplied, manualEntry } = task;
     const running = agent.running;
+    useEffect(() => {
+        if (editing) setText(editing.detail ?? '');
+    }, [editing]);
 
     const handleSubmit = (payload: { text: string; files: File[]; model: string }) => {
         setText('');
+        if (editing && onSendEdit) { onSendEdit(editing, payload.text); return; }
         // Percorso "senza AI" (vedi ManualEntryRunner/SubagentManifest.manualEntry) — il testo
         // costruisce i parametri DIRETTAMENTE, mai una chiamata al modello: niente
         // agent.sendMessage qui, `manualEntry.onSubmit` gestisce tutto (run con AI disabilitata,
@@ -97,6 +108,14 @@ function AgenticoComposer({ task }: { task: AgenticoTask }) {
         : flattenModelOptions(agent.modelsByProvider);
 
     return (
+        <>
+        {editing && (
+            <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Icon name="pencil" size={12} className="shrink-0" />
+                <span className="flex-1">{t.editingMessage}</span>
+                <ActionButton label={t.cancelEdit} variant="link" className="p-0 text-xs" onClick={() => { setText(''); onCancelEdit?.(); }} />
+            </div>
+        )}
         <Chatbot
             value={text}
             onChange={setText}
@@ -115,6 +134,7 @@ function AgenticoComposer({ task }: { task: AgenticoTask }) {
             minHeight={44}
             maxHeight={220}
         />
+        </>
     );
 }
 
@@ -414,6 +434,10 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
     const t = useAgenticoI18n();
     const bodyRef = useRef<HTMLDivElement | null>(null);
     const [historyOpen, setHistoryOpen] = useState(false);
+    // CR-016: the message being edited, and a going back waiting for the person to confirm it.
+    const [editing, setEditing] = useState<AgentActivityEntry | null>(null);
+    const [goingBack, setGoingBack] = useState<{ entry: AgentActivityEntry; text?: string; steps: string[] } | null>(null);
+    useEffect(() => { setEditing(null); setGoingBack(null); }, [task?.id]);
     // CR-011: once per scope and session, the saved chats without a title get one.
     useChatTitles(scope?.id);
     const panelWidth = usePanelWidth({ defaultWidth, minWidth, maxWidth, onWidthChange });
@@ -445,6 +469,33 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
     const activityBeforePanelExtra = displayedActivity.slice(0, panelExtraAnchorIndex);
     const activityAfterPanelExtra = displayedActivity.slice(panelExtraAnchorIndex);
     const hasError = !!(task && !task.agent.running && task.agent.error);
+    // CR-016: back to a message of the person. The steps done after it stay done: said first, when there are any.
+    const rewindTo = (entry: AgentActivityEntry, text?: string) => {
+        if (!task) return;
+        setEditing(null);
+        void task.agent.rewind(entry.id, text).then((result) => { if (result) task.onApplied(result); });
+    };
+    const stepsAfter = (entry: AgentActivityEntry): string[] => {
+        const own = task?.agent.activity ?? [];
+        const after = own.slice(own.findIndex((item) => item.id === entry.id) + 1);
+        const labels = after.flatMap((item) => [
+            ...(item.kind === 'tool' && item.status === 'done' ? [item.label] : []),
+            ...(item.parts ?? []).flatMap((part) => (part.type === 'tool' && part.status === 'done' ? [part.label] : [])),
+        ]);
+        return [...new Set(labels.filter(Boolean))];
+    };
+    const askRewind = (entry: AgentActivityEntry, text?: string) => {
+        const steps = stepsAfter(entry);
+        if (steps.length) setGoingBack({ entry, steps, ...(text !== undefined ? { text } : {}) });
+        else rewindTo(entry, text);
+    };
+    const messageActions: UserMessageActions | undefined = task ? {
+        // Only the messages of this conversation (not of a transcript before it), sent with where to go back to.
+        available: (entry) => task.agent.canRewind && entry.historyAt !== undefined && task.agent.activity.some((item) => item.id === entry.id),
+        disabled: task.agent.running,
+        onRetry: (entry) => askRewind(entry),
+        onEdit: (entry) => setEditing(entry),
+    } : undefined;
     // Questions of the agent (CR-004): answerable in the entries of the live conversation only (not
     // in the transcript that precedes it); the result of the turn that carries them is applied
     // like the one of a message.
@@ -668,13 +719,13 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                             {task.manualEntry && displayedActivity.length === 0 && (
                                 <p className="text-xs text-muted-foreground">{task.manualEntry.prompt}</p>
                             )}
-                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} />
+                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} />
                             {task.panelExtra && <div className="mt-3">{task.panelExtra}</div>}
                             {/* Conversazione successiva a `panelExtra` (retry, follow-up) — un
                                 secondo <ul> (AgentActivityLog ne apre uno suo), non un problema:
                                 lo sticky delle bolle utente è per-<li> rispetto allo scroll
                                 container di questo pannello, non al singolo <ul> che le contiene. */}
-                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} />}
+                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} />}
                             {!task.agent.running && task.agent.error && (
                                 <div className="mt-2 flex items-center gap-2">
                                     <p className="flex-1 text-xs text-destructive">{task.agent.error}</p>
@@ -764,9 +815,24 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                     {/* What the controls of the host show (registerSubagentControls, CR-003), right above the composer. */}
                     {task?.panelActions && <div className="mb-2">{task.panelActions}</div>}
                     {task
-                        ? <AgenticoComposer key={task.id} task={task} />
+                        ? <AgenticoComposer key={task.id} task={task} editing={editing} onCancelEdit={() => setEditing(null)} onSendEdit={(entry, text) => askRewind(entry, text)} />
                         : <AgenticoStarterComposer />}
                 </div>
+            )}
+            {goingBack && (
+                <ModalYesNo
+                    title={t.rewindTitle}
+                    onClose={() => setGoingBack(null)}
+                    onYes={async () => {
+                        rewindTo(goingBack.entry, goingBack.text);
+                        return true;
+                    }}
+                >
+                    <p className="text-sm">{t.rewindText}</p>
+                    <ul className="mt-2 list-disc space-y-0.5 ps-5 text-sm text-muted-foreground">
+                        {goingBack.steps.slice(0, 8).map((step) => <li key={step}>{step}</li>)}
+                    </ul>
+                </ModalYesNo>
             )}
         </div>
         </>
