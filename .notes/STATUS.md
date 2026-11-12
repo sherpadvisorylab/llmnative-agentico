@@ -7,17 +7,17 @@
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.17.1 ready (published by the person). Peers: `@llmnative/react` ^1.34 || ^2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.17.2 ready (published by the person). Peers: `@llmnative/react` ^1.34 || ^2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 20 files / 88 tests (Vitest, happy-dom). | — |
+| Tests | 20 files / 89 tests (Vitest, happy-dom). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
-| CR-018 | Done | Sessions of one chat and who speaks: `SubagentManifest.thread`/`speaker`, `<AgenticoProvider person>`, `author` on messages of the person, `EarlierSessions` (read-only, loaded as the person scrolls up, Continue this session), `chatThreadOf`, `earlierSessions`. 88 tests. Version 0.17.0 (0.17.1: the picture on the left, a person icon for a message without an author), verified in Playbook against the local build. Issue #18. |
+| CR-018 | Done | Sessions of one chat and who speaks: `SubagentManifest.thread`/`speaker`, `<AgenticoProvider person>`, `author` on messages of the person, `EarlierSessions` (read-only, loaded as the person scrolls up, Continue this session), `chatThreadOf`, `earlierSessions`. 88 tests. Version 0.17.0 (0.17.1-0.17.2: one column on the left for people and agents, the reasoning and steps summed up next to the name of the agent), verified in Playbook against the local build. Issue #18. |
 | CR-017 | Done | Attachments for an executor: `executor.attachments`, `AgentExecutorTurn.attachments`, the composer offers them on its models. 83 tests. Version 0.16.0. Issue #17. |
 | CR-016 | Done | Retry from here and Edit on a message of the person: `rewind`, `historyAt`, `executor.canRewind`, `rewound` on the next turn of the executor, a confirmation listing the steps done after it. 79 tests. Version 0.15.0. Issue #16. |
 | CR-015 | Done | `AgentDefinition.offersFallback: false` hides Continue without AI when the model fails. 75 tests. Version 0.14.0. Issue #15. |

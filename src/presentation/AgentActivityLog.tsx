@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActionButton, Badge, Card, ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, Identicon, ImageAvatar, LoadingButton, Modal, Tree, interpolate } from '@llmnative/react';
 import type { ChatAuthor } from '../domain/entityChatStore';
 import type { AgentActivityEntry } from './useAgent';
-import type { AgentCardPart, AgentMessagePart, AgentQuestionAnswer, AgentQuestionsPart, AgentToolPart } from '../domain/messageParts';
+import type { AgentCardPart, AgentMessagePart, AgentQuestionAnswer, AgentQuestionsPart, AgentReasoningPart, AgentToolPart } from '../domain/messageParts';
 import { useAgenticoI18n, type AgenticoDict } from '../i18n';
 
 /** Un blocco ```lang ... ``` dentro al testo, o testo semplice attorno — il modello spesso
@@ -199,13 +199,46 @@ export function ChatAvatar({ author, size = 20 }: { author: ChatAuthor; size?: n
         : <Identicon value={author.name} size={size} title={author.name} />;
 }
 
-/** CR-018: who answers, at the start of a turn of the agent. */
-function SpeakerRow({ speaker }: { speaker: ChatAuthor }) {
+/** CR-018: the column on the left of a chat that shows who speaks: the same for people and agents. */
+const GUTTER = 'w-6';
+
+/** CR-018: the reasoning and steps an agent did before it wrote: shown closed, next to its name. */
+function leadingParts(entry: AgentActivityEntry | undefined): AgentMessagePart[] {
+    if (!entry || entry.kind !== 'thinking' || !entry.parts) return [];
+    const lead: AgentMessagePart[] = [];
+    for (const part of entry.parts) {
+        if (part.type !== 'reasoning' && part.type !== 'tool') break;
+        lead.push(part);
+    }
+    return lead;
+}
+
+/** CR-018: "reasoned for 4 s · 1 step", next to the name of the agent: opens what it sums up. */
+function ProcessSummary({ parts, open, onToggle }: { parts: AgentMessagePart[]; open: boolean; onToggle: () => void }) {
+    const t = useAgenticoI18n();
+    const reasoning = parts.filter((p): p is AgentReasoningPart => p.type === 'reasoning');
+    const steps = parts.filter((p): p is AgentToolPart => p.type === 'tool');
+    const thinking = reasoning.some((p) => p.streaming);
+    const runningStep = steps.filter((p) => p.status === 'running').at(-1);
+    const seconds = Math.round(reasoning.reduce((total, p) => total + (p.duration ?? 0), 0));
+    const pieces = [
+        ...(reasoning.length ? [thinking ? t.reasoningNow : seconds > 0 ? interpolate(t.reasonedFor, { seconds }) : t.reasoned] : []),
+        ...(steps.length ? [runningStep?.label ?? (steps.length === 1 ? t.oneStep : interpolate(t.steps, { count: steps.length }))] : []),
+    ];
+    const busy = thinking || Boolean(runningStep);
+    const failed = steps.some((p) => p.status === 'error');
     return (
-        <div className="flex items-center gap-1.5 pt-1 text-xs font-medium text-foreground">
-            <ChatAvatar author={speaker} size={18} />
-            <span className="truncate">{speaker.name}</span>
-        </div>
+        <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            title={t.processDetails}
+            className="inline-flex min-w-0 items-center gap-1 rounded text-xs text-muted-foreground hover:text-foreground"
+        >
+            <Icon name={busy ? 'loader-circle' : failed ? 'circle-alert' : reasoning.length ? 'brain' : 'list-checks'} size={12} className={`shrink-0 ${busy ? 'animate-spin' : ''}`} />
+            <span className="truncate">{pieces.join(' · ')}</span>
+            <Icon name={open ? 'chevron-up' : 'chevron-down'} size={12} className="shrink-0" />
+        </button>
     );
 }
 
@@ -231,29 +264,18 @@ function UserMessageBubble({ entry, pinned = true, actions, cut = false, showAut
 
     const collapsed = overflowing && !expanded;
 
-    return (
-        // Not pinned while questions are docked at the bottom (CR-005): the thread gets the room.
-        <div className={`${pinned ? 'sticky top-0 z-20 border-b border-border/40' : ''} group flex items-start justify-end gap-1 bg-background py-1.5`}>
-            {/* CR-016: Edit on hover of the message (and to the keyboard); Retry always, when its answer was cut. */}
-            {actions?.available(entry) && (
-                <span className="flex shrink-0 items-center">
-                    {cut && <ActionButton icon="rotate-ccw" ariaLabel={t.retry} title={t.retry} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onRetry(entry)} />}
-                    <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                        <ActionButton icon="pencil" ariaLabel={t.editMessage} title={t.editMessage} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onEdit(entry)} />
-                    </span>
-                </span>
-            )}
-            {/* CR-018: who wrote it, on the left of the bubble; a message saved without an author, a person icon. */}
-            {showAuthor && (
-                <span className="mt-0.5 shrink-0">
-                    {entry.author ? <ChatAvatar author={entry.author} /> : (
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden>
-                            <Icon name="user" size={12} />
-                        </span>
-                    )}
-                </span>
-            )}
-            <div className="max-w-[85%] rounded-lg bg-primary/10 text-xs text-foreground">
+    const retryButton = actions?.available(entry) && cut
+        ? <ActionButton icon="rotate-ccw" ariaLabel={t.retry} title={t.retry} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onRetry(entry)} />
+        : null;
+    const editButton = actions?.available(entry)
+        ? (
+            <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                <ActionButton icon="pencil" ariaLabel={t.editMessage} title={t.editMessage} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onEdit(entry)} />
+            </span>
+        )
+        : null;
+    const bubble = (wide: boolean) => (
+            <div className={`${wide ? 'w-full' : 'max-w-[85%]'} rounded-lg bg-primary/10 text-xs text-foreground`}>
                 <div
                     ref={contentRef}
                     className={`space-y-1 px-2.5 pt-1.5 ${collapsed ? 'overflow-hidden' : ''}`}
@@ -291,6 +313,42 @@ function UserMessageBubble({ entry, pinned = true, actions, cut = false, showAut
                     </button>
                 )}
             </div>
+    );
+
+    // CR-018: a chat that shows who speaks. Everyone in the same column on the left: the picture of who wrote it
+    // (a person icon for a message saved without an author), its actions under it; the name above the message,
+    // which takes the whole width.
+    if (showAuthor) {
+        return (
+            <div className={`${pinned ? 'sticky top-0 z-20 border-b border-border/40' : ''} group flex items-start gap-2 bg-background py-1.5`}>
+                <span className={`flex shrink-0 flex-col items-center ${GUTTER}`}>
+                    {entry.author ? <ChatAvatar author={entry.author} /> : (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden>
+                            <Icon name="user" size={12} />
+                        </span>
+                    )}
+                    {retryButton}
+                    {editButton}
+                </span>
+                <div className="min-w-0 flex-1">
+                    {entry.author && <div className="pb-0.5 text-xs font-medium text-foreground">{entry.author.name}</div>}
+                    {bubble(true)}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        // Not pinned while questions are docked at the bottom (CR-005): the thread gets the room.
+        <div className={`${pinned ? 'sticky top-0 z-20 border-b border-border/40' : ''} group flex items-start justify-end gap-1 bg-background py-1.5`}>
+            {/* CR-016: Edit on hover of the message (and to the keyboard); Retry always, when its answer was cut. */}
+            {actions?.available(entry) && (
+                <span className="flex shrink-0 items-center">
+                    {retryButton}
+                    {editButton}
+                </span>
+            )}
+            {bubble(false)}
         </div>
     );
 }
@@ -454,9 +512,10 @@ export function QuestionsPart({ entry, part, questions, autoFocus, className }: 
 /** A message in parts (CR-004), in the order the parts arrived: text with `ChatMarkdown`
  * (repaired while it streams), reasoning with `ChatReasoning`, consecutive steps as one group,
  * questions with `ChatQuestions` (read-only once answered). */
-function MessageParts({ entry, questions, hiddenPartId }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions; hiddenPartId?: string }) {
-    // The questions docked at the bottom of the panel (CR-005) are not repeated in the thread.
-    const parts = (entry.parts ?? []).filter((p) => !(p.type === 'questions' && p.id === hiddenPartId));
+function MessageParts({ entry, questions, hiddenPartId, skip }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions; hiddenPartId?: string; skip?: ReadonlySet<string> }) {
+    // The questions docked at the bottom of the panel (CR-005) are not repeated in the thread; the parts summed
+    // up next to the name of the agent (CR-018) neither.
+    const parts = (entry.parts ?? []).filter((p) => !(p.type === 'questions' && p.id === hiddenPartId) && !skip?.has(p.id));
     const blocks: Array<{ key: string; part: Exclude<AgentMessagePart, AgentToolPart> } | { key: string; steps: AgentToolPart[] }> = [];
     for (const part of parts) {
         const last = blocks.at(-1);
@@ -487,7 +546,7 @@ function MessageParts({ entry, questions, hiddenPartId }: { entry: AgentActivity
     );
 }
 
-function ActivityRow({ entry, questions, hiddenPartId }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions; hiddenPartId?: string }) {
+function ActivityRow({ entry, questions, hiddenPartId, skip }: { entry: AgentActivityEntry; questions?: AgentActivityLogQuestions; hiddenPartId?: string; skip?: ReadonlySet<string> }) {
     const t = useAgenticoI18n();
 
     // A message in parts (remote agent, CR-004): the parts say it all; a status line only while
@@ -496,11 +555,12 @@ function ActivityRow({ entry, questions, hiddenPartId }: { entry: AgentActivityE
         // While the turn runs the spinner stays under what arrived, with the time it has been at it: a long
         // reasoning or a slow tool is seen to go on, not mistaken for a turn that stopped.
         const showStatus = entry.status === 'error' || entry.status === 'stopped' || entry.status === 'running';
+        const shown = skip ? entry.parts.filter((p) => !skip.has(p.id)).length : entry.parts.length;
         return (
             <li className="text-xs text-muted-foreground">
-                {entry.parts.length > 0 && <MessageParts entry={entry} questions={questions} hiddenPartId={hiddenPartId} />}
+                {shown > 0 && <MessageParts entry={entry} questions={questions} hiddenPartId={hiddenPartId} skip={skip} />}
                 {showStatus && (
-                    <div className={`flex items-start gap-1.5 ${entry.parts.length > 0 ? 'mt-1' : ''}`}>
+                    <div className={`flex items-start gap-1.5 ${shown > 0 ? 'mt-1' : ''}`}>
                         <span className="pt-px"><ActivityStatusIcon status={entry.status} /></span>
                         <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{thinkingDisplayLabel(entry, t)}{entry.status === 'running' && <Elapsed />}</span>
                     </div>
@@ -545,6 +605,60 @@ function ActivityRow({ entry, questions, hiddenPartId }: { entry: AgentActivityE
     );
 }
 
+/** CR-018: what the summary next to the name of the agent sums up, open: its reasoning and its steps as they are. */
+function ProcessDetails({ parts }: { parts: AgentMessagePart[] }) {
+    return (
+        <div className="mb-1 space-y-1 border-l-2 border-border pl-2 text-xs text-muted-foreground">
+            {parts.map((part) => part.type === 'reasoning'
+                ? <ChatMarkdown key={part.id} content={part.text} tone="muted" streaming={part.streaming} className="break-words text-xs leading-relaxed" />
+                : part.type === 'tool' ? (
+                    <div key={part.id} className="flex items-start gap-1.5">
+                        <Icon name={STEP_ICONS[part.status]} size={12} className={`mt-0.5 shrink-0 ${part.status === 'running' ? 'animate-spin' : ''}`} />
+                        <span className={`min-w-0 break-words ${part.status === 'error' ? 'text-destructive' : ''}`}>{part.label}</span>
+                    </div>
+                ) : null)}
+        </div>
+    );
+}
+
+/**
+ * CR-018: a turn of the agent in a chat that shows who speaks: its picture in the column on the left; next to it
+ * its name and, closed, the reasoning and steps it did before it wrote; under them what it wrote, the whole width.
+ */
+function AgentTurn({ speaker, entries, questions, docked }: {
+    speaker: ChatAuthor;
+    entries: AgentActivityEntry[];
+    questions?: AgentActivityLogQuestions;
+    docked?: DockedQuestions | null;
+}) {
+    const lead = leadingParts(entries[0]);
+    const skip = lead.length ? new Set(lead.map((p) => p.id)) : undefined;
+    const [open, setOpen] = useState(false);
+    return (
+        <div className="flex items-start gap-2 pt-1.5">
+            <span className={`flex shrink-0 justify-center pt-px ${GUTTER}`}><ChatAvatar author={speaker} /></span>
+            <div className="min-w-0 flex-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2 pb-0.5">
+                    <span className="truncate text-xs font-medium text-foreground">{speaker.name}</span>
+                    {lead.length > 0 && <ProcessSummary parts={lead} open={open} onToggle={() => setOpen((value) => !value)} />}
+                </div>
+                {open && lead.length > 0 && <ProcessDetails parts={lead} />}
+                <ul className="space-y-0.5">
+                    {entries.map((entry, index) => (
+                        <ActivityRow
+                            key={entry.id}
+                            entry={entry}
+                            questions={questions}
+                            hiddenPartId={docked?.entry.id === entry.id ? docked.part.id : undefined}
+                            {...(index === 0 && skip ? { skip } : {})}
+                        />
+                    ))}
+                </ul>
+            </div>
+        </div>
+    );
+}
+
 /** Il log di attività di un agente, usato dal pannello globale (Agentico) — ogni agente ora
  * ci passa attraverso, il pannello embedded legacy (AgentFollowUp) è stato ritirato una volta
  * migrato anche l'ultimo consumer (import HTML/JSX, vedi ComponentEditPage.tsx). Un solo posto
@@ -581,8 +695,9 @@ export function AgentActivityLog({ activity, questions, docked, pinUserMessages 
             {turns.map((turn) => (
                 <li key={turn.user?.id ?? turn.entries[0]?.id}>
                     {turn.user && <UserMessageBubble entry={turn.user} pinned={pinUserMessages} actions={messageActions} cut={interrupted(turn.entries)} showAuthor={authors} />}
-                    {speaker && turn.entries.length > 0 && <SpeakerRow speaker={speaker} />}
-                    {turn.entries.length > 0 && (
+                    {speaker && turn.entries.length > 0 ? (
+                        <AgentTurn speaker={speaker} entries={turn.entries} questions={questions} docked={docked} />
+                    ) : turn.entries.length > 0 && (
                         <ul className="space-y-0.5">
                             {turn.entries.map((entry) => (
                                 <ActivityRow key={entry.id} entry={entry} questions={questions} hiddenPartId={docked?.entry.id === entry.id ? docked.part.id : undefined} />

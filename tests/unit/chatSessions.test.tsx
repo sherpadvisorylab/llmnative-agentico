@@ -149,6 +149,25 @@ describe('who speaks', () => {
         expect(screen.getAllByRole('img', { name: 'Jonny' }).length).toBeGreaterThan(0);
     });
 
+    it('the reasoning and steps before the text are summed up next to the name of the agent, opened on a click', async () => {
+        registerSubagents([manifest([])]);
+        const saved = chat('s1', 'shop', 100, 'one');
+        saved.activity[1] = {
+            id: 's1-a', kind: 'thinking', label: '', status: 'done', detail: 'The answer.', parts: [
+                { type: 'reasoning', id: 'r', text: 'Thinking it through', duration: 4 },
+                { type: 'tool', id: 't', label: 'Read the CRs', status: 'done' },
+                { type: 'text', id: 'x', text: 'The answer.' },
+            ],
+        };
+        keep([saved]);
+        renderPanel({ resume: saved });
+        const summary = await screen.findByRole('button', { name: 'Reasoned for 4 s · 1 step' });
+        expect(screen.getByText('The answer.')).toBeInTheDocument();
+        expect(screen.queryByText('Read the CRs')).toBeNull();
+        fireEvent.click(summary);
+        expect(await screen.findByText('Read the CRs')).toBeInTheDocument();
+    });
+
     it('a saved message keeps its author; one saved before has none', async () => {
         registerSubagents([manifest([])]);
         const saved = chat('s1', 'shop', 100, 'one');

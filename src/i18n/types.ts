@@ -48,6 +48,14 @@ export interface AgenticoDict {
     oneStep: string;
     /** The group of the steps of the agent. `{count}` = number of steps */
     steps: string;
+    /** CR-018: next to the name of the agent while it reasons. */
+    reasoningNow: string;
+    /** CR-018: next to the name of the agent once it reasoned; `{seconds}`. */
+    reasonedFor: string;
+    /** CR-018: the same without a duration. */
+    reasoned: string;
+    /** CR-018: the tooltip of the summary that opens the reasoning and the steps. */
+    processDetails: string;
     /** Accessible name of the group of the steps. */
     stepsLabel: string;
     // Panel

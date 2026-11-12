@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-11-12
+
+### Changed
+- Who speaks (CR-018), laid out as the chats with several people do (one column on the left for everyone):
+  - A turn of the agent: its picture in the column; next to it its name and, closed, a summary of the reasoning and
+    steps it did before it wrote ("Reasoned for 4 s · 1 step"), opened with a click; under them what it wrote,
+    the whole width. Steps after the text stay where they are.
+  - A message of a person: their picture in the column, Edit and Retry under it; the name above the message,
+    which takes the whole width. Without a `speaker` or an `author`, the panel is as before (bubble on the right).
+  - i18n `reasoningNow`, `reasonedFor`, `reasoned`, `processDetails` (en, it, de).
+
 ## [0.17.1] - 2026-11-12
 
 ### Changed
