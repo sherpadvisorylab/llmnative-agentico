@@ -260,6 +260,26 @@ export function SubagentRunner({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [agent.running]);
 
+    // What a card of the chat came to (an action of the host ran: a CR opened, a draft discarded) is saved at once,
+    // not with the next turn: reopened, the chat shows it, and its buttons stay off.
+    const outcomes = agent.activity.flatMap((entry) => (entry.parts ?? []).flatMap((part) => (part.type === 'card' && part.outcome ? [`${part.id}:${part.outcome.status}`] : []))).join(',');
+    const savedOutcomes = useRef(outcomes);
+    useEffect(() => {
+        if (outcomes === savedOutcomes.current) return;
+        savedOutcomes.current = outcomes;
+        if (!outcomes || !chatEntityId || !scope || agent.running || resumingRef.current) return;
+        const snap = agent.snapshot();
+        if (!snap) return;
+        const activity = [...(precedingActivity ?? []), ...snap.activity];
+        if (manifest.autoTitle && manifest.definition.conversational && !chatHasPersonMessage({ activity })) return;
+        saveEntityChat({
+            scopeId: scope.id, subagentId: manifest.id, entityId: chatEntityId, params, title: deriveHistoryTitle(manifest, params),
+            history: snap.history,
+            activity,
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [outcomes]);
+
     const dismiss = () => {
         dismissedRef.current = true;
         if (agent.running) agent.stop();

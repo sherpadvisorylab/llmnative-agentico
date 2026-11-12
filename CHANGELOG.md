@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-11-12
+
+### Fixed
+- What a card of a saved chat came to (an action of the host ran: a CR opened) is saved with the chat at once, not with
+  the next turn (CR-014): a chat reopened before another turn showed the card as never clicked, and a second click ran
+  the action again (a second CR).
+
 ## [0.19.0] - 2026-11-12
 
 ### Added
