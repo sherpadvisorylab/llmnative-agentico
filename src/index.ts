@@ -69,7 +69,7 @@ export {
     type ChatAuthor,
 } from './domain/entityChatStore';
 export { chatThreadOf, earlierSessions } from './domain/chatThread';
-export { placeEvents, type ThreadEvent, type ThreadEventsSource } from './domain/threadEvents';
+export { placeEvents, type ThreadEvent, type ThreadEventAction, type ThreadEventChat, type ThreadEventsSource } from './domain/threadEvents';
 export { imagePreviews, PREVIEW_MAX, PREVIEW_LIMIT, type AttachmentPreview } from './presentation/imagePreview';
 
 // ── i18n ──────────────────────────────────────────────────────────────────────────────────────

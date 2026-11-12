@@ -77,6 +77,14 @@ function AgenticoComposer({ task, editing, onCancelEdit, onSendEdit }: {
     useEffect(() => {
         if (editing) setText(editing.detail ?? '');
     }, [editing]);
+    // CR-021: a text the host put in the field (an action of an event: "explain the questions of Leo").
+    const { draft } = useAgentico();
+    const draftSeen = useRef(draft?.nonce ?? 0);
+    useEffect(() => {
+        if (!draft || draft.nonce === draftSeen.current) return;
+        draftSeen.current = draft.nonce;
+        setText(draft.text);
+    }, [draft]);
 
     const handleSubmit = (payload: { text: string; files: File[]; model: string }) => {
         setText('');

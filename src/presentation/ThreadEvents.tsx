@@ -1,7 +1,7 @@
 // CR-019: the events of the host in a chat: read for a span of time, read again when the host says so, shown as
 // compact cards with who did it in the column on the left. The model never reads them.
 import React, { useEffect, useState } from 'react';
-import { Badge, ChatMarkdown, Icon, useI18n } from '@llmnative/react';
+import { Badge, ChatMarkdown, Icon, LoadingButton, useI18n } from '@llmnative/react';
 import { useAgentico } from './AgenticoContext';
 import { ChatAvatar } from './AgentActivityLog';
 import type { ThreadEvent } from '../domain/threadEvents';
@@ -49,7 +49,26 @@ export function useThreadEvents(thread: string | undefined, from: number, to: nu
 export function ThreadEventCard({ event }: { event: ThreadEvent }) {
     const t = useAgenticoI18n();
     const { locale } = useI18n();
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(Boolean(event.open));
+    const { threadEvents, task, compose } = useAgentico();
+    const [busy, setBusy] = useState<string | null>(null);
+    // CR-021: a button of the card, run by the host, with the chat open in the panel at hand.
+    const act = async (actionId: string) => {
+        if (!threadEvents?.onAction) return;
+        setBusy(actionId);
+        try {
+            await threadEvents.onAction(event, actionId, {
+                compose,
+                send: async (text) => {
+                    if (!task || task.agent.running) { compose(text); return; }
+                    const result = await task.agent.sendMessage(text);
+                    if (result) task.onApplied(result);
+                },
+            });
+        } finally {
+            setBusy(null);
+        }
+    };
     const time = new Date(event.at).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
     return (
         <li className="flex items-start gap-2 py-1 text-xs" aria-label={`${event.author.name}: ${event.title}`} aria-busy={event.running || undefined}>
@@ -77,6 +96,22 @@ export function ThreadEventCard({ event }: { event: ThreadEvent }) {
                     </span>
                 </div>
                 {open && event.body && <ChatMarkdown content={event.body} tone="muted" className="mt-1 break-words text-xs leading-relaxed" />}
+                {event.actions && event.actions.length > 0 && threadEvents?.onAction && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {event.actions.map((action) => (
+                            <LoadingButton
+                                key={action.id}
+                                label={action.label}
+                                {...(action.icon ? { icon: action.icon } : {})}
+                                variant={action.primary ? 'primary' : 'outline-primary'}
+                                className="px-2 py-0.5 text-xs"
+                                loading={busy === action.id}
+                                disabled={busy !== null || Boolean(task?.agent.running)}
+                                onClick={() => act(action.id)}
+                            />
+                        ))}
+                    </div>
+                )}
             </div>
         </li>
     );

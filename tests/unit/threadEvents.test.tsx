@@ -167,6 +167,40 @@ describe('the events of a chat', () => {
     });
 });
 
+describe('the actions of an event (CR-021)', () => {
+    it('show the body at once, put a text in the field of the chat, or send it', async () => {
+        const turns: Turn[] = [];
+        registerSubagents([manifest(turns)]);
+        const saved: EntityChatSnapshot = {
+            scopeId: 'acme', subagentId: 'design', entityId: 's1', params: { project: 'shop' }, title: 'Shop', savedAt: 3000, startedAt: 1000,
+            history: [{ role: 'user', content: 'hello' }, { role: 'assistant', content: 'hi' }],
+            activity: [{ id: 'u1', kind: 'user', label: 'Tu', status: 'done', detail: 'hello', at: 1000 }],
+        };
+        localStorage.setItem(STORE, JSON.stringify([saved]));
+        const blocked = event('b1', 2000, '#296 waits for you', {
+            open: true, body: 'Which layout do you want?',
+            actions: [{ id: 'ask', label: 'Ask Jonny' }, { id: 'answer', label: 'Answer', primary: true }],
+        });
+        const source: ThreadEventsSource = {
+            load: () => [blocked],
+            onAction: async (_event, action, chat) => {
+                if (action === 'answer') chat.compose('My answers on #296: ');
+                else await chat.send('Explain the questions on #296');
+            },
+        };
+        const { container } = renderPanel(source, { resume: saved });
+        // Open at once: the questions are in sight.
+        expect(await screen.findByText('Which layout do you want?')).toBeInTheDocument();
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Answer' })); await new Promise((r) => setTimeout(r, 100)); });
+        await waitFor(() => expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('My answers on #296: '));
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Ask Jonny' })); await new Promise((r) => setTimeout(r, 100)); });
+        await waitFor(() => expect(turns).toHaveLength(1));
+        expect(turns[0].text).toBe('Explain the questions on #296');
+        await act(async () => { turns[0].reply('Leo asks which layout.'); });
+        expect(await screen.findByText('Leo asks which layout.')).toBeInTheDocument();
+    });
+});
+
 describe('the images of a message (CR-020)', () => {
     it('stay in sight as previews, opened larger on a click; other files as their names', async () => {
         registerSubagents([manifest([])]);

@@ -29,6 +29,36 @@
 | [CR-018](#cr-018--sessioni-di-una-chat-e-chi-parla) | Sessioni di una chat e chi parla (avatar) | Alta | CR-010, CR-013 | ✅ |
 | [CR-019](#cr-019--attività-degli-altri-agenti-nella-chat) | Attività degli altri agenti nella chat (eventi dell'host) | Alta | CR-018 | ✅ |
 | [CR-020](#cr-020--immagini-in-vista-ed-eventi-in-corso) | Immagini in vista ed eventi in corso | Media | CR-017, CR-019 | ✅ |
+| [CR-021](#cr-021--azioni-sulle-card-degli-eventi-e-testo-precompilato) | Azioni sulle card degli eventi e testo precompilato nella chat | Alta | CR-019 | ✅ |
+
+---
+
+## CR-021 — Azioni sulle card degli eventi e testo precompilato
+
+**Stato:** ✅ done (0.20.0)
+**Issue:** [#21](https://github.com/sherpadvisorylab/llmnative-agentico/issues/21)
+**Priorità:** Alta
+**Dipende da:** CR-019 (eventi dell'host)
+
+### Motivazione
+
+Emersa nel Playbook il 12/11/2026. Quando una CR si blocca in attesa di una persona, la chat deve mostrare le domande
+dell'agente e permettere di chiedere chiarimenti a Jonny e rispondere da lì, senza aprire GitHub.
+
+### Scope
+
+- `ThreadEvent.actions`: pulsanti sulla card dell'evento. `ThreadEvent.open`: corpo mostrato subito.
+- `ThreadEventsSource.onAction(event, actionId, chat)`:
+  - `chat.compose(text)` precompila il campo di testo della chat aperta;
+  - `chat.send(text)` lo invia come messaggio della persona. Se un turno è in corso, lo precompila invece di inviarlo.
+- `useAgentico().compose(text)` e `draft`.
+
+### Checklist
+
+- [x] Dominio, contesto (`compose`, `draft`), composer, card con le azioni
+- [x] Test: 22 file / 98 test
+- [x] Playbook come host contro la build locale (le domande delle CR bloccate, Chiedi a Jonny, Rispondi): typecheck, 90 file / 683 test
+- [x] README, llms.txt, CHANGELOG, versione 0.20.0
 
 ---
 

@@ -7,16 +7,17 @@
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.19.1 ready (published by the person). Peers: `@llmnative/react` ^1.34 || ^2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.20.0 ready (published by the person). Peers: `@llmnative/react` ^1.34 || ^2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 22 files / 97 tests (Vitest, happy-dom). | — |
+| Tests | 22 files / 98 tests (Vitest, happy-dom). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-021 | Done | Act on an event from the chat: `ThreadEvent.actions`/`open`, `ThreadEventsSource.onAction` with `chat.compose`/`chat.send`, `useAgentico().compose`. 98 tests. Version 0.20.0, verified in Playbook against the local build. Issue #21. |
 | CR-020 | Done | Images in sight (`attachmentPreviews`, `imagePreviews`: previews kept with the chat, opened larger) and events going on (`ThreadEvent.running`, a spinner). 96 tests. Version 0.19.0, verified in Playbook against the local build. Issue #20. |
 | CR-019 | Done | What happened around a chat: `at` on every entry, `<AgenticoProvider threadEvents>` (`ThreadEventsSource`), events among the turns by time as cards with who did it, header filter, never read by the model; `placeEvents`. 93 tests. Version 0.18.0, verified in Playbook against the local build. Issue #19. |
 | CR-018 | Done | Sessions of one chat and who speaks: `SubagentManifest.thread`/`speaker`, `<AgenticoProvider person>`, `author` on messages of the person, `EarlierSessions` (read-only, loaded as the person scrolls up, Continue this session), `chatThreadOf`, `earlierSessions`. 88 tests. Version 0.17.0 (0.17.1-0.17.2: one column on the left for people and agents, the reasoning and steps summed up next to the name of the agent), verified in Playbook against the local build. Issue #18. |

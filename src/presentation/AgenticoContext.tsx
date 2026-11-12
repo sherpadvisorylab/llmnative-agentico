@@ -248,6 +248,10 @@ interface AgenticoContextValue {
     /** Apre il pannello incondizionatamente — a differenza di toggleOpen(), non dipende dal
      * valore corrente di isOpen. */
     openPanel: () => void;
+    /** CR-021: puts `text` in the field of the chat open in the panel (opening the panel), for the person to send. */
+    compose: (text: string) => void;
+    /** CR-021: the text last put in the field (`nonce` changes each time). */
+    draft: { text: string; nonce: number } | null;
     /** Persiste (sovrascrivendo un'eventuale chat già salvata per la STESSA entità, vedi
      * entityChatStore) la conversazione del task `taskId`, keyed su `${scopeId}:${subagentId}:
      * ${entityId}` — chiamato da un componente (es. ThemeEditor) subito dopo un salvataggio
@@ -363,6 +367,11 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
 
     const toggleOpen = useCallback(() => setIsOpen((v) => !v), []);
     const openPanel = useCallback(() => setIsOpen(true), []);
+    const [draft, setDraft] = useState<{ text: string; nonce: number } | null>(null);
+    const compose = useCallback((text: string) => {
+        setIsOpen(true);
+        setDraft((current) => ({ text, nonce: (current?.nonce ?? 0) + 1 }));
+    }, []);
 
     const [pendingGoal, setPendingGoal] = useState<string | null>(null);
     const [pendingExtraDestinations, setPendingExtraDestinations] = useState<ResultDestination[] | undefined>(undefined);
@@ -556,7 +565,7 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
 
     const value = useMemo(
         () => ({
-            scope, person, threadEvents, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator,
+            scope, person, threadEvents, compose, draft, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator,
             pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId,
             componentAnchors, anchoredUserMessages, registerComponentAnchor,
             openPanel, pendingExtraDestinations,
@@ -566,7 +575,7 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
             pendingResumeWithAI, resumeWithAIRunId, resumeWithAI,
             startSubagent, pendingStart, startRunId,
         }),
-        [scope, person, threadEvents, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
+        [scope, person, threadEvents, compose, draft, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
     );
 
     return (

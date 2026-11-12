@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-12
+
+### Added
+- Act on an event from the chat (CR-021, GH issue #21):
+  - `ThreadEvent.actions`: buttons on the card of an event, run by `ThreadEventsSource.onAction(event, actionId, chat)`.
+  - `ThreadEvent.open`: its body shown at once (e.g. the questions an agent waits on).
+  - `chat.compose(text)` puts a text in the field of the chat open in the panel; `chat.send(text)` sends it as a message
+    of the person (composed instead while a turn runs). `useAgentico().compose(text)` and `draft` for the host.
+  - `ThreadEventAction`, `ThreadEventChat`.
+
 ## [0.19.1] - 2026-11-12
 
 ### Fixed

@@ -21,6 +21,26 @@ export interface ThreadEvent {
     icon?: string;
     /** CR-020: still going on (an agent at work on it): a spinner in place of its icon. */
     running?: boolean;
+    /** CR-021: its body shown at once (e.g. the questions an agent waits on), not behind a click. */
+    open?: boolean;
+    /** CR-021: buttons on the card, run by the host (`ThreadEventsSource.onAction`). */
+    actions?: ThreadEventAction[];
+}
+
+/** CR-021: a button on the card of an event. */
+export interface ThreadEventAction {
+    id: string;
+    label: string;
+    icon?: string;
+    primary?: boolean;
+}
+
+/** CR-021: what an action of an event may do in the chat open in the panel. */
+export interface ThreadEventChat {
+    /** Puts `text` in the field of the chat, for the person to change and send. */
+    compose(text: string): void;
+    /** Sends `text` as a message of the person. */
+    send(text: string): Promise<void>;
 }
 
 /** Where the panel reads the events of a chat (`<AgenticoProvider threadEvents>`). */
@@ -29,6 +49,8 @@ export interface ThreadEventsSource {
     load(thread: string, from: number, to: number): ThreadEvent[] | Promise<ThreadEvent[]>;
     /** Called when the events of `thread` may have changed: the panel reads them again. Returns the unsubscribe. */
     subscribe?(thread: string, onChange: () => void): () => void;
+    /** CR-021: a button of the card of an event was clicked. */
+    onAction?(event: ThreadEvent, actionId: string, chat: ThreadEventChat): void | Promise<void>;
 }
 
 /** Each of the events among the turns of a log, by time: before the turn it came before. Turns without a time
