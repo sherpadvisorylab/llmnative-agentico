@@ -19,6 +19,8 @@ export interface ThreadEvent {
     href?: string;
     /** Framework icon of what it was (default: none). */
     icon?: string;
+    /** CR-020: still going on (an agent at work on it): a spinner in place of its icon. */
+    running?: boolean;
 }
 
 /** Where the panel reads the events of a chat (`<AgenticoProvider threadEvents>`). */

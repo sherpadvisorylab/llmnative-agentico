@@ -194,6 +194,27 @@ export interface UserMessageActions {
 /** Whether the answer to a message of the person was cut: a step of its turn stopped or failed. */
 const interrupted = (entries: readonly AgentActivityEntry[]) => entries.some((entry) => entry.status === 'stopped' || entry.status === 'error');
 
+/** CR-020: the previews of the images of a message: small, side by side; a click opens one larger. */
+function AttachmentPreviews({ previews }: { previews: ReadonlyArray<{ name: string; src: string }> }) {
+    const [open, setOpen] = useState<{ name: string; src: string } | null>(null);
+    return (
+        <>
+            <div className="flex flex-wrap gap-1.5">
+                {previews.map((preview) => (
+                    <button key={preview.name} type="button" onClick={() => setOpen(preview)} title={preview.name} className="overflow-hidden rounded-md border border-border/60 bg-background">
+                        <img src={preview.src} alt={preview.name} className="block max-h-40 max-w-full object-contain" />
+                    </button>
+                ))}
+            </div>
+            {open && (
+                <Modal title={open.name} size="lg" onClose={() => setOpen(null)}>
+                    <img src={open.src} alt={open.name} className="mx-auto block max-h-[70vh] max-w-full object-contain" />
+                </Modal>
+            )}
+        </>
+    );
+}
+
 /** CR-018: the picture of who speaks: theirs, else an icon drawn from their name. */
 export function ChatAvatar({ author, size = 20 }: { author: ChatAuthor; size?: number }) {
     return author.avatarUrl
@@ -283,12 +304,14 @@ function UserMessageBubble({ entry, pinned = true, actions, cut = false, showAut
                     className={`space-y-1 px-2.5 pt-1.5 ${collapsed ? 'overflow-hidden' : ''}`}
                     style={collapsed ? { maxHeight: USER_BUBBLE_COLLAPSED_MAX_HEIGHT } : undefined}
                 >
-                    {entry.attachmentNames && entry.attachmentNames.length > 0 && (
+                    {/* CR-020: the images it carried, as they were pasted: a click shows them larger. */}
+                    {entry.attachmentPreviews && entry.attachmentPreviews.length > 0 && <AttachmentPreviews previews={entry.attachmentPreviews} />}
+                    {entry.attachmentNames && entry.attachmentNames.some((name) => !entry.attachmentPreviews?.some((preview) => preview.name === name)) && (
                         // Pillole SOPRA il testo, non dentro DetailContent — sono metadati del
                         // messaggio (cosa era allegato), non parte del testo scritto dall'utente,
                         // niente markdown/segmenti codice da applicargli.
                         <div className="flex flex-wrap gap-1">
-                            {entry.attachmentNames.map((name, i) => (
+                            {entry.attachmentNames.filter((name) => !entry.attachmentPreviews?.some((preview) => preview.name === name)).map((name, i) => (
                                 <span key={i} className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-1.5 py-0.5 text-[11px] text-foreground">
                                     <Icon name="paperclip" size={10} className="shrink-0" />
                                     <span className="max-w-[160px] truncate">{name}</span>

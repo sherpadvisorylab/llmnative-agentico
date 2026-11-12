@@ -33,6 +33,8 @@ export interface EntityChatActivityEntry {
     author?: ChatAuthor;
     /** CR-019: when it was born (ms). Absent on entries saved before 0.18.0. */
     at?: number;
+    /** CR-020: on a message of the person, small previews (data URLs) of the images attached to it. */
+    attachmentPreviews?: Array<{ name: string; src: string }>;
     /** CR-016: the length of the history of the model when this message of the person was sent. */
     historyAt?: number;
     /** The message in parts (CR-004): saved and reloaded as they are. Absent in chats saved before

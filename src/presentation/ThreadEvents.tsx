@@ -52,12 +52,14 @@ export function ThreadEventCard({ event }: { event: ThreadEvent }) {
     const [open, setOpen] = useState(false);
     const time = new Date(event.at).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
     return (
-        <li className="flex items-start gap-2 py-1 text-xs" aria-label={`${event.author.name}: ${event.title}`}>
+        <li className="flex items-start gap-2 py-1 text-xs" aria-label={`${event.author.name}: ${event.title}`} aria-busy={event.running || undefined}>
             <span className="flex w-6 shrink-0 justify-center pt-px"><ChatAvatar author={event.author} /></span>
-            <div className="min-w-0 flex-1 rounded-md border border-border/60 bg-muted/30 px-2 py-1">
+            <div className={`min-w-0 flex-1 rounded-md border px-2 py-1 ${event.running ? 'border-primary/40 bg-primary/5' : 'border-border/60 bg-muted/30'}`}>
                 <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                     <span className="font-medium text-foreground">{event.author.name}</span>
-                    {event.icon && <Icon name={event.icon} size={12} className="shrink-0 text-muted-foreground" />}
+                    {event.running
+                        ? <Icon name="loader-circle" size={12} className="shrink-0 animate-spin text-primary" aria-label={t.eventRunning} />
+                        : event.icon && <Icon name={event.icon} size={12} className="shrink-0 text-muted-foreground" />}
                     <span className="min-w-0 break-words text-muted-foreground">{event.title}</span>
                     {event.badge && <Badge variant={event.badge.variant ?? 'light'}>{event.badge.label}</Badge>}
                     <span className="ms-auto flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">

@@ -30,6 +30,7 @@ import { APPROVAL_PART_ID, approvalOf, needsApproval, type ApprovalDecision } fr
 import { getAgenticoPrompts } from '../domain/prompts';
 import { useAgenticoI18n } from '../i18n';
 import type { ChatAuthor } from '../domain/entityChatStore';
+import { imagePreviews, type AttachmentPreview } from './imagePreview';
 
 /** Numero massimo di round-trip tool_calls consecutivi in un singolo turno — argine contro
  * un modello che continua a invocare tool senza mai arrivare a una risposta testuale. Un
@@ -96,6 +97,8 @@ export interface AgentActivityEntry {
     author?: ChatAuthor;
     /** CR-019: when it was born (ms). Absent on entries saved before 0.18.0. */
     at?: number;
+    /** CR-020: on a message of the person, small previews of the images attached to it, kept with the chat. */
+    attachmentPreviews?: AttachmentPreview[];
     /** CR-016: on a message of the person, how many turns the history of the model had when it was sent:
      * where the chat goes back to when the person retries or edits it. Absent on messages sent before
      * 0.15.0 (no Retry from here on them). */
@@ -267,6 +270,14 @@ export function useAgent<TParams, TContext, TResult>(
             }
             activityRef.current = value;
             return value;
+        });
+    };
+    // CR-020: the previews of the images of a message, added to it once drawn (the message is shown at once).
+    const addPreviews = (entryId: string, files: readonly File[] | undefined) => {
+        if (!files?.some((file) => file.type.startsWith('image/'))) return;
+        void imagePreviews(files).then((previews) => {
+            if (!previews.length) return;
+            setActivity((prev) => prev.map((entry) => (entry.id === entryId ? { ...entry, attachmentPreviews: previews } : entry)));
         });
     };
     // Questions asked by a turn still running, by `${entryId}:${partId}`: answering resolves them.
@@ -898,9 +909,11 @@ export function useAgent<TParams, TContext, TResult>(
         // Stesso trattamento del testo di sendMessage() sotto — mostrato subito, prima di
         // aspettare la risposta, cosi il messaggio che ha avviato la conversazione non "scompare"
         // dal log (vedi il commento su opts.openingMessage in UseAgentResult.run).
+        const openingId = crypto.randomUUID();
+        if (opts?.openingMessage) addPreviews(openingId, opts.attachments);
         setActivity(opts?.openingMessage
             ? [{
-                id: crypto.randomUUID(), kind: 'user', label: 'Tu', status: 'done', detail: opts.openingMessage,
+                id: openingId, kind: 'user', label: 'Tu', status: 'done', detail: opts.openingMessage,
                 ...(authorRef.current ? { author: authorRef.current } : {}),
                 ...(opts.attachments?.length ? { attachmentNames: opts.attachments.map((f) => f.name) } : {}),
               }]
@@ -1003,6 +1016,7 @@ export function useAgent<TParams, TContext, TResult>(
         // pensando" del modello, che invece parte vuoto e si riempie solo a risposta arrivata).
         const messageId = crypto.randomUUID();
         sendingRef.current = messageId;
+        addPreviews(messageId, opts?.attachments);
         setActivity((prev) => [...prev, {
             id: messageId, kind: 'user', label: 'Tu', status: 'done', detail: text,
             ...(authorRef.current ? { author: authorRef.current } : {}),

@@ -50,6 +50,7 @@ export const agenticoEn: AgenticoDict = {
     eventMore: 'More',
     eventLess: 'Less',
     eventOpen: 'Open',
+    eventRunning: 'In progress',
     showEvents: 'Show what the agents did',
     hideEvents: 'Conversation only',
     cardView: 'View',

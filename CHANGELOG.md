@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-12
+
+### Added
+- Images in sight and events going on (CR-020, GH issue #20):
+  - The images pasted or attached to a message of the person stay in sight after it is sent: small previews (JPEG,
+    at most 480 px a side, the first 4) kept with the chat as `attachmentPreviews`, a click opens one larger. Other
+    files stay as their names. `imagePreviews(files)`.
+  - `ThreadEvent.running`: an event still going on (an agent at work on it) has a spinner in place of its icon.
+  - i18n `eventRunning` (en, it, de).
+
 ## [0.18.0] - 2026-11-12
 
 ### Added

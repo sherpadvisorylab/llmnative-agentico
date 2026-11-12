@@ -50,6 +50,7 @@ export const agenticoDe: AgenticoDict = {
     eventMore: 'Mehr',
     eventLess: 'Weniger',
     eventOpen: 'Öffnen',
+    eventRunning: 'Läuft',
     showEvents: 'Zeigen, was die Agenten getan haben',
     hideEvents: 'Nur das Gespräch',
     cardView: 'Ansehen',

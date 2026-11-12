@@ -7,6 +7,7 @@ import {
     Agentico,
     AgenticoProvider,
     placeEvents,
+    imagePreviews,
     registerSubagents,
     useAgentico,
     type AgentExecutorTurn,
@@ -150,5 +151,48 @@ describe('the events of a chat', () => {
         renderPanel(null, { resume: saved });
         await screen.findByText('first question');
         expect(screen.queryByRole('button', { name: 'Conversation only' })).toBeNull();
+    });
+
+    it('one still going on has a spinner (CR-020)', async () => {
+        registerSubagents([manifest([])]);
+        const saved: EntityChatSnapshot = {
+            scopeId: 'acme', subagentId: 'design', entityId: 's1', params: { project: 'shop' }, title: 'Shop', savedAt: 3000, startedAt: 1000,
+            history: [], activity: [{ id: 'u1', kind: 'user', label: 'Tu', status: 'done', detail: 'first question', at: 1000 }],
+        };
+        localStorage.setItem(STORE, JSON.stringify([saved]));
+        renderPanel({ load: () => [event('e1', 2000, 'Fra took #291', { running: true }), event('e2', 1500, '#290 closed')] }, { resume: saved });
+        const running = await screen.findByRole('listitem', { name: 'Leo: Fra took #291' });
+        expect(running).toHaveAttribute('aria-busy', 'true');
+        expect(screen.getByRole('listitem', { name: 'Leo: #290 closed' })).not.toHaveAttribute('aria-busy');
+    });
+});
+
+describe('the images of a message (CR-020)', () => {
+    it('stay in sight as previews, opened larger on a click; other files as their names', async () => {
+        registerSubagents([manifest([])]);
+        const src = 'data:image/jpeg;base64,AAAA';
+        const saved: EntityChatSnapshot = {
+            scopeId: 'acme', subagentId: 'design', entityId: 's1', params: { project: 'shop' }, title: 'Shop', savedAt: 3000, startedAt: 1000,
+            history: [],
+            activity: [{
+                id: 'u1', kind: 'user', label: 'Tu', status: 'done', detail: 'why did it fail?', at: 1000,
+                attachmentNames: ['screen.png', 'log.txt'], attachmentPreviews: [{ name: 'screen.png', src }],
+            }],
+        };
+        localStorage.setItem(STORE, JSON.stringify([saved]));
+        renderPanel(null, { resume: saved });
+        const image = await screen.findByRole('img', { name: 'screen.png' });
+        expect(image).toHaveAttribute('src', src);
+        // The image is not repeated as a name; the text file is.
+        expect(screen.queryByText('screen.png')).toBeNull();
+        expect(screen.getByText('log.txt')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'screen.png' }));
+        await waitFor(() => expect(screen.getAllByRole('img', { name: 'screen.png' })).toHaveLength(2));
+    });
+
+    it('a browser that cannot draw them keeps the names only', async () => {
+        const previews = await imagePreviews([new File(['x'], 'a.png', { type: 'image/png' }), new File(['y'], 'b.txt', { type: 'text/plain' })]);
+        expect(Array.isArray(previews)).toBe(true);
+        expect(previews.every((preview) => preview.name === 'a.png')).toBe(true);
     });
 });

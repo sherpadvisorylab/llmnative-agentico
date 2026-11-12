@@ -75,6 +75,8 @@ export interface AgenticoDict {
     eventLess: string;
     /** CR-019: opens the event where the host keeps it. */
     eventOpen: string;
+    /** CR-020: an event still going on (its spinner). */
+    eventRunning: string;
     /** CR-019: the filter in the header: show the events of the host, or the conversation only. */
     showEvents: string;
     hideEvents: string;

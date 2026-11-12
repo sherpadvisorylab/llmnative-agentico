@@ -28,6 +28,36 @@
 | [CR-017](#cr-017--allegati-per-lesecutore) | Allegati per l'esecutore | Alta | CR-003, CR-124 (framework) | ✅ |
 | [CR-018](#cr-018--sessioni-di-una-chat-e-chi-parla) | Sessioni di una chat e chi parla (avatar) | Alta | CR-010, CR-013 | ✅ |
 | [CR-019](#cr-019--attività-degli-altri-agenti-nella-chat) | Attività degli altri agenti nella chat (eventi dell'host) | Alta | CR-018 | ✅ |
+| [CR-020](#cr-020--immagini-in-vista-ed-eventi-in-corso) | Immagini in vista ed eventi in corso | Media | CR-017, CR-019 | ✅ |
+
+---
+
+## CR-020 — Immagini in vista ed eventi in corso
+
+**Stato:** ✅ done (0.19.0)
+**Issue:** [#20](https://github.com/sherpadvisorylab/llmnative-agentico/issues/20)
+**Priorità:** Media
+**Dipende da:** CR-017 (allegati), CR-019 (eventi dell'host)
+
+### Motivazione
+
+Emersa nel Playbook il 12/11/2026:
+- un'immagine incollata in un messaggio, una volta inviato, restava solo come icona di allegato;
+- nella chat non si capiva quali attività degli agenti fossero ancora in corso.
+
+### Scope
+
+- Anteprime delle immagini di un messaggio della persona (`attachmentPreviews`):
+  - JPEG di al massimo 480 px per lato, le prime 4, disegnate nel browser e salvate con la chat;
+  - un clic apre l'anteprima più grande; il file originale non viene mai salvato.
+- `ThreadEvent.running`: uno spinner al posto dell'icona, la card evidenziata.
+
+### Checklist
+
+- [x] `imagePreview.ts`, useAgent, bolla della persona, card dell'evento
+- [x] Test: 21 file / 96 test
+- [x] Playbook come host contro la build locale: typecheck, 89 file / 681 test
+- [x] README, llms.txt, CHANGELOG, versione 0.19.0
 
 ---
 

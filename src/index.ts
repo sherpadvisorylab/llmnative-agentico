@@ -70,6 +70,7 @@ export {
 } from './domain/entityChatStore';
 export { chatThreadOf, earlierSessions } from './domain/chatThread';
 export { placeEvents, type ThreadEvent, type ThreadEventsSource } from './domain/threadEvents';
+export { imagePreviews, PREVIEW_MAX, PREVIEW_LIMIT, type AttachmentPreview } from './presentation/imagePreview';
 
 // ── i18n ──────────────────────────────────────────────────────────────────────────────────────
 export { agenticoTranslations, agenticoEn, agenticoIt, agenticoDe, useAgenticoI18n, type AgenticoDict } from './i18n';
