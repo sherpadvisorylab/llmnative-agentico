@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-11-12
+
+### Changed
+- Peer dependency `@llmnative/react` `^1.34.0 || ^2.0.0`: 2.0 changes only the Form's action mode (`onSubmit`
+  instead of `requireChanges`), which Agentico does not use.
+
 ## [0.16.0] - 2026-11-11
 
 ### Added
