@@ -70,6 +70,14 @@ export interface AgenticoDict {
     continueSession: string;
     /** CR-018: the separator of an earlier session without a title; `{at}` its start. */
     sessionOf: string;
+    /** CR-019: opens and closes what an event of the host said. */
+    eventMore: string;
+    eventLess: string;
+    /** CR-019: opens the event where the host keeps it. */
+    eventOpen: string;
+    /** CR-019: the filter in the header: show the events of the host, or the conversation only. */
+    showEvents: string;
+    hideEvents: string;
     /** CR-011: renaming a saved chat. */
     /** CR-014: the whole text of a card, and closing it. */
     cardView: string;

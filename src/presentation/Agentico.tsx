@@ -11,6 +11,8 @@ import { OrchestratorRunner } from './OrchestratorRunner';
 import { SubagentRunner } from './SubagentRunner';
 import { ManualEntryRunner } from './ManualEntryRunner';
 import { EarlierSessions } from './EarlierSessions';
+import { useShowThreadEvents, useThreadEvents } from './ThreadEvents';
+import { earlierSessions } from '../domain/chatThread';
 import { ORCHESTRATOR_TASK_ID } from './AgenticoContext';
 import type { AgenticoTask } from './AgenticoContext';
 import type { AgentActivityEntry } from './useAgent';
@@ -430,7 +432,7 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
         anchoredUserMessages, pendingResume, resumeRunId, dismissForeignTask, resumeEntityChat,
         pendingManualEntry, manualEntryRunId, startManualEntry, pendingExtraDestinations,
         pendingResumeWithAI, resumeWithAIRunId, pendingStart, startRunId,
-        scope,
+        scope, threadEvents,
     } = useAgentico();
 
     const t = useAgenticoI18n();
@@ -471,6 +473,24 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
     const activityBeforePanelExtra = displayedActivity.slice(0, panelExtraAnchorIndex);
     const activityAfterPanelExtra = displayedActivity.slice(panelExtraAnchorIndex);
     const hasError = !!(task && !task.agent.running && task.agent.error);
+    // CR-019: what happened around this chat (the host's events), from the last message of the session before it
+    // (else from its start): among its turns by time, unless the person keeps to the conversation.
+    const [showEvents, setShowEvents] = useShowThreadEvents();
+    const openedAt = useRef<{ id?: string; at: number }>({ at: Date.now() });
+    if (openedAt.current.id !== task?.id) openedAt.current = { id: task?.id, at: Date.now() };
+    const eventsFrom = useMemo(() => {
+        if (!scope || !task?.thread) return openedAt.current.at;
+        const before = earlierSessions(scope.id, task.thread, task.id)[0];
+        if (before) return before.savedAt;
+        const open = listEntityChats(scope.id).find((chat) => entityChatTaskId(chat.subagentId, chat.entityId) === task.id);
+        return open ? chatStartedAt(open) : (displayedActivity.find((entry) => entry.at !== undefined)?.at ?? openedAt.current.at);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [scope?.id, task?.thread, task?.id, activityCount === 0]);
+    const events = useThreadEvents(task?.thread, eventsFrom, Infinity, showEvents);
+    // With a part after `panelExtra`, the events after its first entry go with it.
+    const splitAt = activityAfterPanelExtra.find((entry) => entry.at !== undefined)?.at;
+    const eventsBefore = activityAfterPanelExtra.length === 0 || splitAt === undefined ? events : events.filter((event) => event.at < splitAt);
+    const eventsAfter = activityAfterPanelExtra.length === 0 || splitAt === undefined ? [] : events.filter((event) => event.at >= splitAt);
     // CR-016: back to a message of the person. The steps done after it stay done: said first, when there are any.
     const rewindTo = (entry: AgentActivityEntry, text?: string) => {
         if (!task) return;
@@ -684,6 +704,17 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                 {/* Storico — TUTTE le chat salvate dello scope (vedi AgenticoHistoryDropdown),
                     mescolate across subagent, più recenti prima. Nessuna dipendenza da
                     `isOpen`/task: uno stato locale a sé, sempre disponibile col pannello aperto. */}
+                {/* CR-019: what the agents did, or the conversation only (kept in this browser). */}
+                {task?.thread && threadEvents && (
+                    <ActionButton
+                        icon={showEvents ? 'activity' : 'message-square'}
+                        ariaLabel={showEvents ? t.hideEvents : t.showEvents}
+                        title={showEvents ? t.hideEvents : t.showEvents}
+                        variant="link"
+                        className={`p-1 ${showEvents ? 'text-primary' : 'text-muted-foreground'}`}
+                        onClick={() => setShowEvents(!showEvents)}
+                    />
+                )}
                 {scope && (
                     <AgenticoHistoryDropdown
                         scopeId={scope.id}
@@ -721,6 +752,7 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                                     taskId={task.id}
                                     scrollRef={bodyRef}
                                     busy={task.agent.running}
+                                    showEvents={showEvents}
                                     onLoad={() => { isNearBottomRef.current = false; }}
                                     onContinue={(chat) => resumeEntityChat(chat.subagentId, chat.entityId, chat)}
                                 />
@@ -733,13 +765,13 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                             {task.manualEntry && displayedActivity.length === 0 && (
                                 <p className="text-xs text-muted-foreground">{task.manualEntry.prompt}</p>
                             )}
-                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} speaker={task.speaker} />
+                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} speaker={task.speaker} events={eventsBefore} />
                             {task.panelExtra && <div className="mt-3">{task.panelExtra}</div>}
                             {/* Conversazione successiva a `panelExtra` (retry, follow-up) — un
                                 secondo <ul> (AgentActivityLog ne apre uno suo), non un problema:
                                 lo sticky delle bolle utente è per-<li> rispetto allo scroll
                                 container di questo pannello, non al singolo <ul> che le contiene. */}
-                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} speaker={task.speaker} />}
+                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} speaker={task.speaker} events={eventsAfter} />}
                             {!task.agent.running && task.agent.error && (
                                 <div className="mt-2 flex items-center gap-2">
                                     <p className="flex-1 text-xs text-destructive">{task.agent.error}</p>

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-12
+
+### Added
+- What happened around a chat (CR-019, GH issue #19):
+  - `<AgenticoProvider threadEvents>`: a `ThreadEventsSource` (`load(thread, from, to)`, `subscribe`) gives the events of
+    the host for a chat with a `thread` (the work of other agents on a project…).
+  - The panel shows them among the turns, by time, as compact cards: who did it in the column on the left, what
+    happened next to their name, its time; opened, what it said; a link to where it is kept. In the open session from
+    the last message of the session before it, in each earlier session up to its last message.
+  - A filter in the header ("Conversation only"), kept in this browser. The model never reads the events.
+  - Every entry of a chat keeps when it was born (`at`), saved with the chat; entries saved before have none.
+  - `ThreadEvent`, `ThreadEventsSource`, `placeEvents`; i18n `eventMore`, `eventLess`, `eventOpen`, `showEvents`,
+    `hideEvents` (en, it, de).
+
 ## [0.17.2] - 2026-11-12
 
 ### Changed

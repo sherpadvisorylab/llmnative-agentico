@@ -94,6 +94,8 @@ export interface AgentActivityEntry {
     retry?: boolean;
     /** CR-018: on a message of the person, who wrote it (the `author` of useAgent). */
     author?: ChatAuthor;
+    /** CR-019: when it was born (ms). Absent on entries saved before 0.18.0. */
+    at?: number;
     /** CR-016: on a message of the person, how many turns the history of the model had when it was sent:
      * where the chat goes back to when the person retries or edits it. Absent on messages sent before
      * 0.15.0 (no Retry from here on them). */
@@ -251,9 +253,18 @@ export function useAgent<TParams, TContext, TResult>(
     const [activity, setActivityState] = useState<AgentActivityEntry[]>([]);
     // The log as last set, readable outside a render (answerQuestions looks its entry up there).
     const activityRef = useRef<AgentActivityEntry[]>([]);
-    const setActivity = (next: AgentActivityEntry[] | ((prev: AgentActivityEntry[]) => AgentActivityEntry[])) => {
+    // CR-019: an entry gets the time it was born (`at`), kept with the chat; a chat resumed keeps its own.
+    const setActivity = (next: AgentActivityEntry[] | ((prev: AgentActivityEntry[]) => AgentActivityEntry[]), opts?: { stamp?: boolean }) => {
         setActivityState((prev) => {
-            const value = typeof next === 'function' ? next(prev) : next;
+            let value = typeof next === 'function' ? next(prev) : next;
+            if (opts?.stamp !== false) {
+                const known = new Set(prev.map((entry) => entry.id));
+                const born = (entry: AgentActivityEntry) => entry.at === undefined && !known.has(entry.id);
+                if (value.some(born)) {
+                    const now = Date.now();
+                    value = value.map((entry) => (born(entry) ? { ...entry, at: now } : entry));
+                }
+            }
             activityRef.current = value;
             return value;
         });
@@ -955,7 +966,7 @@ export function useAgent<TParams, TContext, TResult>(
         setError(null);
         // A chat saved while a turn ran (and left: the page reloaded, the server went away) shows that turn as
         // stopped, not as one still at work: nothing runs it any more.
-        setActivity(settleActivity(seed.activity));
+        setActivity(settleActivity(seed.activity), { stamp: false });
         // `running`, come in run() — buildContext() per theme rifà una vera fetch di rete
         // (extractSiteSnapshot): senza, `task.agent.running` resterebbe falsamente `false` per
         // tutta quella finestra, e qualunque logica che vi si affida (spinner del composer,

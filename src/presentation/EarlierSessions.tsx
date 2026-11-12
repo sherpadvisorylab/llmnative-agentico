@@ -4,6 +4,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ActionButton, interpolate, useI18n } from '@llmnative/react';
 import { AgentActivityLog } from './AgentActivityLog';
+import { useThreadEvents } from './ThreadEvents';
 import { earlierSessions } from '../domain/chatThread';
 import { chatStartedAt, chatTitle, onEntityChatsChange, type EntityChatSnapshot } from '../domain/entityChatStore';
 import { findSubagentManifest } from '../domain/subagentRegistry';
@@ -24,7 +25,20 @@ function SessionSeparator({ title, meta, action }: { title: string; meta?: strin
     );
 }
 
-export function EarlierSessions({ scopeId, thread, taskId, scrollRef, onLoad, onContinue, busy = false }: {
+/** An earlier session, read-only, with what happened from the last message of the session before it to its own. */
+function SessionLog({ chat, thread, from, showEvents }: { chat: EntityChatSnapshot; thread: string; from: number; showEvents: boolean }) {
+    const events = useThreadEvents(thread, from, chat.savedAt, showEvents);
+    return (
+        <AgentActivityLog
+            activity={chat.activity}
+            pinUserMessages={false}
+            speaker={findSubagentManifest(chat.subagentId)?.speaker?.(chat.params)}
+            events={events}
+        />
+    );
+}
+
+export function EarlierSessions({ scopeId, thread, taskId, scrollRef, onLoad, onContinue, busy = false, showEvents = true }: {
     scopeId: string;
     /** The chat the open one is a session of. */
     thread: string;
@@ -38,6 +52,8 @@ export function EarlierSessions({ scopeId, thread, taskId, scrollRef, onLoad, on
     onContinue: (chat: EntityChatSnapshot) => void;
     /** A turn of the open session runs: it is not left meanwhile. */
     busy?: boolean;
+    /** CR-019: the events of the host among the messages (the filter of the header). */
+    showEvents?: boolean;
 }) {
     const t = useAgenticoI18n();
     const { locale } = useI18n();
@@ -94,6 +110,11 @@ export function EarlierSessions({ scopeId, thread, taskId, scrollRef, onLoad, on
     const when = (at: number) => new Date(at).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
     // The oldest loaded at the top, the one just before the open session right above it.
     const visible = sessions.slice(0, shown).reverse();
+    // CR-019: each session has what happened from the last message of the one before it.
+    const fromOf = (chat: EntityChatSnapshot) => {
+        const older = sessions[sessions.indexOf(chat) + 1];
+        return older ? older.savedAt : chatStartedAt(chat);
+    };
     return (
         <div>
             {more && (
@@ -109,11 +130,7 @@ export function EarlierSessions({ scopeId, thread, taskId, scrollRef, onLoad, on
                         action={<ActionButton label={t.continueSession} variant="link" className="text-[11px]" disabled={busy} onClick={() => onContinue(chat)} />}
                     />
                     {/* Read-only: no questions to answer, no Retry or Edit. */}
-                    <AgentActivityLog
-                        activity={chat.activity}
-                        pinUserMessages={false}
-                        speaker={findSubagentManifest(chat.subagentId)?.speaker?.(chat.params)}
-                    />
+                    <SessionLog chat={chat} thread={thread} from={fromOf(chat)} showEvents={showEvents} />
                 </section>
             ))}
             {shown > 0 && <SessionSeparator title={t.thisSession} />}

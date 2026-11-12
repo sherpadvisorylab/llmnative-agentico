@@ -5,6 +5,7 @@ import type { ResultDestination } from '../domain/resultDestination';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
 import { findSubagentManifest } from '../domain/subagentRegistry';
 import { saveEntityChat, syncEntityChats, type ChatAuthor, type EntityChatSnapshot } from '../domain/entityChatStore';
+import type { ThreadEventsSource } from '../domain/threadEvents';
 import { getAgenticoPrompts } from '../domain/prompts';
 
 /** Where results are saved and chats are kept: the host's current tenant, company, workspace…
@@ -155,6 +156,8 @@ interface AgenticoContextValue {
     scope: AgenticoScope | null;
     /** CR-018: the person using the panel (<AgenticoProvider person>): the author of their messages. */
     person: ChatAuthor | null;
+    /** CR-019: where the panel reads what happened around a chat (<AgenticoProvider threadEvents>). */
+    threadEvents: ThreadEventsSource | null;
     task: AgenticoTask | null;
     /** Visibilità del pannello — completamente indipendente dal task (vedi AgenticoToggle:
      * icona persistente stile "estensione del browser"). Nessuna chiamata a `openTask` la forza
@@ -311,11 +314,14 @@ interface AgenticoContextValue {
 
 const AgenticoContext = createContext<AgenticoContextValue | null>(null);
 
-export function AgenticoProvider({ children, scope = null, person = null }: {
+export function AgenticoProvider({ children, scope = null, person = null, threadEvents = null }: {
     children: React.ReactNode;
     scope?: AgenticoScope | null;
     /** CR-018: who uses the panel: their messages carry their name and picture, kept with the chat. */
     person?: ChatAuthor | null;
+    /** CR-019: what happened around a chat with a `thread` (the work of other agents…), shown among its messages
+     * in order of time, each with who did it. The model never reads it. Keep it stable (memoized). */
+    threadEvents?: ThreadEventsSource | null;
 }) {
     const [task, setTaskState] = useState<AgenticoTask | null>(null);
     // Stabile per tutta la vita del provider (vedi openTask sotto) — leggere `task` da una ref
@@ -550,7 +556,7 @@ export function AgenticoProvider({ children, scope = null, person = null }: {
 
     const value = useMemo(
         () => ({
-            scope, person, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator,
+            scope, person, threadEvents, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator,
             pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId,
             componentAnchors, anchoredUserMessages, registerComponentAnchor,
             openPanel, pendingExtraDestinations,
@@ -560,7 +566,7 @@ export function AgenticoProvider({ children, scope = null, person = null }: {
             pendingResumeWithAI, resumeWithAIRunId, resumeWithAI,
             startSubagent, pendingStart, startRunId,
         }),
-        [scope, person, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
+        [scope, person, threadEvents, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
     );
 
     return (

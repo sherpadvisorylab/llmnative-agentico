@@ -69,6 +69,7 @@ export {
     type ChatAuthor,
 } from './domain/entityChatStore';
 export { chatThreadOf, earlierSessions } from './domain/chatThread';
+export { placeEvents, type ThreadEvent, type ThreadEventsSource } from './domain/threadEvents';
 
 // ── i18n ──────────────────────────────────────────────────────────────────────────────────────
 export { agenticoTranslations, agenticoEn, agenticoIt, agenticoDe, useAgenticoI18n, type AgenticoDict } from './i18n';

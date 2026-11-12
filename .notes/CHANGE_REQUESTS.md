@@ -27,6 +27,40 @@
 | [CR-016](#cr-016--riprova-e-modifica-di-un-messaggio-della-persona) | Riprova e modifica di un messaggio della persona | Alta | CR-003, CR-009 | ✅ |
 | [CR-017](#cr-017--allegati-per-lesecutore) | Allegati per l'esecutore | Alta | CR-003, CR-124 (framework) | ✅ |
 | [CR-018](#cr-018--sessioni-di-una-chat-e-chi-parla) | Sessioni di una chat e chi parla (avatar) | Alta | CR-010, CR-013 | ✅ |
+| [CR-019](#cr-019--attività-degli-altri-agenti-nella-chat) | Attività degli altri agenti nella chat (eventi dell'host) | Alta | CR-018 | ✅ |
+
+---
+
+## CR-019 — Attività degli altri agenti nella chat
+
+**Stato:** ✅ done (0.18.0)
+**Issue:** [#19](https://github.com/sherpadvisorylab/llmnative-agentico/issues/19)
+**Priorità:** Alta
+**Dipende da:** CR-018 (sessioni di una chat, chi parla)
+
+### Motivazione
+
+Emersa nel Playbook il 12/11/2026. La chat di progetto, divisa in sessioni, deve diventare la cronologia di tutto
+quello che succede: oltre ai messaggi della persona e di Jonny, anche il lavoro degli altri agenti, ognuno con il suo
+avatar.
+
+### Scope
+
+- Ogni voce del log ha `at`, l'ora in cui nasce, salvata con la chat. La ripresa di una chat salvata non la inventa.
+- `<AgenticoProvider threadEvents>`: `ThreadEventsSource` con `load(thread, from, to)` e `subscribe`. `ThreadEvent`
+  ha `id`, `at`, `author`, `title` e, opzionali, `body`, `badge`, `href`, `icon`.
+- Il pannello mostra gli eventi tra i turni in ordine di tempo (`placeEvents`), come card compatte con l'avatar nella
+  colonna di sinistra:
+  - nella sessione aperta, dall'ultimo messaggio della sessione precedente;
+  - in ogni sessione precedente, fino al suo ultimo messaggio.
+- Filtro "Solo la conversazione" nell'header, ricordato dal browser. Il modello non legge mai gli eventi.
+
+### Checklist
+
+- [x] `at` sulle voci, dominio `threadEvents.ts`, provider, `ThreadEvents.tsx`, log, pannello, sessioni precedenti
+- [x] Test: 21 file / 93 test
+- [x] Playbook come host contro la build locale (eventi dell'Attività del progetto): typecheck, 89 file / 678 test
+- [x] README, llms.txt, CHANGELOG, versione 0.18.0
 
 ---
 

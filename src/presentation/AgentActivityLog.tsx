@@ -1,6 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActionButton, Badge, Card, ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, Identicon, ImageAvatar, LoadingButton, Modal, Tree, interpolate } from '@llmnative/react';
 import type { ChatAuthor } from '../domain/entityChatStore';
+import { placeEvents, type ThreadEvent } from '../domain/threadEvents';
+import { ThreadEventCard } from './ThreadEvents';
 import type { AgentActivityEntry } from './useAgent';
 import type { AgentCardPart, AgentMessagePart, AgentQuestionAnswer, AgentQuestionsPart, AgentReasoningPart, AgentToolPart } from '../domain/messageParts';
 import { useAgenticoI18n, type AgenticoDict } from '../i18n';
@@ -667,7 +669,7 @@ function AgentTurn({ speaker, entries, questions, docked }: {
  * One `<li>` per turn (CR-004): the message of the person, sticky at the top while its turn
  * scrolls, then what the agent did and said. Entries before the first message of the person
  * (an opening without text) form a turn of their own, without a bubble. */
-export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true, messageActions, speaker, showAuthors }: {
+export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true, messageActions, speaker, showAuthors, events }: {
     activity: AgentActivityEntry[];
     /** CR-018: who answers, shown at the start of each turn of the agent. */
     speaker?: ChatAuthor;
@@ -682,18 +684,24 @@ export function AgentActivityLog({ activity, questions, docked, pinUserMessages 
     /** The message of the person sticks at the top while its turn scrolls (default). Off while
      * questions are docked, so the thread has more room. */
     pinUserMessages?: boolean;
+    /** CR-019: what happened around this chat, placed among its turns by time. */
+    events?: readonly ThreadEvent[];
 }) {
-    if (activity.length === 0) return null;
+    if (activity.length === 0 && !events?.length) return null;
     const authors = showAuthors ?? (Boolean(speaker) || activity.some((entry) => entry.kind === 'user' && entry.author));
     const turns: Array<{ user?: AgentActivityEntry; entries: AgentActivityEntry[] }> = [];
     for (const entry of activity) {
         if (entry.kind === 'user' || turns.length === 0) turns.push(entry.kind === 'user' ? { user: entry, entries: [] } : { entries: [entry] });
         else turns[turns.length - 1].entries.push(entry);
     }
+    // CR-019: the events of the host before the turn they came before, the later ones at the end.
+    const slots = placeEvents(turns.map((turn) => (turn.user ?? turn.entries[0])?.at), events ?? []);
     return (
         <ul className="space-y-0.5">
-            {turns.map((turn) => (
-                <li key={turn.user?.id ?? turn.entries[0]?.id}>
+            {turns.map((turn, index) => (
+                <React.Fragment key={turn.user?.id ?? turn.entries[0]?.id}>
+                {slots[index].map((event) => <ThreadEventCard key={event.id} event={event} />)}
+                <li>
                     {turn.user && <UserMessageBubble entry={turn.user} pinned={pinUserMessages} actions={messageActions} cut={interrupted(turn.entries)} showAuthor={authors} />}
                     {speaker && turn.entries.length > 0 ? (
                         <AgentTurn speaker={speaker} entries={turn.entries} questions={questions} docked={docked} />
@@ -705,7 +713,9 @@ export function AgentActivityLog({ activity, questions, docked, pinUserMessages 
                         </ul>
                     )}
                 </li>
+                </React.Fragment>
             ))}
+            {slots[turns.length].map((event) => <ThreadEventCard key={event.id} event={event} />)}
         </ul>
     );
 }
