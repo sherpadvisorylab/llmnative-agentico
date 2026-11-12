@@ -352,11 +352,16 @@ function UserMessageBubble({ entry, pinned = true, actions, cut = false, showAut
                             <Icon name="user" size={12} />
                         </span>
                     )}
-                    {retryButton}
-                    {editButton}
                 </span>
                 <div className="min-w-0 flex-1">
-                    {entry.author && <div className="pb-0.5 text-xs font-medium text-foreground">{entry.author.name}</div>}
+                    {/* Its name, and its actions next to it (as the steps of an agent next to its name). */}
+                    {(entry.author || retryButton || editButton) && (
+                        <div className="flex min-h-5 items-center gap-0.5 pb-0.5">
+                            {entry.author && <span className="me-1 truncate text-xs font-medium text-foreground">{entry.author.name}</span>}
+                            {retryButton}
+                            {editButton}
+                        </div>
+                    )}
                     {bubble(true)}
                 </div>
             </div>

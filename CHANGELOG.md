@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.1] - 2026-11-13
+
+### Changed
+- Who speaks (CR-018): in a chat that shows who speaks, Edit and Retry of a message of the person are next to their
+  name, as the steps of an agent next to its name, no longer under their picture.
+
 ## [0.20.0] - 2026-11-12
 
 ### Added
