@@ -209,8 +209,10 @@ function SpeakerRow({ speaker }: { speaker: ChatAuthor }) {
     );
 }
 
-function UserMessageBubble({ entry, pinned = true, actions, cut = false }: {
+function UserMessageBubble({ entry, pinned = true, actions, cut = false, showAuthor = false }: {
     entry: AgentActivityEntry;
+    /** CR-018: the picture of who wrote it, on the left (a chat that shows who speaks). */
+    showAuthor?: boolean;
     pinned?: boolean;
     actions?: UserMessageActions;
     /** Its answer was cut (stopped, failed): Retry, always shown. */
@@ -239,6 +241,16 @@ function UserMessageBubble({ entry, pinned = true, actions, cut = false }: {
                     <span className="opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                         <ActionButton icon="pencil" ariaLabel={t.editMessage} title={t.editMessage} variant="link" className="p-1 text-muted-foreground hover:text-foreground" disabled={actions.disabled} onClick={() => actions.onEdit(entry)} />
                     </span>
+                </span>
+            )}
+            {/* CR-018: who wrote it, on the left of the bubble; a message saved without an author, a person icon. */}
+            {showAuthor && (
+                <span className="mt-0.5 shrink-0">
+                    {entry.author ? <ChatAvatar author={entry.author} /> : (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-hidden>
+                            <Icon name="user" size={12} />
+                        </span>
+                    )}
                 </span>
             )}
             <div className="max-w-[85%] rounded-lg bg-primary/10 text-xs text-foreground">
@@ -279,8 +291,6 @@ function UserMessageBubble({ entry, pinned = true, actions, cut = false }: {
                     </button>
                 )}
             </div>
-            {/* CR-018: who wrote it, when known. */}
-            {entry.author && <span className="mt-0.5 shrink-0"><ChatAvatar author={entry.author} /></span>}
         </div>
     );
 }
@@ -543,10 +553,13 @@ function ActivityRow({ entry, questions, hiddenPartId }: { entry: AgentActivityE
  * One `<li>` per turn (CR-004): the message of the person, sticky at the top while its turn
  * scrolls, then what the agent did and said. Entries before the first message of the person
  * (an opening without text) form a turn of their own, without a bubble. */
-export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true, messageActions, speaker }: {
+export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true, messageActions, speaker, showAuthors }: {
     activity: AgentActivityEntry[];
     /** CR-018: who answers, shown at the start of each turn of the agent. */
     speaker?: ChatAuthor;
+    /** CR-018: the picture of who wrote each message of a person, on its left. Default: when there is a
+     * `speaker` or a message with an `author` (a chat that shows who speaks). */
+    showAuthors?: boolean;
     /** CR-016: Retry from here and Edit on the messages of the person. */
     messageActions?: UserMessageActions;
     questions?: AgentActivityLogQuestions;
@@ -557,6 +570,7 @@ export function AgentActivityLog({ activity, questions, docked, pinUserMessages 
     pinUserMessages?: boolean;
 }) {
     if (activity.length === 0) return null;
+    const authors = showAuthors ?? (Boolean(speaker) || activity.some((entry) => entry.kind === 'user' && entry.author));
     const turns: Array<{ user?: AgentActivityEntry; entries: AgentActivityEntry[] }> = [];
     for (const entry of activity) {
         if (entry.kind === 'user' || turns.length === 0) turns.push(entry.kind === 'user' ? { user: entry, entries: [] } : { entries: [entry] });
@@ -566,7 +580,7 @@ export function AgentActivityLog({ activity, questions, docked, pinUserMessages 
         <ul className="space-y-0.5">
             {turns.map((turn) => (
                 <li key={turn.user?.id ?? turn.entries[0]?.id}>
-                    {turn.user && <UserMessageBubble entry={turn.user} pinned={pinUserMessages} actions={messageActions} cut={interrupted(turn.entries)} />}
+                    {turn.user && <UserMessageBubble entry={turn.user} pinned={pinUserMessages} actions={messageActions} cut={interrupted(turn.entries)} showAuthor={authors} />}
                     {speaker && turn.entries.length > 0 && <SpeakerRow speaker={speaker} />}
                     {turn.entries.length > 0 && (
                         <ul className="space-y-0.5">

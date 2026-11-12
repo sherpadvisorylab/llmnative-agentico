@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-12
+
+### Changed
+- Who speaks (CR-018): the picture of the person is on the left of their message. In a chat that shows who speaks
+  (a `speaker`, or a message with an `author`), a message saved without an author shows a person icon, so every
+  message of a person has one. `AgentActivityLog showAuthors` forces it on or off.
+
 ## [0.17.0] - 2026-11-12
 
 ### Added
