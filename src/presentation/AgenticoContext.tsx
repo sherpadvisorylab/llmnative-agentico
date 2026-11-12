@@ -4,7 +4,7 @@ import type { AgentActivityEntry, AgentConversation } from './useAgent';
 import type { ResultDestination } from '../domain/resultDestination';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
 import { findSubagentManifest } from '../domain/subagentRegistry';
-import { saveEntityChat, syncEntityChats, type EntityChatSnapshot } from '../domain/entityChatStore';
+import { saveEntityChat, syncEntityChats, type ChatAuthor, type EntityChatSnapshot } from '../domain/entityChatStore';
 import { getAgenticoPrompts } from '../domain/prompts';
 
 /** Where results are saved and chats are kept: the host's current tenant, company, workspace…
@@ -97,6 +97,11 @@ export interface AgenticoTask<TResult = unknown> {
      * top=vecchio/bottom=nuovo (bug segnalato). Assente = comportamento invariato, sempre in
      * fondo (equivalente a passare la lunghezza corrente del log). */
     panelExtraAnchorIndex?: number;
+    /** CR-018: the chat this one is a session of (SubagentManifest.thread): the panel shows the earlier
+     * sessions above it. */
+    thread?: string;
+    /** CR-018: who answers in this chat (SubagentManifest.speaker), shown at the start of its turns. */
+    speaker?: ChatAuthor;
     /** What the host shows at the bottom of the panel, above the composer, while the task is open
      * (see registerSubagentControls, CR-003). */
     panelActions?: React.ReactNode;
@@ -148,6 +153,8 @@ export interface ComponentAnchor {
 interface AgenticoContextValue {
     /** The host scope passed to <AgenticoProvider scope>. */
     scope: AgenticoScope | null;
+    /** CR-018: the person using the panel (<AgenticoProvider person>): the author of their messages. */
+    person: ChatAuthor | null;
     task: AgenticoTask | null;
     /** Visibilità del pannello — completamente indipendente dal task (vedi AgenticoToggle:
      * icona persistente stile "estensione del browser"). Nessuna chiamata a `openTask` la forza
@@ -304,7 +311,12 @@ interface AgenticoContextValue {
 
 const AgenticoContext = createContext<AgenticoContextValue | null>(null);
 
-export function AgenticoProvider({ children, scope = null }: { children: React.ReactNode; scope?: AgenticoScope | null }) {
+export function AgenticoProvider({ children, scope = null, person = null }: {
+    children: React.ReactNode;
+    scope?: AgenticoScope | null;
+    /** CR-018: who uses the panel: their messages carry their name and picture, kept with the chat. */
+    person?: ChatAuthor | null;
+}) {
     const [task, setTaskState] = useState<AgenticoTask | null>(null);
     // Stabile per tutta la vita del provider (vedi openTask sotto) — leggere `task` da una ref
     // invece che dalle dipendenze di useCallback evita che openTask cambi identità ogni volta che
@@ -538,7 +550,7 @@ export function AgenticoProvider({ children, scope = null }: { children: React.R
 
     const value = useMemo(
         () => ({
-            scope, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator,
+            scope, person, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator,
             pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId,
             componentAnchors, anchoredUserMessages, registerComponentAnchor,
             openPanel, pendingExtraDestinations,
@@ -548,7 +560,7 @@ export function AgenticoProvider({ children, scope = null }: { children: React.R
             pendingResumeWithAI, resumeWithAIRunId, resumeWithAI,
             startSubagent, pendingStart, startRunId,
         }),
-        [scope, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
+        [scope, person, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
     );
 
     return (

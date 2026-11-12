@@ -25,8 +25,8 @@ export function OrchestratorRunner({ userGoal }: { userGoal: string }) {
         collecting: t.orchestratorCollecting,
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }), []);
-    const agent = useAgent(definition, { defaultEnabled: true });
     const sidebar = useAgentico();
+    const agent = useAgent(definition, { defaultEnabled: true, ...(sidebar.person ? { author: sidebar.person } : {}) });
     const [handoff, setHandoff] = useState<OrchestratorHandoff | null>(null);
     const startedRef = useRef(false);
     const readyToStart = !agent.hasProviders || agent.selectedModel !== '';

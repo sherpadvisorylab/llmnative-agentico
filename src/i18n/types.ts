@@ -54,6 +54,14 @@ export interface AgenticoDict {
     /** `{label}` = subagent label */
     newInstance: string;
     chatHistory: string;
+    /** CR-018: the button that loads the session before (also loaded by scrolling to the top). */
+    earlierSession: string;
+    /** CR-018: the separator above the open session, once earlier ones are shown. */
+    thisSession: string;
+    /** CR-018: takes up an earlier session (its own context). */
+    continueSession: string;
+    /** CR-018: the separator of an earlier session without a title; `{at}` its start. */
+    sessionOf: string;
     /** CR-011: renaming a saved chat. */
     /** CR-014: the whole text of a card, and closing it. */
     cardView: string;

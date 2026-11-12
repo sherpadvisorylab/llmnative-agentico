@@ -26,6 +26,45 @@
 | [CR-015](#cr-015--continua-senza-ai-solo-se-lagente-ha-un-risultato-senza-modello) | Continua senza AI solo se l'agente ha un risultato senza modello | Media | — | ✅ |
 | [CR-016](#cr-016--riprova-e-modifica-di-un-messaggio-della-persona) | Riprova e modifica di un messaggio della persona | Alta | CR-003, CR-009 | ✅ |
 | [CR-017](#cr-017--allegati-per-lesecutore) | Allegati per l'esecutore | Alta | CR-003, CR-124 (framework) | ✅ |
+| [CR-018](#cr-018--sessioni-di-una-chat-e-chi-parla) | Sessioni di una chat e chi parla (avatar) | Alta | CR-010, CR-013 | ✅ |
+
+---
+
+## CR-018 — Sessioni di una chat e chi parla
+
+**Stato:** ✅ done (0.17.0)
+**Issue:** [#18](https://github.com/sherpadvisorylab/llmnative-agentico/issues/18)
+**Priorità:** Alta
+**Dipende da:** CR-010 (inizio di una chat), CR-013 (chat tenute dall'host)
+
+### Motivazione
+
+Emersa nel Playbook il 12/11/2026. La persona vuole vivere la chat con l'orchestratore di un progetto come una
+sola chat, divisa in sessioni di lavoro. Ogni sessione ha il suo contesto, e scorrendo in alto compare la sessione
+precedente. Vuole anche capire chi parla: le chat sono dell'organizzazione e più persone scrivono nella stessa.
+
+### Scope
+
+- `SubagentManifest.thread(params)`: le chat salvate dello scope con la stessa chiave, anche di subagent diversi,
+  sono sessioni di una chat.
+  - Il pannello mostra le precedenti sopra quella aperta, solo da leggere, una per volta quando la persona scorre
+    in cima. In cima c'è anche il pulsante "Sessione precedente".
+  - Ogni sessione ha un separatore con titolo, inizio e "Continua questa sessione". Prima di quella aperta c'è
+    "Questa sessione".
+  - La posizione di scorrimento resta dov'era. Il modello legge solo la sessione aperta.
+- `SubagentManifest.speaker(params)`: avatar e nome all'inizio di ogni turno dell'agente.
+- `<AgenticoProvider person>`: un messaggio della persona porta `author`, salvato con la chat e mostrato accanto
+  alla bolla. Senza immagine si usa `Identicon` del nome.
+- `chatThreadOf`, `earlierSessions`, `ChatAuthor`; i18n in en, it, de.
+- Fuori scope: le card delle attività di altri agenti nella chat, inserite dall'host. Va in una CR successiva.
+
+### Checklist
+
+- [x] Dominio (`chatThread.ts`), manifest, autore su useAgent e runner, provider
+- [x] Pannello (`EarlierSessions`), avatar nel log
+- [x] Test: 20 file / 88 test
+- [x] Playbook come host contro la build locale: typecheck, 88 file / 677 test
+- [x] README, llms.txt, CHANGELOG, versione 0.17.0
 
 ---
 

@@ -32,9 +32,9 @@ export function ManualEntryRunner({
     manifest: SubagentManifest<any, any, any>;
     extraDestinations?: ResultDestination[];
 }) {
-    const agent = useAgent(manifest.definition, { defaultEnabled: false });
-    const t = useAgenticoI18n();
     const sidebar = useAgentico();
+    const agent = useAgent(manifest.definition, { defaultEnabled: false, ...(sidebar.person ? { author: sidebar.person } : {}) });
+    const t = useAgenticoI18n();
     const taskId = useRef(`manual-${manifest.id}-${crypto.randomUUID()}`).current;
     const [result, setResult] = useState<unknown>(null);
     const [appliedIds, setAppliedIds] = useState<string[]>([]);

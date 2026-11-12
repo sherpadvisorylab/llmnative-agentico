@@ -29,11 +29,19 @@ export interface EntityChatActivityEntry {
     attachmentNames?: string[];
     /** A message the Retry button sent for the person, not one they wrote (never a title). */
     retry?: boolean;
+    /** CR-018: who wrote this message of the person (AgenticoProvider `person`). */
+    author?: ChatAuthor;
     /** CR-016: the length of the history of the model when this message of the person was sent. */
     historyAt?: number;
     /** The message in parts (CR-004): saved and reloaded as they are. Absent in chats saved before
      * 0.3.0, which show `detail` as before. */
     parts?: AgentMessagePart[];
+}
+
+/** CR-018: who speaks in a chat, a person or an agent: a name and, when there is one, a picture. */
+export interface ChatAuthor {
+    name: string;
+    avatarUrl?: string;
 }
 
 export interface EntityChatSnapshot {

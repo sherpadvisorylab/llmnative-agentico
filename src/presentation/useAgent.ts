@@ -29,6 +29,7 @@ import { useAIModelCatalog } from './useAIModelCatalog';
 import { APPROVAL_PART_ID, approvalOf, needsApproval, type ApprovalDecision } from '../domain/approval';
 import { getAgenticoPrompts } from '../domain/prompts';
 import { useAgenticoI18n } from '../i18n';
+import type { ChatAuthor } from '../domain/entityChatStore';
 
 /** Numero massimo di round-trip tool_calls consecutivi in un singolo turno — argine contro
  * un modello che continua a invocare tool senza mai arrivare a una risposta testuale. Un
@@ -91,6 +92,8 @@ export interface AgentActivityEntry {
     attachmentNames?: string[];
     /** A message the Retry button sent for the person (never the title of the chat). */
     retry?: boolean;
+    /** CR-018: on a message of the person, who wrote it (the `author` of useAgent). */
+    author?: ChatAuthor;
     /** CR-016: on a message of the person, how many turns the history of the model had when it was sent:
      * where the chat goes back to when the person retries or edits it. Absent on messages sent before
      * 0.15.0 (no Retry from here on them). */
@@ -231,9 +234,15 @@ export function settleActivity(activity: AgentActivityEntry[]): AgentActivityEnt
 
 export function useAgent<TParams, TContext, TResult>(
     definition: AgentDefinition<TParams, TContext, TResult>,
-    options: { defaultEnabled?: boolean } = {},
+    options: {
+        defaultEnabled?: boolean;
+        /** CR-018: who writes the messages of the person (AgenticoProvider `person`), kept on each of them. */
+        author?: ChatAuthor;
+    } = {},
 ): UseAgentResult<TParams, TResult> {
     const { defaultEnabled = false } = options;
+    const authorRef = useRef(options.author);
+    authorRef.current = options.author;
     const [enabled, setEnabled]     = useState(defaultEnabled);
     const { hasProviders, modelsByProvider, modelsLoading, selectedModel, setSelectedModel } = useAIModelCatalog();
     const [running, setRunning]     = useState(false);
@@ -881,6 +890,7 @@ export function useAgent<TParams, TContext, TResult>(
         setActivity(opts?.openingMessage
             ? [{
                 id: crypto.randomUUID(), kind: 'user', label: 'Tu', status: 'done', detail: opts.openingMessage,
+                ...(authorRef.current ? { author: authorRef.current } : {}),
                 ...(opts.attachments?.length ? { attachmentNames: opts.attachments.map((f) => f.name) } : {}),
               }]
             : []);
@@ -984,6 +994,7 @@ export function useAgent<TParams, TContext, TResult>(
         sendingRef.current = messageId;
         setActivity((prev) => [...prev, {
             id: messageId, kind: 'user', label: 'Tu', status: 'done', detail: text,
+            ...(authorRef.current ? { author: authorRef.current } : {}),
             ...(opts?.attachments?.length ? { attachmentNames: opts.attachments.map((f) => f.name) } : {}),
             // Sent by the Retry button, not written by the person: never the title of the chat.
             ...(opts?.retry ? { retry: true } : {}),

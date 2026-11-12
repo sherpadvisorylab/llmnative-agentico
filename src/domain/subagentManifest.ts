@@ -6,6 +6,7 @@
 // Filosofia: nessuna registrazione a DB. Un subagent "esiste" perché il suo file è importato in
 // subagentRegistry.ts — lo stesso principio filesystem-first di domain/services/<feature>/.
 import type { z } from 'zod';
+import type { ChatAuthor } from './entityChatStore';
 import type { AgentDefinition } from './agentDefinition';
 
 /** Una singola capability offerta dal subagent (oggi quasi sempre una sola per manifest). */
@@ -178,6 +179,15 @@ export interface SubagentManifest<TParams = any, TContext = any, TResult = any> 
      * `deriveHistoryTitle`, as before.
      */
     autoTitle?: boolean;
+    /**
+     * CR-018: the chat its saved chats are sessions of, from their raw params (e.g. the project). The
+     * saved chats of the scope with the same key, of any subagent, are one chat: the panel shows the
+     * earlier sessions above the open one, read-only, loaded as the person scrolls up. Each session
+     * keeps its own context: the model never reads the others. Absent: each chat stands alone.
+     */
+    thread?(params: Record<string, unknown>): string | undefined;
+    /** CR-018: who answers in its chats (its name and picture), shown at the start of each of its turns. */
+    speaker?(params: Record<string, unknown>): ChatAuthor | undefined;
     /** true = the orchestrator offers this subagent only when the conversation is scoped to it,
      * i.e. a component anchored to it is on the page (CR-003): a subagent that makes sense on
      * one page only (e.g. the design of the project open there). Absent = offered everywhere. */

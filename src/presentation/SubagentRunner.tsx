@@ -63,8 +63,11 @@ export function SubagentRunner({
      * (AgenticoContext.startSubagent, CR-003): shown in the log and given to the first turn. */
     openingMessage?: string;
 }) {
-    const agent = useAgent(manifest.definition, { defaultEnabled: true });
     const sidebar = useAgentico();
+    const agent = useAgent(manifest.definition, { defaultEnabled: true, ...(sidebar.person ? { author: sidebar.person } : {}) });
+    // CR-018: the chat this one is a session of, and who answers in it.
+    const thread = manifest.thread?.(params) || undefined;
+    const speaker = manifest.speaker?.(params);
     const scope = sidebar.scope;
     const proxyFetch = useProxy();
     const taskId = useRef(taskIdProp ?? `subagent-${manifest.id}-${crypto.randomUUID()}`).current;
@@ -290,6 +293,8 @@ export function SubagentRunner({
             id: taskId, title: deriveHistoryTitle(manifest, params), icon: manifest.icon, agent, onApplied: (r: unknown) => setResult(r), precedingActivity,
             panelExtraAnchorIndex: panelExtraAnchorIndexRef.current,
             onDismiss: dismiss,
+            ...(thread ? { thread } : {}),
+            ...(speaker ? { speaker } : {}),
             // Saved at every turn: leaving it asks nothing (see Agentico.tsx, "new chat").
             ...(chatEntityId ? { savedToDisk: true } : {}),
             panelActions: controls.content,

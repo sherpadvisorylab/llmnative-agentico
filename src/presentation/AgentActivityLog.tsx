@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ActionButton, Badge, Card, ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, LoadingButton, Modal, Tree, interpolate } from '@llmnative/react';
+import { ActionButton, Badge, Card, ChatMarkdown, ChatQuestions, ChatReasoning, Code, Icon, Identicon, ImageAvatar, LoadingButton, Modal, Tree, interpolate } from '@llmnative/react';
+import type { ChatAuthor } from '../domain/entityChatStore';
 import type { AgentActivityEntry } from './useAgent';
 import type { AgentCardPart, AgentMessagePart, AgentQuestionAnswer, AgentQuestionsPart, AgentToolPart } from '../domain/messageParts';
 import { useAgenticoI18n, type AgenticoDict } from '../i18n';
@@ -191,6 +192,23 @@ export interface UserMessageActions {
 /** Whether the answer to a message of the person was cut: a step of its turn stopped or failed. */
 const interrupted = (entries: readonly AgentActivityEntry[]) => entries.some((entry) => entry.status === 'stopped' || entry.status === 'error');
 
+/** CR-018: the picture of who speaks: theirs, else an icon drawn from their name. */
+export function ChatAvatar({ author, size = 20 }: { author: ChatAuthor; size?: number }) {
+    return author.avatarUrl
+        ? <ImageAvatar src={author.avatarUrl} title={author.name} alt={author.name} width={size} height={size} />
+        : <Identicon value={author.name} size={size} title={author.name} />;
+}
+
+/** CR-018: who answers, at the start of a turn of the agent. */
+function SpeakerRow({ speaker }: { speaker: ChatAuthor }) {
+    return (
+        <div className="flex items-center gap-1.5 pt-1 text-xs font-medium text-foreground">
+            <ChatAvatar author={speaker} size={18} />
+            <span className="truncate">{speaker.name}</span>
+        </div>
+    );
+}
+
 function UserMessageBubble({ entry, pinned = true, actions, cut = false }: {
     entry: AgentActivityEntry;
     pinned?: boolean;
@@ -261,6 +279,8 @@ function UserMessageBubble({ entry, pinned = true, actions, cut = false }: {
                     </button>
                 )}
             </div>
+            {/* CR-018: who wrote it, when known. */}
+            {entry.author && <span className="mt-0.5 shrink-0"><ChatAvatar author={entry.author} /></span>}
         </div>
     );
 }
@@ -523,8 +543,10 @@ function ActivityRow({ entry, questions, hiddenPartId }: { entry: AgentActivityE
  * One `<li>` per turn (CR-004): the message of the person, sticky at the top while its turn
  * scrolls, then what the agent did and said. Entries before the first message of the person
  * (an opening without text) form a turn of their own, without a bubble. */
-export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true, messageActions }: {
+export function AgentActivityLog({ activity, questions, docked, pinUserMessages = true, messageActions, speaker }: {
     activity: AgentActivityEntry[];
+    /** CR-018: who answers, shown at the start of each turn of the agent. */
+    speaker?: ChatAuthor;
     /** CR-016: Retry from here and Edit on the messages of the person. */
     messageActions?: UserMessageActions;
     questions?: AgentActivityLogQuestions;
@@ -545,6 +567,7 @@ export function AgentActivityLog({ activity, questions, docked, pinUserMessages 
             {turns.map((turn) => (
                 <li key={turn.user?.id ?? turn.entries[0]?.id}>
                     {turn.user && <UserMessageBubble entry={turn.user} pinned={pinUserMessages} actions={messageActions} cut={interrupted(turn.entries)} />}
+                    {speaker && turn.entries.length > 0 && <SpeakerRow speaker={speaker} />}
                     {turn.entries.length > 0 && (
                         <ul className="space-y-0.5">
                             {turn.entries.map((entry) => (

@@ -10,6 +10,7 @@ import { AgenticoToggle } from './AgenticoToggle';
 import { OrchestratorRunner } from './OrchestratorRunner';
 import { SubagentRunner } from './SubagentRunner';
 import { ManualEntryRunner } from './ManualEntryRunner';
+import { EarlierSessions } from './EarlierSessions';
 import { ORCHESTRATOR_TASK_ID } from './AgenticoContext';
 import type { AgenticoTask } from './AgenticoContext';
 import type { AgentActivityEntry } from './useAgent';
@@ -712,6 +713,18 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                 <div ref={contentRef} className="pt-2">
                     {task ? (
                         <>
+                            {/* CR-018: the earlier sessions of the same chat, read-only, loaded as the person scrolls up. */}
+                            {scope && task.thread && (
+                                <EarlierSessions
+                                    scopeId={scope.id}
+                                    thread={task.thread}
+                                    taskId={task.id}
+                                    scrollRef={bodyRef}
+                                    busy={task.agent.running}
+                                    onLoad={() => { isNearBottomRef.current = false; }}
+                                    onContinue={(chat) => resumeEntityChat(chat.subagentId, chat.entityId, chat)}
+                                />
+                            )}
                             {/* Prompt statico del percorso "senza AI" (vedi
                                 SubagentManifest.manualEntry) — mostrato SOLO finché non c'è
                                 ancora attività: una volta inviato il primo testo, la bolla utente
@@ -720,13 +733,13 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                             {task.manualEntry && displayedActivity.length === 0 && (
                                 <p className="text-xs text-muted-foreground">{task.manualEntry.prompt}</p>
                             )}
-                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} />
+                            <AgentActivityLog activity={activityBeforePanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} speaker={task.speaker} />
                             {task.panelExtra && <div className="mt-3">{task.panelExtra}</div>}
                             {/* Conversazione successiva a `panelExtra` (retry, follow-up) — un
                                 secondo <ul> (AgentActivityLog ne apre uno suo), non un problema:
                                 lo sticky delle bolle utente è per-<li> rispetto allo scroll
                                 container di questo pannello, non al singolo <ul> che le contiene. */}
-                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} />}
+                            {activityAfterPanelExtra.length > 0 && <AgentActivityLog activity={activityAfterPanelExtra} questions={questions} docked={docked} pinUserMessages={!docked} messageActions={messageActions} speaker={task.speaker} />}
                             {!task.agent.running && task.agent.error && (
                                 <div className="mt-2 flex items-center gap-2">
                                     <p className="flex-1 text-xs text-destructive">{task.agent.error}</p>

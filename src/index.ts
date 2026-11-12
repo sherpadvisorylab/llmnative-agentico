@@ -66,7 +66,9 @@ export {
     removeEntityChat,
     entityChatTaskId,
     type EntityChatSnapshot,
+    type ChatAuthor,
 } from './domain/entityChatStore';
+export { chatThreadOf, earlierSessions } from './domain/chatThread';
 
 // ── i18n ──────────────────────────────────────────────────────────────────────────────────────
 export { agenticoTranslations, agenticoEn, agenticoIt, agenticoDe, useAgenticoI18n, type AgenticoDict } from './i18n';

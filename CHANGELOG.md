@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-12
+
+### Added
+- Sessions of one chat and who speaks (CR-018, GH issue #18):
+  - `SubagentManifest.thread(params)`: the saved chats of the scope with the same key are sessions of one chat.
+    Above the open one the panel shows the earlier ones, read-only, one more each time the person scrolls to the
+    top (or presses "Earlier session"), each opened by a separator with its title, its start and "Continue this
+    session"; "This session" above the open one. The model reads only the open session.
+  - `SubagentManifest.speaker(params)`: each turn of the agent starts with its picture and name.
+  - `<AgenticoProvider person>`: the messages of the person carry `author` (name, picture), kept with the chat and
+    shown next to the bubble in every browser. Without a picture, an `Identicon` of the name.
+  - `chatThreadOf`, `earlierSessions`, `ChatAuthor`; i18n `earlierSession`, `thisSession`, `continueSession`,
+    `sessionOf` (en, it, de).
+
 ## [0.16.1] - 2026-11-12
 
 ### Changed
