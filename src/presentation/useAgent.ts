@@ -546,9 +546,16 @@ export function useAgent<TParams, TContext, TResult>(
             setError(labelsRef.current.requestInProgress);
             throw new Error(labelsRef.current.requestInProgress);
         }
-        if (!remote || !sessionRef.current) {
+        if (!sessionRef.current) {
             setError(labelsRef.current.noActiveSession);
             throw new Error(labelsRef.current.noActiveSession);
+        }
+        // No turn waits for these answers any more (an approval the executor stopped waiting for, the turn
+        // of an agent alongside the catalog): they go as a message of the person, as if written, and the agent goes
+        // on from there.
+        if (!remote) {
+            markAnswered();
+            return sendMessage(formatQuestionAnswers(part.questions, answers));
         }
         runningRef.current = true;
         setRunning(true);

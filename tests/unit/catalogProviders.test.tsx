@@ -79,6 +79,36 @@ describe('the AI catalog of a chat (CR-010)', () => {
         expect(result.current.selectedModel).toBe('h:opus');
     });
 
+    it('sends the answers no turn waits for any more as a message of the person', async () => {
+        // The executor asked an approval, then stopped waiting for it (its call timed out) and ended its turn.
+        const texts: string[] = [];
+        const base = definition([{ label: 'Claude Opus', value: 'h:opus' }]);
+        const asking: Definition = {
+            ...base,
+            executor: {
+                ...base.executor!,
+                turn: async (turn) => {
+                    texts.push(turn.text);
+                    if (texts.length === 1) void turn.onQuestions([{ id: 'approval-start_release', question: 'Approve? Starting the release v0.1.4', options: [{ label: 'Approve' }, { label: 'Reject' }] }]).catch(() => undefined);
+                    return { text: texts.length === 1 ? 'It did not start: try again?' : 'Started.' };
+                },
+            },
+        };
+        const { result } = renderHook(() => useAgent(asking, { defaultEnabled: true }), { wrapper });
+        await act(async () => { await result.current.resume({ project: 'crm' }, { history: [], activity: [] }); });
+        await act(async () => { await result.current.sendMessage('Release'); });
+        const entry = result.current.activity.at(-1)!;
+        expect(entry.parts?.some((part) => part.type === 'questions')).toBe(true);
+
+        await act(async () => { await result.current.answerQuestions(entry.id, 'questions-1', [{ id: 'approval-start_release', values: ['Approve'] }]); });
+        expect(result.current.error).toBeNull();
+        // Answered there, and said to the agent as the next message.
+        expect(result.current.activity.find((item) => item.id === entry.id)?.parts?.find((part) => part.type === 'questions')).toMatchObject({ answers: [{ values: ['Approve'] }] });
+        expect(texts).toHaveLength(2);
+        expect(texts[1]).toContain('Approve');
+        expect(result.current.activity.at(-1)?.detail).toBe('Started.');
+    });
+
     it('offers the whole catalog to a chat that names no provider', async () => {
         const { result } = renderHook(() => useAgent(definition(), { defaultEnabled: true }), { wrapper });
         await act(async () => { await result.current.resume({ project: 'shop' }, { history: [], activity: [] }); });

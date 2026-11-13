@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.2] - 2026-11-13
+
+### Fixed
+- Answers no turn waits for any more (an approval the executor stopped waiting for, or questions of an agent alongside
+  the AI catalog) no longer fail with "No active session": they go to the agent as a message of the person, and the
+  questions show them as answered.
+
 ## [0.20.1] - 2026-11-13
 
 ### Changed
