@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Settings of Agentico in one schema, with a modal (CR-022): the model the chats start with, the reasoning on the AI
+  catalog, the providers the chats may use, the titles written by the model, the events of the other agents. The host
+  decides in code which ones are shown, fixed or hidden (`<AgenticoProvider settings={{ store, fixed, hidden }}>`);
+  the values go to its store (default: this browser). The modal holds the connectors of the AI providers
+  (`connections`: `AIConnections` of `@llmnative/react` 3.2). `useAgenticoSettings`, `AgenticoSettingsModal`.
+
+### Changed
+- Peer `@llmnative/react` ^3.2.0 (was ^1.34 || ^2). The framework imports `firebase` and `@supabase/supabase-js`:
+  the host installs them.
+
 ## [0.20.2] - 2026-11-13
 
 ### Fixed

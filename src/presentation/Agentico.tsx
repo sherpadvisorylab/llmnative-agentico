@@ -22,6 +22,8 @@ import type { SubagentUsageCard } from '../domain/subagentUsageCard';
 import { findSubagentManifest } from '../domain/subagentRegistry';
 import { chatStartedAt, chatTitle, entityChatTaskId, listEntityChats, onEntityChatsChange, removeEntityChat, renameEntityChat } from '../domain/entityChatStore';
 import { useChatTitles } from './chatTitles';
+import { useAgenticoSettings } from './AgenticoSettingsContext';
+import { AgenticoSettingsModal, useHasAgenticoSettings } from './AgenticoSettingsModal';
 
 export { AGENTICO_WIDTH };
 
@@ -483,7 +485,9 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
     const hasError = !!(task && !task.agent.running && task.agent.error);
     // CR-019: what happened around this chat (the host's events), from the last message of the session before it
     // (else from its start): among its turns by time, unless the person keeps to the conversation.
-    const [showEvents, setShowEvents] = useShowThreadEvents();
+    const [showEvents, setShowEvents, eventsOffered] = useShowThreadEvents();
+    const settingsPanel = useAgenticoSettings();
+    const hasSettings = useHasAgenticoSettings();
     const openedAt = useRef<{ id?: string; at: number }>({ at: Date.now() });
     if (openedAt.current.id !== task?.id) openedAt.current = { id: task?.id, at: Date.now() };
     const eventsFrom = useMemo(() => {
@@ -713,7 +717,7 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                     mescolate across subagent, più recenti prima. Nessuna dipendenza da
                     `isOpen`/task: uno stato locale a sé, sempre disponibile col pannello aperto. */}
                 {/* CR-019: what the agents did, or the conversation only (kept in this browser). */}
-                {task?.thread && threadEvents && (
+                {task?.thread && threadEvents && eventsOffered && (
                     <ActionButton
                         icon={showEvents ? 'activity' : 'message-square'}
                         ariaLabel={showEvents ? t.hideEvents : t.showEvents}
@@ -734,8 +738,20 @@ export function Agentico({ defaultWidth, minWidth, maxWidth, onWidthChange }: Ag
                         onArchivedCurrent={dismissForeignTask}
                     />
                 )}
+                {/* CR-022: the settings of Agentico and the connectors of the AI providers. */}
+                {hasSettings && (
+                    <ActionButton
+                        icon="settings"
+                        ariaLabel={t.settingsTitle}
+                        title={t.settingsTitle}
+                        variant="link"
+                        className="p-1 text-muted-foreground"
+                        onClick={settingsPanel.open}
+                    />
+                )}
                 <AgenticoToggle />
             </div>
+            <AgenticoSettingsModal />
 
             {/* Niente `pt-*` qui — un padding-top sul contenitore di scroll resterebbe SEMPRE
                 visibile sopra un elemento sticky `top-0` (lo spazio di offset per lo sticky è

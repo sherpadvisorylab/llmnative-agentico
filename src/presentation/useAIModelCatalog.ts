@@ -4,6 +4,7 @@
 // prima che l'orchestratore parta, non solo nei turni di follow-up.
 import { useEffect, useState } from 'react';
 import { getAIModelCatalog, useAIProviderRegistry } from '@llmnative/react';
+import { useAgenticoSettings } from './AgenticoSettingsContext';
 import type { AIModelDescriptor, AIProviderAdapter } from '@llmnative/react';
 
 export interface UseAIModelCatalogResult {
@@ -36,8 +37,17 @@ function writeStoredModel(id: string): void {
     }
 }
 
-export function useAIModelCatalog(): UseAIModelCatalogResult {
-    const registry: Record<string, AIProviderAdapter> = useAIProviderRegistry()?.registry ?? {};
+/**
+ * The AI catalog of the chats: the providers the settings allow (CR-022), and the model picked — else the one
+ * the settings start with. `unfiltered`: every connected provider (the settings modal).
+ */
+export function useAIModelCatalog({ unfiltered = false }: { unfiltered?: boolean } = {}): UseAIModelCatalogResult {
+    const allRegistry: Record<string, AIProviderAdapter> = useAIProviderRegistry()?.registry ?? {};
+    const { settings } = useAgenticoSettings();
+    const allowedProviders = unfiltered ? undefined : settings.providers;
+    const registry = allowedProviders
+        ? Object.fromEntries(Object.entries(allRegistry).filter(([id]) => allowedProviders.includes(id)))
+        : allRegistry;
     const hasProviders = Object.keys(registry).length > 0;
     const [modelsByProvider, setModelsByProvider] = useState<Record<string, AIModelDescriptor[]>>({});
     const [modelsLoading, setModelsLoading] = useState(false);
@@ -71,8 +81,9 @@ export function useAIModelCatalog(): UseAIModelCatalogResult {
             // in silenzio finché l'utente non lo cambia a mano.
             setSelectedModelState((prev) => {
                 if (flat.some((m) => m.id === prev)) return prev;
-                writeStoredModel('');
-                return '';
+                if (prev) writeStoredModel('');
+                // CR-022: the model the settings start with, when it is in the catalog.
+                return settings.defaultModel && flat.some((m) => m.id === settings.defaultModel) ? settings.defaultModel : '';
             });
         }).catch((error) => {
             // BUG FISSATO: questo catch azzerava modelsByProvider SENZA loggare nulla — un
@@ -87,7 +98,7 @@ export function useAIModelCatalog(): UseAIModelCatalogResult {
             .finally(() => { if (!cancelled) setModelsLoading(false); });
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hasProviders, JSON.stringify(Object.keys(registry).sort())]);
+    }, [hasProviders, JSON.stringify(Object.keys(registry).sort()), settings.defaultModel]);
 
     return { hasProviders, modelsByProvider, modelsLoading, selectedModel, setSelectedModel };
 }

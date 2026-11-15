@@ -10,6 +10,7 @@ import { findSubagentManifest } from '../domain/subagentRegistry';
 import { chatHasPersonMessage, isRetryMessage, getEntityChat, listEntityChats, removeEntityChat, renameEntityChat, type EntityChatSnapshot } from '../domain/entityChatStore';
 import { getAgenticoPrompts } from '../domain/prompts';
 import { useAIModelCatalog } from './useAIModelCatalog';
+import { useAgenticoSettings } from './AgenticoSettingsContext';
 
 /** What the model reads of a chat: who wrote what, in order; the middle of a long one left out. */
 export function chatTranscript(activity: EntityChatSnapshot['activity'], max = 6000): string {
@@ -56,12 +57,14 @@ export function titleModel(
 export function useChatTitles(scopeId: string | undefined) {
     const registry: Record<string, AIProviderAdapter> = useAIProviderRegistry()?.registry ?? {};
     const { modelsByProvider, selectedModel } = useAIModelCatalog();
-    const latest = useRef({ registry, modelsByProvider, selectedModel });
-    latest.current = { registry, modelsByProvider, selectedModel };
+    // CR-022: the model writes the titles only when the settings say so.
+    const { settings } = useAgenticoSettings();
+    const latest = useRef({ registry, modelsByProvider, selectedModel, enabled: settings.chatTitles });
+    latest.current = { registry, modelsByProvider, selectedModel, enabled: settings.chatTitles };
     const busy = useRef(new Set<string>());
 
     const titleChat = useCallback(async (subagentId: string, entityId: string, preferred?: string): Promise<boolean> => {
-        if (!scopeId) return false;
+        if (!scopeId || !latest.current.enabled) return false;
         const chat = getEntityChat(scopeId, subagentId, entityId);
         const manifest = findSubagentManifest(subagentId);
         const key = `${scopeId}:${subagentId}:${entityId}`;

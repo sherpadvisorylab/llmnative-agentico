@@ -6,12 +6,17 @@ import { useAgentico } from './AgenticoContext';
 import { ChatAvatar } from './AgentActivityLog';
 import type { ThreadEvent } from '../domain/threadEvents';
 import { useAgenticoI18n } from '../i18n';
+import { useAgenticoSettings } from './AgenticoSettingsContext';
 
 /** Where the person's choice to see the events or not is kept (this browser only). */
 export const THREAD_EVENTS_STORAGE_KEY = 'llmnative.agentico.threadEvents';
 
-/** Whether the events are shown (the filter in the header of the panel): on unless the person turned them off. */
-export function useShowThreadEvents(): [boolean, (show: boolean) => void] {
+/**
+ * Whether the events are shown (the filter in the header of the panel): on unless the person turned them off; never
+ * when the settings of Agentico turn them off (CR-022), and then the filter is not offered.
+ */
+export function useShowThreadEvents(): [boolean, (show: boolean) => void, boolean] {
+    const { settings } = useAgenticoSettings();
     const [show, setShow] = useState(() => {
         try { return localStorage.getItem(THREAD_EVENTS_STORAGE_KEY) !== 'off'; } catch { return true; }
     });
@@ -19,7 +24,7 @@ export function useShowThreadEvents(): [boolean, (show: boolean) => void] {
         setShow(next);
         try { localStorage.setItem(THREAD_EVENTS_STORAGE_KEY, next ? 'on' : 'off'); } catch { /* not kept: fine */ }
     };
-    return [show, set];
+    return settings.threadEvents ? [show, set, true] : [false, () => undefined, false];
 }
 
 /** The events of `thread` from `from` to `to`, as the host has them; none without a source or a thread. */

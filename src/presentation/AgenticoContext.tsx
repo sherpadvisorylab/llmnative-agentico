@@ -7,6 +7,7 @@ import { findSubagentManifest } from '../domain/subagentRegistry';
 import { saveEntityChat, syncEntityChats, type ChatAuthor, type EntityChatSnapshot } from '../domain/entityChatStore';
 import type { ThreadEventsSource } from '../domain/threadEvents';
 import { getAgenticoPrompts } from '../domain/prompts';
+import { AgenticoSettingsProvider, type AgenticoSettingsConfig } from './AgenticoSettingsContext';
 
 /** Where results are saved and chats are kept: the host's current tenant, company, workspace…
  * `null` while the host has none selected — destinations then refuse to save. */
@@ -318,8 +319,11 @@ interface AgenticoContextValue {
 
 const AgenticoContext = createContext<AgenticoContextValue | null>(null);
 
-export function AgenticoProvider({ children, scope = null, person = null, threadEvents = null }: {
+export function AgenticoProvider({ children, scope = null, person = null, threadEvents = null, settings }: {
     children: React.ReactNode;
+    /** CR-022: the settings of Agentico: where they are kept, which ones the code fixes or hides, and the connectors
+     * of the AI providers shown in the settings modal. Keep it stable (memoized). */
+    settings?: AgenticoSettingsConfig;
     scope?: AgenticoScope | null;
     /** CR-018: who uses the panel: their messages carry their name and picture, kept with the chat. */
     person?: ChatAuthor | null;
@@ -580,7 +584,9 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
 
     return (
         <AgenticoContext.Provider value={value}>
-            {children}
+            <AgenticoSettingsProvider config={settings}>
+                {children}
+            </AgenticoSettingsProvider>
         </AgenticoContext.Provider>
     );
 }

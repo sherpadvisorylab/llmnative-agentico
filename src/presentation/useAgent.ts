@@ -16,6 +16,7 @@
 // chiamante. Il loop tool_use → execute → continua è interamente interno a questo hook.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseAIModelRef, PromptUtils, useAIProviderRegistry } from '@llmnative/react';
+import { useAgenticoSettings } from './AgenticoSettingsContext';
 import type { AIAttachment, AIConversationTurn, AIModelDescriptor, AIProviderAdapter, AIToolResult } from '@llmnative/react';
 import type { AgentDefinition, AgentExecutorModel, AgentExecutorPartOptions, AgentExecutorStep, AgentModelGroupBadge, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
 import {
@@ -323,6 +324,10 @@ export function useAgent<TParams, TContext, TResult>(
     // A ref too, so a turn reads them within the render that set them.
     const [catalogProviders, setCatalogProvidersState] = useState<readonly string[] | undefined>(undefined);
     const catalogProvidersRef = useRef<readonly string[] | undefined>(undefined);
+    // CR-022: the settings of Agentico, read in the turn (the reasoning when the agent says nothing).
+    const { settings: agenticoSettings } = useAgenticoSettings();
+    const settingsRef = useRef(agenticoSettings);
+    settingsRef.current = agenticoSettings;
     const allowedIn = (allowed: readonly string[] | undefined, model: string | undefined) => {
         if (!model) return false;
         if (!allowed) return true;
@@ -588,7 +593,8 @@ export function useAgent<TParams, TContext, TResult>(
             : !allowedIn(allowed, catalogModel) ? firstAllowed : undefined;
         // CR-012: how much the model reasons on this provider, on every request of the turn.
         const turnRef = overrideModel ? parseAIModelRef(overrideModel) : ref;
-        const level = turnRef && sessionRef.current ? executor?.catalogReasoning?.(sessionRef.current.params, turnRef.provider) : undefined;
+        // CR-022: else how much the settings of Agentico say.
+        const level = (turnRef && sessionRef.current ? executor?.catalogReasoning?.(sessionRef.current.params, turnRef.provider) : undefined) ?? settingsRef.current.reasoning;
         const reasoning = level ? { reasoning: level } : {};
         const session = sessionRef.current;
         if (!session) { setError(labelsRef.current.noActiveSession); return null; }

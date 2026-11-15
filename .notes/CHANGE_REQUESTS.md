@@ -30,6 +30,41 @@
 | [CR-019](#cr-019--attività-degli-altri-agenti-nella-chat) | Attività degli altri agenti nella chat (eventi dell'host) | Alta | CR-018 | ✅ |
 | [CR-020](#cr-020--immagini-in-vista-ed-eventi-in-corso) | Immagini in vista ed eventi in corso | Media | CR-017, CR-019 | ✅ |
 | [CR-021](#cr-021--azioni-sulle-card-degli-eventi-e-testo-precompilato) | Azioni sulle card degli eventi e testo precompilato nella chat | Alta | CR-019 | ✅ |
+| [CR-022](#cr-022--impostazioni-di-agentico-in-una-sua-modale-con-i-connettori-ai) | Impostazioni di Agentico in una sua modale, con i connettori AI | Alta | CR-132, CR-134 (framework) | ✅ |
+
+---
+
+## CR-022 — Impostazioni di Agentico in una sua modale, con i connettori AI
+
+**Stato:** ✅ done (0.21.0)
+**Issue:** [#22](https://github.com/sherpadvisorylab/llmnative-agentico/issues/22)
+**Priorità:** Alta
+**Dipende da:** CR-132, CR-134 (framework)
+
+### Motivazione
+
+Emersa il 15/11/2026. Oggi le impostazioni di Agentico (modello di partenza, ragionamento, provider ammessi, ordine) arrivano
+dall'host: in parte fisse nel codice, in parte da variabili che Agentico non gestisce. Agentico deve avere le sue impostazioni
+e una modale per cambiarle, e da lì anche collegare i provider AI, abbonamenti compresi, come fa lo studio.
+
+### Scope
+
+- **Schema delle impostazioni** dichiarato da Agentico (modello di partenza per provider, ragionamento, provider e modelli ammessi,
+  ordine, titoli automatici delle chat, allegati…), con valori di partenza.
+- **Mostra o fissa, dal codice dell'host**: per ogni impostazione l'host sceglie se mostrarla nella modale o fissarne il valore
+  (non modificabile), come per le verticali di progetto. Senza indicazioni: mostrata.
+- **Modale "Impostazioni"** dal pannello: le impostazioni mostrate, e la sezione **Connettori** con `AIConnections` del
+  framework (CR-134): chiavi, account, ordine, e i connettori a abbonamento che l'host registra, con il runner configurabile.
+- **Archivio**: impostazioni e connessioni passano dalla porta dell'host (lo store di CR-013 per le impostazioni,
+  `AIConnectionStore` per i segreti): niente valori fissi nel pacchetto, niente variabili d'ambiente lette da Agentico.
+- Un host senza runner non mostra gli abbonamenti (nessun connettore registrato).
+
+### Checklist
+
+- [x] Schema, contesto, modale, sezione Connettori
+- [x] Test: 23 file / 104 test (5 nuovi)
+- [x] Playbook come host: adottato con la release (connettori del framework, Claude Code come connettore dell'host)
+- [x] README, llms.txt, CHANGELOG, versione 0.21.0
 
 ---
 

@@ -79,6 +79,19 @@ export { agenticoTranslations, agenticoEn, agenticoIt, agenticoDe, useAgenticoI1
 export { Agentico, AGENTICO_WIDTH, type AgenticoProps } from './presentation/Agentico';
 export { AGENTICO_MIN_WIDTH, AGENTICO_MAX_WIDTH, AGENTICO_WIDTH_STORAGE_KEY, type AgenticoPanelSize } from './presentation/panelWidth';
 export { AgenticoToggle } from './presentation/AgenticoToggle';
+// ── Settings (CR-022): one schema, shown or fixed by the host, with the connectors of the AI providers ─────────────
+export { useAgenticoSettings, type AgenticoSettingsConfig } from './presentation/AgenticoSettingsContext';
+export { AgenticoSettingsModal } from './presentation/AgenticoSettingsModal';
+export {
+    AGENTICO_SETTING_KEYS,
+    DEFAULT_AGENTICO_SETTINGS,
+    effectiveSettings,
+    shownSettings,
+    browserSettingsStore,
+    type AgenticoSettings,
+    type AgenticoSettingKey,
+    type AgenticoSettingsStore,
+} from './domain/settings';
 export {
     AgenticoProvider,
     useAgentico,

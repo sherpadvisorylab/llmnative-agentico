@@ -1,22 +1,23 @@
 # Project status
 
 > Snapshot verified against the real codebase.
-> Last reviewed: 2026-11-12
+> Last reviewed: 2026-11-15
 
 ## General state
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.20.2 ready (published by the person). Peers: `@llmnative/react` ^1.34 || ^2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.21.0 ready (published by the person). Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 22 files / 99 tests (Vitest, happy-dom). | — |
+| Tests | 23 files / 104 tests (Vitest, happy-dom). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-022 | Done | Settings of Agentico in one schema (`defaultModel`, `reasoning`, `providers`, `chatTitles`, `threadEvents`), shown/fixed/hidden by the host, kept by its store; gear in the panel header opens `AgenticoSettingsModal` with the connectors of the AI providers (`AIConnections`, @llmnative/react 3.2). Tests: 5 new (104 green). Released in 0.21.0. Issue #22. |
 | CR-021 | Done | Act on an event from the chat: `ThreadEvent.actions`/`open`, `ThreadEventsSource.onAction` with `chat.compose`/`chat.send`, `useAgentico().compose`. 98 tests. Version 0.20.0, verified in Playbook against the local build. Issue #21. |
 | CR-020 | Done | Images in sight (`attachmentPreviews`, `imagePreviews`: previews kept with the chat, opened larger) and events going on (`ThreadEvent.running`, a spinner). 96 tests. Version 0.19.0, verified in Playbook against the local build. Issue #20. |
 | CR-019 | Done | What happened around a chat: `at` on every entry, `<AgenticoProvider threadEvents>` (`ThreadEventsSource`), events among the turns by time as cards with who did it, header filter, never read by the model; `placeEvents`. 93 tests. Version 0.18.0, verified in Playbook against the local build. Issue #19. |

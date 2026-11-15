@@ -80,6 +80,23 @@ export interface AgenticoDict {
     /** CR-019: the filter in the header: show the events of the host, or the conversation only. */
     showEvents: string;
     hideEvents: string;
+    /** CR-022: the settings modal of Agentico. */
+    settingsTitle: string;
+    settingsSave: string;
+    settingsClose: string;
+    settingsChats: string;
+    settingsDefaultModel: string;
+    settingsDefaultModelNone: string;
+    settingsReasoning: string;
+    settingsReasoningDefault: string;
+    settingsReasoningLow: string;
+    settingsReasoningMedium: string;
+    settingsReasoningHigh: string;
+    settingsReasoningMax: string;
+    settingsProviders: string;
+    settingsChatTitles: string;
+    settingsThreadEvents: string;
+    settingsConnectors: string;
     /** CR-011: renaming a saved chat. */
     /** CR-014: the whole text of a card, and closing it. */
     cardView: string;

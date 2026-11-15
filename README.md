@@ -47,6 +47,29 @@ configureAgenticoPrompts({                                    // optional: langu
 </App>
 ```
 
+## Settings and connectors (CR-022)
+
+Agentico keeps its settings in one schema: the model the chats start with, how much it reasons, the providers of the
+AI catalog the chats may use, the titles written by the model, the events of the other agents. The host decides in
+code which ones the person changes (the gear in the header of the panel) and which it fixes or hides; the values the
+person changes go to the host's store (default: this browser). The modal can also hold the connectors of the AI
+providers (`AIConnections` of `@llmnative/react` 3.2): keys, accounts, order, the models with their data region, and
+the host's connectors (e.g. a subscription on a runner).
+
+```tsx
+const settings = useMemo<AgenticoSettingsConfig>(() => ({
+    store: { load: () => api.get('/agentico/settings'), save: (values) => api.put('/agentico/settings', values) },
+    fixed: { threadEvents: true },          // applied, not shown
+    hidden: ['providers'],                  // not shown, keeps its value
+    connections: { store: aiConnections, region: { preferred: 'eu' }, connectors: [claudeCodeOnRunner] },
+}), [aiConnections]);
+
+<AgenticoProvider scope={scope} settings={settings}>…</AgenticoProvider>
+```
+
+`useAgenticoSettings()` gives the values in effect. A reasoning set by the agent (`executor.catalogReasoning`) wins over
+the one of the settings.
+
 ## Concepts
 
 | Concept | API |
