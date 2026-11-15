@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-15
+
 ### Added
 - Settings of Agentico in one schema, with a modal (CR-022): the model the chats start with, the reasoning on the AI
   catalog, the providers the chats may use, the titles written by the model, the events of the other agents. The host
