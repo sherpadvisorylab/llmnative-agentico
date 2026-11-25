@@ -27,6 +27,7 @@ import { createCrossAgentTools } from '../domain/crossAgentTools';
 import {
     matchAgenticoPage,
     matchesAnyPath,
+    resolveAgenticoRoute,
     subagentToolsOf,
     validateAgenticoRouting,
     type AgenticoPageRule,
@@ -140,7 +141,7 @@ function EditorModal({ title, titleBefore, onClose, onSave, onRestore, errors, c
     };
     return (
         <Modal
-            title={titleBefore ? <span className="flex items-center gap-3">{titleBefore}<span>{title}</span></span> : title}
+            title={titleBefore ? <span className="flex items-center gap-3 [&_form]:m-0">{titleBefore}<span>{title}</span></span> : title}
             position="right"
             size="md"
             onClose={onClose}
@@ -161,30 +162,6 @@ function EditorModal({ title, titleBefore, onClose, onSave, onRestore, errors, c
 }
 
 // ── Subagents ───────────────────────────────────────────────────────────────────────────────────
-
-function Here({ t }: { t: AgenticoDict }) {
-    const { route } = useAgentico();
-    const known = useKnown();
-    if (!route) return null;
-    const labels = new Map(known.subagents.map((s) => [s.id, s.label]));
-    const offered = route.subagentIds.filter((id) => !known.subagents.find((s) => s.id === id)?.onlyWhenAnchored);
-    return (
-        <Card>
-            <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1 text-sm">
-                <dt className="text-muted-foreground">{t.routingHere}</dt>
-                <dd><code className="break-all text-xs">{route.path}</code></dd>
-                <dt className="text-muted-foreground">{t.routingContext}</dt>
-                <dd className="whitespace-pre-wrap">{route.context ?? <span className="text-muted-foreground">{t.routingNoContext}</span>}</dd>
-                <dt className="text-muted-foreground">{t.routingOfferedHere}</dt>
-                <dd className="flex flex-wrap gap-1">
-                    {offered.length === 0 && <span className="text-muted-foreground">{t.routingNone}</span>}
-                    {offered.map((id) => <Badge key={id} variant="success">{labels.get(id) ?? id}</Badge>)}
-                    <ToolBadges names={route.toolNames} />
-                </dd>
-            </dl>
-        </Card>
-    );
-}
 
 /** One path of the subagent being edited, with a key that survives removing the ones before it. */
 interface PathRow { key: number; value: string }
@@ -284,8 +261,64 @@ function SubagentEditor({ t, subagent, routing, defaults: hostDefaults, modified
     );
 }
 
-export function AgenticoSubagentsSettings({ onStack }: { onStack?: (open: boolean) => void }) {
+/** Props of the three tabs: the editor open on top (the settings modal dims behind it). */
+interface RoutingTabProps {
+    onStack?: (open: boolean) => void;
+}
+
+function Nothing({ text }: { text: string }) {
+    return <p className="text-sm text-muted-foreground">{text}</p>;
+}
+
+/** "Try a path": a toggle button in the toolbar opens a field under it, prefilled with the current path; the boxes
+ * are then filtered to what applies on the path written. `filter` = the path the boxes are filtered on, `null` = none. */
+function useTryPath() {
+    const { routing } = useAgentico();
+    const [open, setOpen] = useState(false);
+    const [path, setPath] = useState(routing.path ?? '');
+    const typed = path.trim();
+    const filter = open ? (typed || null) : null;
+    return { open, path, setPath, filter, toggle: () => setOpen((was) => !was) };
+}
+
+type TryPath = ReturnType<typeof useTryPath>;
+
+function Toolbar({ t, intro, tryPath, children }: { t: AgenticoDict; intro: string; tryPath: TryPath; children?: React.ReactNode }) {
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <p className="min-w-0 flex-1 text-xs text-muted-foreground">{intro}</p>
+            <ActionButton
+                icon="search"
+                label={t.routingTryPath}
+                variant={tryPath.open ? 'primary' : 'outline-secondary'}
+                ariaLabel={t.routingTryPath}
+                onClick={tryPath.toggle}
+            />
+            {children}
+        </div>
+    );
+}
+
+function TryPathField({ t, tryPath, count, total }: { t: AgenticoDict; tryPath: TryPath; count: number; total: number }) {
+    if (!tryPath.open) return null;
+    return (
+        <Form appearance="empty" showNotice={false} defaultValues={{ tryPath: tryPath.path }}>
+            <TextInput
+                name="tryPath"
+                placeholder="/sites/acme/en/pages/home"
+                feedback={tryPath.filter ? interpolate(t.routingTryPathCount, { count: String(count), total: String(total) }) : t.routingTryPathFeedback}
+                onChange={({ value }) => tryPath.setPath(String(value ?? ''))}
+            />
+        </Form>
+    );
+}
+
+export function AgenticoSubagentsSettings({ onStack }: RoutingTabProps) {
     const { t, route, state, known, persist, notices } = useRoutingEditor();
+    const tryPath = useTryPath();
+    const shown = tryPath.filter === null
+        ? known.subagents
+        : known.subagents.filter((s) => !s.onlyWhenAnchored && matchesAnyPath(state.routing.subagents?.[s.id]?.paths, tryPath.filter!));
     const [editing, setEditing] = useState<KnownSubagent | null>(null);
     const issues = useMemo(() => validateAgenticoRouting(state.routing, known), [state.routing, known]);
     const open = (subagent: KnownSubagent | null) => { setEditing(subagent); onStack?.(subagent !== null); };
@@ -293,12 +326,13 @@ export function AgenticoSubagentsSettings({ onStack }: { onStack?: (open: boolea
     return (
         <div className="space-y-4">
             {notices}
-            <Here t={t} />
-            <p className="text-xs text-muted-foreground">{t.routingSubagentsIntro}</p>
-            {known.subagents.map((subagent) => {
+            <Toolbar t={t} intro={t.routingSubagentsIntro} tryPath={tryPath} />
+            <TryPathField t={t} tryPath={tryPath} count={shown.length} total={known.subagents.length} />
+            {tryPath.filter !== null && shown.length === 0 && <Nothing text={t.routingNoMatch} />}
+            {shown.map((subagent) => {
                 const paths = state.routing.subagents?.[subagent.id]?.paths;
                 const tools = subagentToolsOf(state.routing, subagent);
-                const here = route ? route.subagentIds.includes(subagent.id) && !subagent.onlyWhenAnchored : null;
+                const here = route && tryPath.filter === null ? route.subagentIds.includes(subagent.id) && !subagent.onlyWhenAnchored : null;
                 return (
                     <Box key={subagent.id} onOpen={state.save ? () => open(subagent) : null}>
                         <div className="space-y-2">
@@ -391,19 +425,27 @@ function ToolEditor({ t, tool, routing, known, onSave, onClose }: {
     );
 }
 
-export function AgenticoToolsSettings({ onStack }: { onStack?: (open: boolean) => void }) {
+export function AgenticoToolsSettings({ onStack }: RoutingTabProps) {
     const { t, route, state, known, persist, notices } = useRoutingEditor();
+    const tryPath = useTryPath();
+    const offeredOnFilter = useMemo(
+        () => (tryPath.filter === null ? null : resolveAgenticoRoute(state.routing, tryPath.filter, getSubagentRegistry()).toolNames),
+        [tryPath.filter, state.routing],
+    );
+    const shownTools = offeredOnFilter === null ? known.tools : known.tools.filter((tool) => offeredOnFilter.includes(tool.name));
     const [editing, setEditing] = useState<{ name: string; description: string } | null>(null);
     const open = (tool: { name: string; description: string } | null) => { setEditing(tool); onStack?.(tool !== null); };
 
     return (
         <div className="space-y-4">
             {notices}
-            <p className="text-xs text-muted-foreground">{t.routingToolsIntro}</p>
-            {known.tools.map((tool) => {
+            <Toolbar t={t} intro={t.routingToolsIntro} tryPath={tryPath} />
+            <TryPathField t={t} tryPath={tryPath} count={shownTools.length} total={known.tools.length} />
+            {offeredOnFilter !== null && shownTools.length === 0 && <Nothing text={t.routingNoMatch} />}
+            {shownTools.map((tool) => {
                 const everywhere = !!state.routing.tools?.[tool.name]?.everywhere;
                 const users = known.subagents.filter((s) => subagentToolsOf(state.routing, s).includes(tool.name));
-                const here = route ? route.toolNames.includes(tool.name) : null;
+                const here = route && tryPath.filter === null ? route.toolNames.includes(tool.name) : null;
                 return (
                     <Box key={tool.name} onOpen={state.save ? () => open(tool) : null}>
                         <div className="space-y-2">
@@ -503,7 +545,7 @@ function PageEditor({ t, rule, index, pages, routing, known, onSave, onClose }: 
             titleBefore={(
                 // Its own form: the head of the modal is outside the form of the rule.
                 <Form appearance="empty" showNotice={false} defaultValues={{ active: initial.active }}>
-                    <Switch name="active" valueChecked="true" title={t.routingFieldActiveFeedback} ariaLabel={t.routingFieldActive} onChange={({ value }) => setActive(value ? 'true' : '')} />
+                    <Switch name="active" valueChecked="true" title={t.routingFieldActiveFeedback} ariaLabel={t.routingFieldActive} inheritWrapperClassName={false} wrapperClassName="m-0" onChange={({ value }) => setActive(value ? 'true' : '')} />
                 </Form>
             )}
             onClose={onClose}
@@ -523,26 +565,7 @@ function PageEditor({ t, rule, index, pages, routing, known, onSave, onClose }: 
     );
 }
 
-function PageTester({ t, pages, start }: { t: AgenticoDict; pages: readonly AgenticoPageRule[]; start: string }) {
-    const [path, setPath] = useState(start);
-    const match = useMemo(() => (path.trim() ? matchAgenticoPage(pages, path.trim()) : null), [pages, path]);
-    return (
-        <div className="space-y-1">
-            <Form appearance="empty" showNotice={false} defaultValues={{ path: start }}>
-                <TextInput name="path" label={t.routingTryPath} feedback={t.routingTryPathFeedback} onChange={({ value }) => setPath(String(value ?? ''))} />
-            </Form>
-            {path.trim() && (
-                <p className="text-sm">
-                    {match
-                        ? <><span className="font-medium">{match.rule.label ?? match.rule.id}</span>{match.context ? <span className="block whitespace-pre-wrap text-xs text-muted-foreground">{match.context}</span> : null}</>
-                        : <span className="text-muted-foreground">{t.routingNoPage}</span>}
-                </p>
-            )}
-        </div>
-    );
-}
-
-export function AgenticoPagesSettings({ onStack }: { onStack?: (open: boolean) => void }) {
+export function AgenticoPagesSettings({ onStack }: RoutingTabProps) {
     const { t, state, known, persist, notices } = useRoutingEditor();
     const pages = state.pages;
     const issues = useMemo(() => validateAgenticoRouting({ pages }, known), [pages, known]);
@@ -557,16 +580,22 @@ export function AgenticoPagesSettings({ onStack }: { onStack?: (open: boolean) =
         write(next);
     };
     const current = state.path !== null ? matchAgenticoPage(pages, state.path) : null;
+    const tryPath = useTryPath();
+    // Filtered on a path: the enabled rules whose pattern matches it; the first one applies, the others are overridden.
+    const filterMatch = tryPath.filter !== null ? matchAgenticoPage(pages, tryPath.filter) : null;
+    const matching = tryPath.filter === null ? null : new Set(pages.filter((rule) => matchAgenticoPage([rule], tryPath.filter!)).map((rule) => rule.id));
+    const winnerIndex = filterMatch ? pages.findIndex((rule) => rule.id === filterMatch.rule.id) : -1;
 
     return (
         <div className="space-y-4">
             {notices}
-            <div className="flex items-start gap-2">
-                <p className="flex-1 text-xs text-muted-foreground">{t.routingPagesIntro}</p>
+            <Toolbar t={t} intro={t.routingPagesIntro} tryPath={tryPath}>
                 {state.save && <ActionButton icon="plus" label={t.routingNewRule} variant="outline-secondary" onClick={() => open({ rule: null, index: 0 })} />}
-            </div>
-            <PageTester t={t} pages={pages} start={state.path ?? ''} />
+            </Toolbar>
+            <TryPathField t={t} tryPath={tryPath} count={matching?.size ?? 0} total={pages.length} />
+            {matching !== null && matching.size === 0 && <Nothing text={t.routingNoMatch} />}
             {pages.map((rule, index) => {
+                if (matching !== null && !matching.has(rule.id)) return null;
                 const origin = { default: t.routingOriginDefault, modified: t.routingOriginModified, added: t.routingOriginAdded }[rule.origin];
                 return (
                     <div key={rule.id} className="flex items-start gap-2">
@@ -578,10 +607,13 @@ export function AgenticoPagesSettings({ onStack }: { onStack?: (open: boolean) =
                                         <span className="text-sm font-medium">{rule.label ?? rule.id}</span>
                                         <Badge variant={ORIGIN_VARIANT[rule.origin]}>{origin}</Badge>
                                         {rule.disabled && <Badge variant="dark">{t.routingRuleOff}</Badge>}
-                                        {current?.rule.id === rule.id && <Badge variant="success" className="ml-auto">{t.routingHereBadge}</Badge>}
+                                        {matching === null && current?.rule.id === rule.id && <Badge variant="success" className="ml-auto">{t.routingHereBadge}</Badge>}
+                                        {matching !== null && (index === winnerIndex
+                                            ? <Badge variant="success" className="ml-auto">{t.routingApplies}</Badge>
+                                            : <Badge variant="secondary" className="ml-auto">{interpolate(t.routingOverridden, { n: String(winnerIndex + 1) })}</Badge>)}
                                     </div>
                                     <code className="block break-all rounded bg-muted px-2 py-1 text-xs">{rule.pattern}{rule.flags ? `  /${rule.flags}` : ''}</code>
-                                    {rule.context && <p className="whitespace-pre-wrap text-xs text-muted-foreground">{rule.context}</p>}
+                                    {rule.context && <p className="whitespace-pre-wrap text-xs text-muted-foreground">{index === winnerIndex && filterMatch?.context ? filterMatch.context : rule.context}</p>}
                                     <Issues t={t} issues={issues.filter((issue) => issue.index === index)} />
                                 </div>
                             </Box>

@@ -126,6 +126,10 @@ export interface AgenticoDict {
     routingNoPage: string;
     routingTryPath: string;
     routingTryPathFeedback: string;
+    routingTryPathCount: string;
+    routingNoMatch: string;
+    routingApplies: string;
+    routingOverridden: string;
     routingOriginDefault: string;
     routingOriginModified: string;
     routingOriginAdded: string;

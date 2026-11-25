@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-11-25
+
+### Changed
+- Routing settings (CR-023): "Try a path" is a button in the toolbar of Subagents, Tools and Pages. It opens a field
+  prefilled with the current path and shows only the boxes that match it, with how many do. On Pages it shows every
+  matching rule: the first is marked "Applies", with its context filled from the path, and the others "Overridden by #n".
+  The field is no longer always open, the introductions are one line, and the summary box "On this page" is gone.
+- The switch "Active" of a page rule is in the head of its editor, next to the title. The Flags field is no longer in the
+  form; flags written in code are kept.
+
 ## [0.22.0] - 2026-11-25
 
 ### Added

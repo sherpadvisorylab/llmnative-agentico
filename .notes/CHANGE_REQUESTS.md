@@ -84,6 +84,7 @@ difficili da leggere. Il modello segue come le persone ragionano ("cosa fa X e d
 - [x] README, llms.txt, CHANGELOG
 - [x] Verifica sul CMS: typecheck, 549 test e build verdi sulla build locale; provata nel browser (schede, modali impilate, switch Attivo)
 - [x] Release 0.22.0
+- [x] 0.22.1: «Prova un percorso» come pulsante che filtra i riquadri (in Pagine: «Vale» / «Superata dalla n.»), switch «Attivo» nella testata dell'editor, niente campo Flag né riquadro «In questa pagina»
 
 ---
 

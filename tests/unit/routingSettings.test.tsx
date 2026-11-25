@@ -85,12 +85,50 @@ describe('the tabs', () => {
     it('Subagents: a box per subagent with its paths, tools and whether it is offered here', async () => {
         registerAll();
         render(<AgenticoSubagentsSettings />, { wrapper: wrap({ path: '/pages/home', defaults }) });
-        await waitFor(() => expect(screen.getByText('Editing home')).toBeTruthy());
-        expect(screen.getAllByText('Theme extractor').length).toBe(2); // its box, and the summary of what is offered here
+        expect(screen.getByText('Theme extractor')).toBeTruthy();
         expect(screen.getByText('^/redirects')).toBeTruthy();
+        expect(screen.getByText('Read sitemap')).toBeTruthy(); // the tool of Redirects manager, readable
         // theme offered here; redirects not.
-        expect(screen.getAllByText('Offered here').length).toBe(2); // the "Offered here" row of the summary, and theme
+        expect(screen.getAllByText('Offered here').length).toBe(1);
         expect(screen.getAllByText('Not here').length).toBe(1);
+    });
+
+    it('"Try a path" on the current path: only its subagents, tools and page rules', async () => {
+        registerAll();
+        const { unmount } = render(<AgenticoSubagentsSettings />, { wrapper: wrap({ path: '/pages/home', defaults }) });
+        fireEvent.click(screen.getByText('Try a path'));
+        expect(screen.getByText('Theme extractor')).toBeTruthy();
+        expect(screen.queryByText('Redirects manager')).toBeNull();
+        unmount();
+        const tools = render(<AgenticoToolsSettings />, { wrapper: wrap({ path: '/pages/home', defaults }) });
+        fireEvent.click(screen.getByText('Try a path'));
+        expect(screen.getByText('Scrape page')).toBeTruthy();
+        expect(screen.queryByText('Read sitemap')).toBeNull();
+        tools.unmount();
+        render(<AgenticoPagesSettings />, { wrapper: wrap({ path: '/pages/home', defaults }) });
+        fireEvent.click(screen.getByText('Try a path'));
+        // Both rules match: the first applies (its context filled from the path), the catch-all is overridden.
+        expect(screen.getByText('Applies')).toBeTruthy();
+        expect(screen.getByText('Editing home')).toBeTruthy();
+        expect(screen.getByText('Overridden by #1')).toBeTruthy();
+    });
+
+    it('"Try a path": the button opens a field, prefilled with the current path, that filters the boxes', async () => {
+        registerAll();
+        render(<AgenticoSubagentsSettings />, { wrapper: wrap({ path: '/pages/home', defaults }) });
+        expect(screen.getByText('Redirects manager')).toBeTruthy();
+        fireEvent.click(screen.getByText('Try a path'));
+        const field = screen.getByPlaceholderText('/sites/acme/en/pages/home') as HTMLInputElement;
+        expect(field.value).toBe('/pages/home');
+        expect(screen.queryByText('Redirects manager')).toBeNull();
+        expect(screen.getByText('1 of 2 match. Query and hash do not count.')).toBeTruthy();
+        fireEvent.change(field, { target: { value: '/redirects/x' } });
+        expect(screen.getByText('Redirects manager')).toBeTruthy();
+        expect(screen.queryByText('Theme extractor')).toBeNull();
+        fireEvent.change(field, { target: { value: '/nowhere' } });
+        expect(screen.getByText('Nothing matches this path.')).toBeTruthy();
+        fireEvent.click(screen.getByText('Try a path'));
+        expect(screen.getByText('Theme extractor')).toBeTruthy();
     });
 
     it('Subagents: a click opens the editor on top; saving keeps the new path', async () => {
@@ -119,7 +157,8 @@ describe('the tabs', () => {
     it('Pages: the rules in order, the one of this page marked', async () => {
         registerAll();
         render(<AgenticoPagesSettings />, { wrapper: wrap({ path: '/pages/home', defaults }) });
-        expect(screen.getAllByText('Page editor').length).toBe(2); // its box, and the result of "try a path"
+        expect(screen.getByText('Page editor')).toBeTruthy();
+        expect(screen.queryByPlaceholderText('/sites/acme/en/pages/home')).toBeNull(); // "Try a path" is closed until asked
         expect(screen.getByText('This page')).toBeTruthy();
     });
 
