@@ -1,7 +1,9 @@
 // CR-022: the settings modal of Agentico: the settings the host lets the person change, and the connectors of the
 // AI providers (the page of the framework, CR-134), subscriptions on a runner included when the host has them.
-import React from 'react';
-import { AIConnections, Checkbox, Form, LoadingButton, ActionButton, Modal, Select, Switch, useAIProviderRegistry, useFormController, type AIReasoningLevel } from '@llmnative/react';
+import React, { useState } from 'react';
+import { AIConnections, Checkbox, Form, LoadingButton, ActionButton, Modal, Select, Switch, Tab, TabItem, useAIProviderRegistry, useFormController, type AIReasoningLevel } from '@llmnative/react';
+import { AgenticoPagesSettings, AgenticoSubagentsSettings, AgenticoToolsSettings } from './AgenticoRoutingSettings';
+import { getSubagentRegistry } from '../domain/subagentRegistry';
 import { useAgenticoI18n } from '../i18n';
 import type { AgenticoSettings } from '../domain/settings';
 import { useAgenticoSettings } from './AgenticoSettingsContext';
@@ -9,10 +11,10 @@ import { useAIModelCatalog } from './useAIModelCatalog';
 
 const LEVELS: AIReasoningLevel[] = ['low', 'medium', 'high', 'max'];
 
-/** Whether the modal has anything to show: a setting the person changes, or the connectors. */
+/** Whether the modal has anything to show: a setting the person changes, the subagents, tools and pages (CR-023), or the connectors. */
 export function useHasAgenticoSettings(): boolean {
     const { shown, connections } = useAgenticoSettings();
-    return shown.length > 0 || Boolean(connections);
+    return shown.length > 0 || Boolean(connections) || getSubagentRegistry().length > 0;
 }
 
 export function AgenticoSettingsModal() {
@@ -21,7 +23,11 @@ export function AgenticoSettingsModal() {
     const form = useFormController();
     const registry = useAIProviderRegistry()?.registry ?? {};
     const { modelsByProvider } = useAIModelCatalog({ unfiltered: true });
+    const [tab, setTab] = useState(0);
+    // An editor of the routing open on top: this modal is dimmed behind it (CR-023).
+    const [stacked, setStacked] = useState(false);
     if (!isOpen) return null;
+    const hasAgents = getSubagentRegistry().length > 0;
 
     const providerIds = Object.keys(registry);
     const labelOf = (id: string) => registry[id]?.label ?? id;
@@ -41,18 +47,19 @@ export function AgenticoSettingsModal() {
             title={t.settingsTitle}
             position="right"
             size="lg"
+            stackedBehind={stacked}
             onClose={close}
             footer={(
                 <>
-                    {shown.length > 0 && <LoadingButton variant="primary" label={t.settingsSave} onClick={(event) => form.save(event)} />}
+                    {shown.length > 0 && tab === 0 && <LoadingButton variant="primary" label={t.settingsSave} onClick={(event) => form.save(event)} />}
                     <ActionButton variant="link" label={t.settingsClose} onClick={close} />
                 </>
             )}
         >
-            <div className="space-y-6">
-                {shown.length > 0 && (
-                    <section className="space-y-3">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t.settingsChats}</h4>
+            <Tab defaultIndex={0} onChange={setTab} contentClassName="pt-4">
+                {[
+                shown.length > 0 && (
+                    <TabItem key="chats" label={t.settingsChats}>
                         <Form
                             appearance="empty"
                             controller={form}
@@ -99,15 +106,30 @@ export function AgenticoSettingsModal() {
                                 {show('threadEvents') && <Switch name="threadEvents" label={t.settingsThreadEvents} />}
                             </div>
                         </Form>
-                    </section>
-                )}
-                {connections && (
-                    <section className="space-y-3">
-                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t.settingsConnectors}</h4>
+                    </TabItem>
+                ),
+                hasAgents && (
+                    <TabItem key="subagents" label={t.settingsSubagents}>
+                        <AgenticoSubagentsSettings onStack={setStacked} />
+                    </TabItem>
+                ),
+                hasAgents && (
+                    <TabItem key="tools" label={t.settingsTools}>
+                        <AgenticoToolsSettings onStack={setStacked} />
+                    </TabItem>
+                ),
+                hasAgents && (
+                    <TabItem key="pages" label={t.settingsPages}>
+                        <AgenticoPagesSettings onStack={setStacked} />
+                    </TabItem>
+                ),
+                connections && (
+                    <TabItem key="connectors" label={t.settingsConnectors}>
                         <AIConnections {...connections} />
-                    </section>
-                )}
-            </div>
+                    </TabItem>
+                ),
+                ].filter(Boolean)}
+            </Tab>
         </Modal>
     );
 }

@@ -1,13 +1,13 @@
 # Project status
 
 > Snapshot verified against the real codebase.
-> Last reviewed: 2026-11-15
+> Last reviewed: 2026-11-25
 
 ## General state
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.21.0 ready (published by the person). Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.22.0 (published from the tag by GitHub Actions). Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
@@ -43,4 +43,5 @@
 
 | CR | Real state | What is missing |
 |----|-----------|-----------------|
+| CR-023 | Done | Routing: paths and tools per subagent, tools used everywhere, context per page; settings tabs Subagents, Tools, Pages. Tests: 122 green. Released in 0.22.0. Issue #23. |
 | CR-002 | ⬜ | Replace hand-rolled `<button>`, `<input>` and switch with framework components. Issue #2. |

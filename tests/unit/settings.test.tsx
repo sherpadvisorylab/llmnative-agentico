@@ -113,8 +113,10 @@ describe('the settings modal', () => {
         const dialog = await screen.findByRole('dialog');
         expect(within(dialog).queryByText('How much the model reasons')).not.toBeInTheDocument();
         expect(within(dialog).queryByText('Show what the other agents did')).not.toBeInTheDocument();
-        expect(within(dialog).getByText('Connectors')).toBeInTheDocument();
+        // CR-023: one tab each — Chats, Agents and tools, Connectors.
+        fireEvent.click(within(dialog).getByText('Connectors'));
         expect(await within(dialog).findByText('Anthropic')).toBeInTheDocument();
+        fireEvent.click(within(dialog).getByText('Chats'));
         fireEvent.click(within(dialog).getByLabelText(/The model writes the titles/));
         fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
         await waitFor(() => expect(store.save).toHaveBeenCalled());

@@ -97,9 +97,35 @@ export {
     useAgentico,
     ORCHESTRATOR_TASK_ID,
     type AgenticoScope,
+    type AgenticoRoute,
+    type AgenticoRoutingState,
     type AgenticoTask,
     type ComponentAnchor,
 } from './presentation/AgenticoContext';
+export {
+    resolveAgenticoRoute,
+    matchAgenticoPage,
+    matchesAnyPath,
+    subagentToolsOf,
+    mergeAgenticoRouting,
+    mergeAgenticoPageRules,
+    diffAgenticoRouting,
+    validateAgenticoRouting,
+    compileRoutePattern,
+    routePathOf,
+    type AgenticoRouting,
+    type AgenticoPageRule,
+    type AgenticoPageRuleWithOrigin,
+    type AgenticoSubagentRouting,
+    type AgenticoToolRouting,
+    type AgenticoRoutingOrigin,
+    type AgenticoRoutingChanges,
+    type AgenticoRoutingStore,
+    type AgenticoPageMatch,
+    type AgenticoRouteMatch,
+    type AgenticoRoutingIssue,
+    type AgenticoRoutingIssueCode,
+} from './domain/routing';
 export { useAgent, type AgentActivityEntry, type AgentConversation, type UseAgentResult } from './presentation/useAgent';
 export { useAgenticoPageContext } from './presentation/useAgenticoPageContext';
 export { useSubagentComponentContext } from './presentation/useSubagentComponentContext';

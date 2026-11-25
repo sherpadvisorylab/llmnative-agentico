@@ -27,6 +27,10 @@ export interface OrchestratorAgentParams {
     /** Subagent the starting page is pinned to, `null` for a generic chat. Restricts the
      * cross-agent tools to the ones that subagent declares (SubagentManifest.crossAgentToolIds). */
     scopedSubagentId: string | null;
+    /** CR-023: what the routing offers on the current path (see routing.ts), `null` = everything.
+     * The subagent the conversation is scoped to is offered anyway, with the tools it uses
+     * (`toolsOf`, else its manifest). */
+    route?: { subagentIds: string[] | null; toolNames: string[] | null; toolsOf?: Record<string, string[]> } | null;
 }
 
 export interface OrchestratorAgentContext {
@@ -51,10 +55,16 @@ export interface OrchestratorLabels {
     collecting: string;
 }
 
-/** The subagents the orchestrator offers: all of them, but one for a page only (onlyWhenAnchored,
- * CR-003) only when the conversation is scoped to it — in its catalog and in its tools alike. */
-function offeredSubagents(scopedSubagentId: string | null) {
-    return getSubagentRegistry().filter((manifest) => !manifest.onlyWhenAnchored || scopedSubagentId === manifest.id);
+/** The subagents the orchestrator offers — in its catalog and in its tools alike: the ones the routing
+ * offers on the current path (CR-023, all without routing), but one for a page only (onlyWhenAnchored,
+ * CR-003) only when the conversation is scoped to it. The scoped subagent is always offered. */
+function offeredSubagents(params: Pick<OrchestratorAgentParams, 'scopedSubagentId' | 'route'>) {
+    const allowed = params.route?.subagentIds ?? null;
+    return getSubagentRegistry().filter((manifest) => {
+        if (params.scopedSubagentId === manifest.id) return true;
+        if (manifest.onlyWhenAnchored) return false;
+        return allowed === null || allowed.includes(manifest.id);
+    });
 }
 
 export function createOrchestratorAgentDefinition(
@@ -63,7 +73,7 @@ export function createOrchestratorAgentDefinition(
     return {
         buildContext(params) {
             return {
-                cliCatalog: renderRegistryCli(offeredSubagents(params.scopedSubagentId)),
+                cliCatalog: renderRegistryCli(offeredSubagents(params)),
                 handoff: { current: null },
                 collected: {},
             };
@@ -99,14 +109,17 @@ export function createOrchestratorAgentDefinition(
         getTools(params, context, attachmentsRef): AgentTool[] {
             const allCrossAgentTools = createCrossAgentTools({ attachmentsRef, collected: context.collected, proxyFetch });
 
-            // A conversation pinned to a subagent only sees the cross-agent tools it declares; a
-            // generic chat (not yet scoped) sees them all, since the target is still unknown.
+            // A conversation pinned to a subagent only sees the cross-agent tools it uses (its routing,
+            // CR-023, else its manifest); a generic chat (not yet scoped) sees the ones the subagents
+            // offered on the current path use, all of them without routing, since the target is unknown.
             const scopedManifest = params.scopedSubagentId ? findSubagentManifest(params.scopedSubagentId) : null;
+            const allowedTools = params.route?.toolNames ?? null;
+            const scopedTools = scopedManifest ? (params.route?.toolsOf?.[scopedManifest.id] ?? scopedManifest.crossAgentToolIds ?? []) : [];
             const crossAgentTools = scopedManifest
-                ? allCrossAgentTools.filter((tool) => (scopedManifest.crossAgentToolIds ?? []).includes(tool.name))
-                : allCrossAgentTools;
+                ? allCrossAgentTools.filter((tool) => scopedTools.includes(tool.name))
+                : allowedTools === null ? allCrossAgentTools : allCrossAgentTools.filter((tool) => allowedTools.includes(tool.name));
 
-            const handoffTools: AgentTool[] = offeredSubagents(params.scopedSubagentId).flatMap((manifest) =>
+            const handoffTools: AgentTool[] = offeredSubagents(params).flatMap((manifest) =>
                 manifest.commands.map((command) => ({
                     name: `${manifest.id}_${command.name}`,
                     description: `${manifest.label}: ${command.summary}`,

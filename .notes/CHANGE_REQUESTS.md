@@ -31,6 +31,59 @@
 | [CR-020](#cr-020--immagini-in-vista-ed-eventi-in-corso) | Immagini in vista ed eventi in corso | Media | CR-017, CR-019 | ✅ |
 | [CR-021](#cr-021--azioni-sulle-card-degli-eventi-e-testo-precompilato) | Azioni sulle card degli eventi e testo precompilato nella chat | Alta | CR-019 | ✅ |
 | [CR-022](#cr-022--impostazioni-di-agentico-in-una-sua-modale-con-i-connettori-ai) | Impostazioni di Agentico in una sua modale, con i connettori AI | Alta | CR-132, CR-134 (framework) | ✅ |
+| [CR-023](#cr-023--routing-sottoagenti-strumenti-e-contesto-per-pagina) | Routing: sottoagenti, strumenti e contesto per pagina | Alta | — | ✅ |
+
+---
+
+## CR-023 — Routing: sottoagenti, strumenti e contesto per pagina
+
+**Stato:** ✅ done (0.22.0)
+**Issue:** [#23](https://github.com/sherpadvisorylab/llmnative-agentico/issues/23)
+**Priorità:** Alta
+**Dipende da:** —
+
+### Motivazione
+
+Emersa il 25/11/2026 dal CMS. Oggi cosa Agentico sa e offre in un punto dell'app è implicito e sparso nel codice
+dell'host: il contesto arriva solo dalle pagine che chiamano `useAgenticoPageContext` o montano un anchor
+(`useSubagentComponentContext`); l'orchestratore offre tutti i sottoagenti ovunque (salvo `onlyWhenAnchored`) e tutti i
+cross-agent tools finché la chat non è legata a un sottoagente. Non c'è modo di vedere, né di cambiare, chi è attivo dove.
+
+### Scope
+
+Rivisto il 25/11/2026 dopo la prima prova: le regole per percorso che limitavano insieme sottoagenti e tools erano
+difficili da leggere. Il modello segue come le persone ragionano ("cosa fa X e dove"):
+
+- **Sottoagenti**: per ognuno i percorsi che lo attivano (espressioni regolari sul percorso, senza query e hash; assenti =
+  ovunque, lista vuota = solo quando la chat è legata a lui) e i tools di raccolta dati che usa (assenti = i
+  `crossAgentToolIds` del manifest).
+- **Tools**: uno strumento può essere usato da tutti i sottoagenti (`everywhere`); altrimenti dai sottoagenti che lo
+  nominano. Le due viste modificano la stessa relazione, tenuta dal lato del sottoagente.
+- **Pagine**: il contesto per il modello per percorso, lista ordinata, vince la **prima** regola che corrisponde (gruppi
+  `{nome}`, `{1}`, `{path}`); precede il contesto delle pagine/anchor nel prompt.
+- **Dominio**: `resolveAgenticoRoute` (cosa è offerto su un percorso), `matchAgenticoPage`, `mergeAgenticoRouting` /
+  `diffAgenticoRouting` (predefiniti dell'host + modifiche salvate altrove, solo le differenze), `validateAgenticoRouting`.
+- **Provider**: `<AgenticoProvider route={{ path, defaults, store?, readOnly? }}>` — il percorso lo dà l'host (Agentico
+  non dipende da un router). `useAgentico().route` e `useAgentico().routing`. Senza `route`: tutto offerto, come prima.
+- **Orchestratore**: offre i sottoagenti i cui percorsi corrispondono e i tools che usano (più quelli usati ovunque). Un
+  sottoagente a cui la chat è legata resta offerto con i suoi tools (`toolsOf`).
+- **Impostazioni** (le regole si vedono dove si vede Agentico, non in una pagina dell'host): schede **Sottoagenti**
+  (un riquadro per sottoagente: percorsi, descrizione, tools come badge; clic → modale sopra le impostazioni per
+  cambiare percorsi e tools, provare un percorso, ripristinare), **Strumenti** (un riquadro per tool con i sottoagenti
+  che lo usano o "tutti"; clic → modale per sceglierli), **Pagine** (contesto per percorso: prova, modifica, riordina,
+  ripristina). Modifiche salvate dall'host (`route.store`, `route.readOnly`).
+- Decide cosa Agentico **propone**, non è un controllo di accesso.
+
+### Checklist
+
+- [x] Dominio: tipi, resolve, match pagine, merge, diff, validate
+- [x] Provider: prop `route`, cosa è offerto nel contesto
+- [x] Orchestratore: filtro sottoagenti e tools, tools del sottoagente legato, contesto della pagina nel prompt
+- [x] Impostazioni: schede Sottoagenti, Strumenti, Pagine con le modali di modifica impilate
+- [x] Test (122 verdi)
+- [x] README, llms.txt, CHANGELOG
+- [x] Verifica sul CMS: typecheck, 549 test e build verdi sulla build locale; provata nel browser (schede, modali impilate, switch Attivo)
+- [x] Release 0.22.0
 
 ---
 

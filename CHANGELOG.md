@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-25
+
+### Added
+- Routing (CR-023): `<AgenticoProvider route={{ path, defaults, store?, readOnly? }}>`, with `defaults: AgenticoRouting`:
+  - `subagents[id].paths`: regular expressions on the path where the subagent is offered (absent = everywhere, `[]` =
+    only when a chat is scoped to it); `subagents[id].tools`: the data-collection tools it uses (absent = its
+    `crossAgentToolIds`);
+  - `tools[name].everywhere`: a tool used by every subagent;
+  - `pages`: the context for the model per path, an ordered list (the first matching rule wins, `{name}`/`{1}`/`{path}`
+    from the pattern), placed before the context of the page.
+  On a path the orchestrator offers the subagents whose paths match and the tools they use; no `route` = everything,
+  as before. `useAgentico().route` (`resolveAgenticoRoute`), `useAgentico().routing`, `mergeAgenticoRouting`,
+  `diffAgenticoRouting`, `validateAgenticoRouting`, `matchAgenticoPage`; changes kept by the host
+  (`AgenticoRoutingStore`: `load`, `save` of what differs from the defaults).
+- Settings › **Subagents**, **Tools**, **Pages** (CR-023): a box per subagent (where it is offered, what it does, the
+  tools it uses) and per tool (the subagents that use it, or all); a click opens an editor on top of the settings.
+  Pages: the context per path, tried on a path, edited, reordered, restored.
+
+### Changed
+- The settings modal is in tabs: Chats, Subagents, Tools, Pages, Connectors.
+
 ## [0.21.0] - 2026-11-15
 
 ### Added

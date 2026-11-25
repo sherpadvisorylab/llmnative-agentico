@@ -98,7 +98,13 @@ export function OrchestratorRunner({ userGoal }: { userGoal: string }) {
         // conversazione parte davvero, non a mount-time del componente (che potrebbe precedere
         // di un istante la registrazione del contesto da parte della pagina chiamante).
         void agent.run(
-            { userGoal, pageContext: sidebar.pageContext, scopedSubagentId: scopedSubagentIdRef.current ?? null },
+            {
+                userGoal,
+                pageContext: sidebar.pageContext,
+                scopedSubagentId: scopedSubagentIdRef.current ?? null,
+                // CR-023: what the routing offers on the current path, read when the conversation starts.
+                route: sidebar.route ? { subagentIds: sidebar.route.subagentIds, toolNames: sidebar.route.toolNames, toolsOf: sidebar.route.toolsOf } : null,
+            },
             { attachments: attachmentsRef.current, model: modelRef.current, openingMessage: userGoal },
         ).then((r) => { if (r) handleResult(r); });
         // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -3,10 +3,21 @@ import type { AIModelDescriptor, ChatbotAction, DataProviderAdapter, EditorComma
 import type { AgentActivityEntry, AgentConversation } from './useAgent';
 import type { ResultDestination } from '../domain/resultDestination';
 import type { SubagentUsageCard } from '../domain/subagentUsageCard';
-import { findSubagentManifest } from '../domain/subagentRegistry';
+import { findSubagentManifest, getSubagentRegistry } from '../domain/subagentRegistry';
 import { saveEntityChat, syncEntityChats, type ChatAuthor, type EntityChatSnapshot } from '../domain/entityChatStore';
 import type { ThreadEventsSource } from '../domain/threadEvents';
 import { getAgenticoPrompts } from '../domain/prompts';
+import {
+    diffAgenticoRouting,
+    mergeAgenticoPageRules,
+    mergeAgenticoRouting,
+    resolveAgenticoRoute,
+    type AgenticoPageRuleWithOrigin,
+    type AgenticoRouteMatch,
+    type AgenticoRouting,
+    type AgenticoRoutingChanges,
+    type AgenticoRoutingStore,
+} from '../domain/routing';
 import { AgenticoSettingsProvider, type AgenticoSettingsConfig } from './AgenticoSettingsContext';
 
 /** Where results are saved and chats are kept: the host's current tenant, company, workspace…
@@ -152,9 +163,44 @@ export interface ComponentAnchor {
     pinnedEntityId?: string;
 }
 
+/** CR-023: where the person is in the host app, and what Agentico knows and offers there (see routing.ts). */
+export interface AgenticoRoute {
+    /** The current location of the host app (its router's): only the path is matched. */
+    path: string;
+    /** The routing of the host in code: where each subagent is offered and the tools it uses, the
+     * tools used everywhere, the context per page. */
+    defaults: AgenticoRouting;
+    /** Where the changes people make are kept (Settings › Subagents, Tools, Pages). Absent: shown,
+     * not changed. Keep it stable (memoized). */
+    store?: AgenticoRoutingStore | null;
+    /** The person may see the routing but not change it. */
+    readOnly?: boolean;
+}
+
+/** CR-023: the routing in use (the host's defaults with the changes kept), for the settings modal. */
+export interface AgenticoRoutingState {
+    /** The current path, `null` without `<AgenticoProvider route>`. */
+    path: string | null;
+    defaults: AgenticoRouting;
+    /** The defaults with the changes kept. */
+    routing: AgenticoRouting;
+    /** The page rules in use, each with its origin. */
+    pages: AgenticoPageRuleWithOrigin[];
+    /** The changes kept (what differs from the defaults: a subagent or tool listed here is modified). */
+    changes: AgenticoRoutingChanges;
+    /** Present when the person may change it. Throws when the store refuses. */
+    save: ((next: AgenticoRouting) => Promise<void>) | null;
+    /** Why the kept changes could not be read (the defaults apply meanwhile). */
+    error: string | null;
+}
+
 interface AgenticoContextValue {
     /** The host scope passed to <AgenticoProvider scope>. */
     scope: AgenticoScope | null;
+    /** CR-023: what is offered on the current path (<AgenticoProvider route>), `null` = no routing: everything offered. */
+    route: AgenticoRouteMatch | null;
+    /** CR-023: the routing in use and how to change it. */
+    routing: AgenticoRoutingState;
     /** CR-018: the person using the panel (<AgenticoProvider person>): the author of their messages. */
     person: ChatAuthor | null;
     /** CR-019: where the panel reads what happened around a chat (<AgenticoProvider threadEvents>). */
@@ -318,9 +364,14 @@ interface AgenticoContextValue {
 }
 
 const AgenticoContext = createContext<AgenticoContextValue | null>(null);
+const NO_ROUTING: AgenticoRouting = {};
 
-export function AgenticoProvider({ children, scope = null, person = null, threadEvents = null, settings }: {
+export function AgenticoProvider({ children, scope = null, person = null, threadEvents = null, settings, route: routeProp = null }: {
     children: React.ReactNode;
+    /** CR-023: the current path of the host app and its routing (see routing.ts): which subagents and
+     * data-collection tools are offered there, and the context the model gets. Absent = everything
+     * offered, no context. Keep `defaults` stable (memoized). */
+    route?: AgenticoRoute | null;
     /** CR-022: the settings of Agentico: where they are kept, which ones the code fixes or hides, and the connectors
      * of the AI providers shown in the settings modal. Keep it stable (memoized). */
     settings?: AgenticoSettingsConfig;
@@ -460,7 +511,48 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
         return `${getAgenticoPrompts().multipleCandidates}\n\n${list}`;
     }, [anchorTexts]);
 
-    const pageContext = anchoredPageContextText ?? lastPageContextEntry?.text ?? null;
+    // CR-023: the routing on the current path. The context of its page rule comes first: where the
+    // person is in the app, then what the page or the anchored component says about what is open there.
+    const routePath = routeProp?.path ?? null;
+    const routeDefaults = routeProp?.defaults ?? NO_ROUTING;
+    const routeStore = routeProp?.store ?? null;
+    const routeReadOnly = routeProp?.readOnly ?? false;
+    const [routeChanges, setRouteChanges] = useState<AgenticoRoutingChanges>({});
+    const [routeError, setRouteError] = useState<string | null>(null);
+    useEffect(() => {
+        setRouteChanges({});
+        setRouteError(null);
+        if (!routeStore) return;
+        let live = true;
+        routeStore.load().then(
+            (changes) => { if (live) setRouteChanges(changes ?? {}); },
+            (error: unknown) => { if (live) setRouteError(error instanceof Error ? error.message : String(error)); },
+        );
+        return () => { live = false; };
+    }, [routeStore]);
+    const mergedRouting = useMemo(() => mergeAgenticoRouting(routeDefaults, routeChanges), [routeDefaults, routeChanges]);
+    const saveRouting = useCallback(async (next: AgenticoRouting) => {
+        if (!routeStore) return;
+        const changes = diffAgenticoRouting(routeDefaults, next);
+        await routeStore.save(changes);
+        setRouteChanges(changes);
+        setRouteError(null);
+    }, [routeStore, routeDefaults]);
+    const routing = useMemo<AgenticoRoutingState>(() => ({
+        path: routePath,
+        defaults: routeDefaults,
+        routing: mergedRouting,
+        pages: mergeAgenticoPageRules(routeDefaults.pages ?? [], routeChanges),
+        changes: routeChanges,
+        save: routeStore && !routeReadOnly ? saveRouting : null,
+        error: routeError,
+    }), [routePath, routeDefaults, mergedRouting, routeChanges, routeStore, routeReadOnly, saveRouting, routeError]);
+    const route = useMemo(
+        () => (routePath !== null ? resolveAgenticoRoute(mergedRouting, routePath, getSubagentRegistry()) : null),
+        [routePath, mergedRouting],
+    );
+    const pagesContext = anchoredPageContextText ?? lastPageContextEntry?.text ?? null;
+    const pageContext = [route?.context, pagesContext].filter((text): text is string => !!text).join('\n\n') || null;
     // Una card a campi (SubagentUsageCardView) ha senso solo per il vecchio meccanismo — un
     // anchor component-based mostra invece `anchoredUserMessages` (una frase, non un modulo).
     const pageContextCard = anchorTexts.length > 0 ? null : (lastPageContextEntry?.card ?? null);
@@ -569,7 +661,7 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
 
     const value = useMemo(
         () => ({
-            scope, person, threadEvents, compose, draft, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator,
+            scope, route, routing, person, threadEvents, compose, draft, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator,
             pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId,
             componentAnchors, anchoredUserMessages, registerComponentAnchor,
             openPanel, pendingExtraDestinations,
@@ -579,7 +671,7 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
             pendingResumeWithAI, resumeWithAIRunId, resumeWithAI,
             startSubagent, pendingStart, startRunId,
         }),
-        [scope, person, threadEvents, compose, draft, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
+        [scope, route, routing, person, threadEvents, compose, draft, task, isOpen, openTask, closeTask, toggleOpen, pendingGoal, startOrchestrator, pageContext, pageContextCard, setPageContext, scopedSubagentId, pendingScopedSubagentId, componentAnchors, anchoredUserMessages, registerComponentAnchor, openPanel, pendingExtraDestinations, pendingAttachments, pendingModel, orchestratorRunId, pendingCarryOver, commitEntityChat, resumeEntityChat, pendingResume, resumeRunId, dismissForeignTask, pendingManualEntry, manualEntryRunId, startManualEntry, pendingResumeWithAI, resumeWithAIRunId, resumeWithAI, startSubagent, pendingStart, startRunId],
     );
 
     return (
