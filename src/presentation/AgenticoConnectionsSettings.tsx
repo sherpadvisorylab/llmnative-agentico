@@ -50,7 +50,7 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
     const { locale } = useI18n();
     const platform = me.role === 'platform';
     // CR-028: the admin of a namespace connects and administers its own runners; the platform all of them.
-    const administers = me.role !== 'member';
+    const administers = me.administers?.runners ?? platform;
     const store = useMemo(() => cloud?.store ?? backend.connections(), [backend, cloud?.store]);
     const [connected, setConnected] = useState<number | null>(null);
     const [runners, setRunners] = useState<RunnerEntry[] | null>(null);

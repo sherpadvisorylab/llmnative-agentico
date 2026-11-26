@@ -131,7 +131,7 @@ export function AgenticoSettingsModal() {
                         <AgenticoConnectionsTab backend={backend} me={me} {...(connections ? { cloud: connections } : {})} />
                     </TabItem>
                 ),
-                backend && me && me.role !== 'member' && (
+                backend && me && (me.administers?.memories ?? me.role === 'platform') && (
                     <TabItem key="memory" label={t.memoryTab}>
                         <AgenticoMemoryTab backend={backend} />
                     </TabItem>

@@ -55,7 +55,7 @@ const fakeAdapter = async (provider: string, fields: Record<string, string>): Pr
     async complete(request: unknown) { return { type: 'text', text: `answer to ${String((request as { prompt?: string }).prompt)}` } as never; },
 } as unknown as AIProviderAdapter);
 
-function setup() {
+function setup(extra: { tenantOwned?: { runners?: boolean; memories?: boolean } } = {}) {
     const stores = memoryStores();
     const runner = fakeRunner();
     const fetched: Array<{ url: string; init: RequestInit }> = [];
@@ -86,6 +86,7 @@ function setup() {
         connectRunner: runner.connection,
         tenants: async () => [{ id: 'acme', name: 'Acme' }, { id: 'beta', name: 'Beta' }],
         sessionHeaders: ['x-session'],
+        ...extra,
         log: (event, details) => lines.push(JSON.stringify({ event, ...details })),
     });
     const call = async (as: AgenticoIdentity | null, method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
@@ -141,8 +142,8 @@ describe('the server of Agentico', () => {
 
     it('runners: the platform connects one by asking it, with its project; a namespace goes on it; people reach it as themselves', async () => {
         const { call, runner, fetched, lines } = setup();
-        expect((await call(ana, 'GET', '/runners')).status).toBe(403);
-        expect((await call(admin, 'GET', '/runners')).json.runners).toEqual([]);
+        // Without tenantOwned the runners are the platform's: an admin is told so.
+        expect((await call(admin, 'GET', '/runners')).status).toBe(403);
         const started = await call(boss, 'POST', '/runners/pairings', { url: 'https://runner.test' });
         expect(started.json).toMatchObject({ code: 'ABCD-EFGH' });
         expect(started.text).not.toContain('pr_secret_request');
@@ -187,8 +188,8 @@ describe('the server of Agentico', () => {
         expect(added.text).not.toContain('mem-key');
         expect((await call(ana, 'GET', '/memory')).json).toEqual({ configured: false });
         expect((await call(ana, 'POST', '/memory/search', { query: 'x' })).status).toBe(409);
-        // A memory of the project is not the admin's: to it, it does not exist (CR-027).
-        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { memoryId: added.json.memory.id })).status).toBe(404);
+        // Without tenantOwned the memories are the platform's to assign.
+        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { memoryId: added.json.memory.id })).status).toBe(403);
         expect((await call(boss, 'PUT', '/namespaces/cms-acme', { memoryId: added.json.memory.id })).status).toBe(200);
         expect((await call(boss, 'PUT', '/namespaces/crm-acme', { memoryId: added.json.memory.id })).status).toBe(404);
         expect((await call(ana, 'GET', '/memory')).json).toEqual({ configured: true, apiUrl: 'https://memory.test', mcpUrl: 'https://memory.test/mcp', namespace: 'cms-acme' });
@@ -202,7 +203,7 @@ describe('the server of Agentico', () => {
         expect((await call(boss, 'DELETE', `/memories/${added.json.memory.id}`)).status).toBe(409);
     });
     it('memories owned by namespaces: each admin administers its own, a shared one is left, not removed (CR-027)', async () => {
-        const { call, stores } = setup();
+        const { call, stores } = setup({ tenantOwned: { runners: true, memories: true } });
         const beta: AgenticoIdentity = { user: { id: 'bob' }, role: 'admin', project: 'cms', tenant: 'beta' };
         const own = await call(admin, 'POST', '/memories', { name: 'Acme memory', apiUrl: 'https://memory.test', key: 'mem-key' });
         expect(own.status).toBe(201);
@@ -234,7 +235,7 @@ describe('the server of Agentico', () => {
         expect(await stores.records.get('agentico_memories', own.json.memory.id)).toBeNull();
     });
     it('runners owned by namespaces: an admin connects its own, others never see it nor work on it (CR-028)', async () => {
-        const { call, runner, stores } = setup();
+        const { call, runner, stores } = setup({ tenantOwned: { runners: true, memories: true } });
         const beta: AgenticoIdentity = { user: { id: 'bob' }, role: 'admin', project: 'cms', tenant: 'beta' };
         const bea: AgenticoIdentity = { user: { id: 'bice' }, role: 'member', project: 'cms', tenant: 'beta' };
         // Acme connects its own runner, by asking it.

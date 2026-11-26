@@ -7,7 +7,7 @@ import { RunnerClient, type RunnerStatus } from '@llmnative/runner/client';
 import type { RunnerEntry, RunnerFleet, RunnerPairingStart, RunnerPairingState, RunnerSshAccess } from '@llmnative/runner/ui';
 
 export type AgenticoRole = 'platform' | 'admin' | 'member';
-export type AgenticoMe = { user: { id: string; name?: string }; role: AgenticoRole; project: string; tenant?: string; namespace: string; /** The namespace has a runner to work on. */ hasRunner?: boolean };
+export type AgenticoMe = { user: { id: string; name?: string }; role: AgenticoRole; project: string; tenant?: string; namespace: string; /** The namespace has a runner to work on. */ hasRunner?: boolean; /** What this person administers (CR-027, CR-028). */ administers?: { runners: boolean; memories: boolean } };
 export type AgenticoMemory = { id: string; name: string; apiUrl: string; mcpUrl?: string };
 export type AgenticoMemoryCheck = { ok: true } | { ok: false; error: 'rejected' | 'unreachable' | 'invalid'; status?: number };
 export type AgenticoNamespaceRow = { namespace: string; tenant?: string; name?: string; runner?: { id: string; name?: string }; memory?: { id: string; name?: string } };

@@ -37,7 +37,7 @@ describe('the client of the server of Agentico', () => {
         expect((await store.load()).order).toEqual({ list: ['anthropic'], manual: true });
         await store.disconnect('anthropic');
         expect((await store.load()).providers).toEqual([]);
-        // An admin sees the runners of its namespace only (CR-028): none yet.
-        expect(await backend.fleet.list()).toEqual([]);
+        // The runners are the platform's (no tenantOwned): an admin is told so.
+        await expect(backend.fleet.list()).rejects.toMatchObject({ status: 403 });
     });
 });

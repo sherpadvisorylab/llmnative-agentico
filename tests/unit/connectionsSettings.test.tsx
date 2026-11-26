@@ -9,7 +9,7 @@ import { createAgenticoServer, memoryStores, type AgenticoIdentity } from '../..
 
 // CR-026: the tabs Connections, Memory and Projects of the settings, on a real server of Agentico in memory.
 
-function backendFor(identity: AgenticoIdentity, options: { runner?: boolean } = {}) {
+function backendFor(identity: AgenticoIdentity, options: { runner?: boolean; tenantOwned?: boolean } = {}) {
     const stores = memoryStores();
     if (options.runner) void stores.records.put('agentico_runners', { id: 'r1', name: 'Runner', url: 'https://runner.test', isDefault: true, draining: false, createdAt: 1, updatedAt: 1 });
     const server = createAgenticoServer({
@@ -20,6 +20,7 @@ function backendFor(identity: AgenticoIdentity, options: { runner?: boolean } = 
         adapter: async (provider) => ({ id: provider, validateApiKey: async () => ({ valid: true }) }) as unknown as AIProviderAdapter,
         fetch: (async () => new Response('{}', { status: 404 })) as typeof fetch,
         tenants: async () => [{ id: 'acme', name: 'Acme' }],
+        ...(options.tenantOwned ? { tenantOwned: { runners: true, memories: true } } : {}),
     });
     return createAgenticoBackend({ baseUrl: 'https://host.test/api/agentico', fetch: ((input: string | URL | Request, init?: RequestInit) => server.handle(new Request(input, init))) as typeof fetch });
 }
@@ -69,7 +70,7 @@ describe('the settings on the server of Agentico', () => {
         expect(within(dialog).queryByText('Projects')).not.toBeInTheDocument();
     });
     it('Cloud is on the connections of the host when it keeps its AI keys itself', async () => {
-        const backend = backendFor({ user: { id: 'adele' }, role: 'admin', project: 'cms', tenant: 'acme' });
+        const backend = backendFor({ user: { id: 'adele' }, role: 'admin', project: 'cms', tenant: 'acme' }, { tenantOwned: true });
         const store = { load: async () => ({ providers: [{ id: 'anthropic' }, { id: 'openai' }] }), connect: async () => ({ ok: true as const }), disconnect: async () => undefined };
         render(<Open />, { wrapper: wrap({ backend, connections: { store }, hidden: ['defaultModel', 'reasoning', 'providers', 'chatTitles', 'threadEvents'] }) });
         fireEvent.click(screen.getByText('open'));
