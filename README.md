@@ -70,6 +70,49 @@ const settings = useMemo<AgenticoSettingsConfig>(() => ({
 `useAgenticoSettings()` gives the values in effect. A reasoning set by the agent (`executor.catalogReasoning`) wins over
 the one of the settings.
 
+## Server, connections, runners and memory (CR-025, CR-026)
+
+The same in every host: the models, the runners and the memory are in the settings of Agentico. The host mounts the
+server of Agentico (`@llmnative/agentico/server`, pure Node) and gives three things: who asks (from its own sign-in),
+where it keeps documents, where it keeps secrets. Keys never reach the browser.
+
+```ts
+// Server (Hono, a Cloud Function…): one handle(Request).
+import { createAgenticoServer, fileStores } from '@llmnative/agentico/server';
+
+const agentico = createAgenticoServer({
+    ...fileStores('.data/agentico'),               // or the host's database and secret manager
+    platformName: 'My app',
+    basePath: '/api/agentico',
+    sessionHeaders: ['x-session'],                 // never forwarded to the AI providers
+    identity: async (request) => {                 // null: not signed in
+        const person = await sessionOf(request);
+        return person && { user: { id: person.id }, role: person.role, project: 'crm', tenant: person.tenant };
+    },
+});
+app.all('/api/agentico/*', (c) => agentico.handle(c.req.raw));
+```
+
+```tsx
+// Browser: the settings get the tabs Connections, Memory and Projects.
+const backend = useMemo(() => createAgenticoBackend({ baseUrl: '/api/agentico', headers: () => ({ 'x-session': token }) }), [token]);
+<AgenticoProvider settings={{ backend }}>…</AgenticoProvider>
+```
+
+- **Namespace** `<project>` or `<project>-<tenant>`: the tenant on the runner and the container of the memory.
+- **Roles**: `platform` (runners, memories, which runner and memory each namespace uses), `admin` (the cloud keys of
+  their namespace), `member` (uses them; their own subscriptions on the runner).
+- **Connections**: boxes that open a modal — *Cloud* (`AIConnections`: the providers of `@llmnative/react` with their
+  keys, checked before kept), one per runner (state, default, draining, the accounts of the namespace: subscriptions and
+  API keys run on the runner), *Add a runner* (installed over SSH or by hand, or connected by approving the request on
+  the runner: the platform key owns only the namespaces of the project, runner 1.2).
+- **Memory**: supermemory (API address, MCP server, key); each namespace reads and writes `/ns/<namespace>`.
+- **Projects**: each namespace of the project, its runner and its memory.
+- The AI adapters of the browser use the proxy of the framework on `<basePath>/ai/proxy` (`providers.proxy.route`,
+  placeholders `llmnative-server-credential:<namespace>:<provider>`); a server answers with `<basePath>/ai/complete`.
+- Without a harness of the host, the runner of the namespace is the harness (CR-024): the subscriptions of the person
+  next to the API models.
+
 ## Concepts
 
 | Concept | API |

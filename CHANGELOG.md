@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-26
+
+### Added
+- `@llmnative/agentico/server` (CR-025): the server of Agentico, pure Node, one `handle(Request)`. The host gives
+  `identity` (person, role `platform` | `admin` | `member`, project, tenant), `records` and `secrets`; references in
+  memory and in JSON files 0600. Namespace `<project>[-<tenant>]`. Cloud connections of the framework (the server side
+  of `AIConnectionStore`, keys checked with the provider before they are kept, the proxy of the framework on
+  `ai/proxy`, `ai/complete`); runners of the project (connected by asking the runner with the project or with a code,
+  installed over SSH with their log, default and draining, a namespace put on one with a key of its own, the requests
+  of a person forwarded as them, chats kept on their runner); memories (supermemory: checked, searched and written in
+  `/ns/<namespace>`); projects (namespace → runner, memory).
+- `createAgenticoBackend` (CR-025): the browser side — `AIConnectionStore`, the `RunnerFleet` of `@llmnative/runner/ui`,
+  clients of the runner of the namespace, memories, projects.
+- Settings on the server of Agentico (CR-026): `settings.backend` adds the tabs Connections (boxes that open a modal:
+  Cloud, one per runner, Add a runner; a member's own subscriptions), Memory and Projects. The runner of the namespace
+  becomes the harness when the host gives none.
+
+### Changed
+- The providers of the AI catalog in the settings are switches, no longer checkboxes.
+- With `settings.backend`, the box Cloud takes the place of the tab Connectors.
+- New dependency `@llmnative/runner` ^1.2.0 (client, UI and setup of the runner).
+
 ## [0.23.0] - 2026-11-26
 
 ### Added

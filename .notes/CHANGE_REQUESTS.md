@@ -33,14 +33,14 @@
 | [CR-022](#cr-022--impostazioni-di-agentico-in-una-sua-modale-con-i-connettori-ai) | Impostazioni di Agentico in una sua modale, con i connettori AI | Alta | CR-132, CR-134 (framework) | ✅ |
 | [CR-023](#cr-023--routing-sottoagenti-strumenti-e-contesto-per-pagina) | Routing: sottoagenti, strumenti e contesto per pagina | Alta | — | ✅ |
 | [CR-024](#cr-024--harness-dellhost-modelli-che-girano-col-loro-ciclo-di-strumenti-per-ogni-agente) | Harness dell'host: modelli col loro ciclo di strumenti, per ogni agente | Alta | CR-009, CR-016, CR-022 | ✅ |
-| [CR-025](#cr-025--pacchetto-server-llmnativeagenticoserver) | Pacchetto server: connessioni, runner, memoria, progetti | Alta | CR-024, runner 1.2 | 🔄 |
-| [CR-026](#cr-026--impostazioni-connessioni-memoria-progetti) | Impostazioni: Connessioni, Memoria, Progetti sul backend dell'host | Alta | CR-025 | ⬜ |
+| [CR-025](#cr-025--pacchetto-server-llmnativeagenticoserver) | Pacchetto server: connessioni, runner, memoria, progetti | Alta | CR-024, runner 1.2 | ✅ |
+| [CR-026](#cr-026--impostazioni-connessioni-memoria-progetti) | Impostazioni: Connessioni, Memoria, Progetti sul backend dell'host | Alta | CR-025 | ✅ |
 
 ---
 
 ## CR-025 — Pacchetto server `@llmnative/agentico/server`
 
-**Stato:** 🔄 in progress
+**Stato:** ✅ done (0.24.0)
 **Issue:** [#25](https://github.com/sherpadvisorylab/llmnative-agentico/issues/25)
 **Priorità:** Alta
 **Dipende da:** CR-024, `@llmnative/runner` 1.2
@@ -77,19 +77,19 @@ porta per installarlo e collegarlo. Resta senza segreti nel browser: tutto ciò 
 
 ### Checklist
 
-- [ ] Porte, namespace, adattatori in memoria e su file
-- [ ] Connessioni cloud: store, verifica, proxy CR-102, complete
-- [ ] Runner: flotta (dal CMS), collegamento con progetto, installazione, assegnazione, inoltro
-- [ ] Memorie: store, verifica, ricerca e scrittura
-- [ ] Progetti
-- [ ] `handle(Request)` con i permessi per ruolo; nessun segreto nelle risposte né nei log
-- [ ] Client del browser
-- [ ] Test (provider, runner e memoria finti), build dell'ingresso server
-- [ ] README, llms.txt, CHANGELOG, STATUS
+- [x] Porte, namespace, adattatori in memoria e su file
+- [x] Connessioni cloud: store, verifica, proxy CR-102, complete
+- [x] Runner: flotta (dal CMS), collegamento con progetto, installazione, assegnazione, inoltro
+- [x] Memorie: store, verifica, ricerca e scrittura
+- [x] Progetti
+- [x] `handle(Request)` con i permessi per ruolo; nessun segreto nelle risposte né nei log
+- [x] Client del browser
+- [x] Test (provider, runner e memoria finti), build dell'ingresso server
+- [x] README, llms.txt, CHANGELOG, STATUS
 
 ## CR-026 — Impostazioni: Connessioni, Memoria, Progetti
 
-**Stato:** ⬜ todo
+**Stato:** ✅ done (0.24.0)
 **Issue:** [#26](https://github.com/sherpadvisorylab/llmnative-agentico/issues/26)
 **Priorità:** Alta
 **Dipende da:** CR-025
@@ -106,12 +106,12 @@ porta per installarlo e collegarlo. Resta senza segreti nel browser: tutto ciò 
 
 ### Checklist
 
-- [ ] Prop `backend`, schede e permessi per ruolo
-- [ ] Connessioni a box, modali, Aggiungi un runner
-- [ ] Memoria, Progetti
-- [ ] Harness del runner dal backend; menu dei modelli dalle connessioni
-- [ ] Switch al posto delle checkbox
-- [ ] Test, verifica in un host, README, CHANGELOG, STATUS
+- [x] Prop `backend`, schede e permessi per ruolo
+- [x] Connessioni a box, modali, Aggiungi un runner
+- [x] Memoria, Progetti
+- [x] Harness del runner dal backend; menu dei modelli dalle connessioni
+- [x] Switch al posto delle checkbox
+- [x] Test, verifica in un host (CMS sulla build locale: typecheck, 569 test, build), README, CHANGELOG, STATUS
 
 ---
 

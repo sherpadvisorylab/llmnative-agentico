@@ -1,22 +1,24 @@
 # Project status
 
 > Snapshot verified against the real codebase.
-> Last reviewed: 2026-11-25
+> Last reviewed: 2026-11-26
 
 ## General state
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.23.0 (published from the tag by GitHub Actions). Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.24.0 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.2.0. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 26 files / 130 tests (Vitest, happy-dom). | — |
+| Tests | 29 files / 138 tests (Vitest, happy-dom; the server in node). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-025 | Done | `@llmnative/agentico/server`: identity, records, secrets; connections (checked keys, proxy, complete), runners (pairing with the project, install, assign, forward), memories, projects; `createAgenticoBackend`. Tests: server end to end and the client against it. Released in 0.24.0. Issue #25. |
+| CR-026 | Done | Settings with `backend`: Connections boxes (Cloud, runners, Add a runner), Memory, Projects; switches; the runner as harness. Verified in the CMS against the local build (typecheck, 569 tests, build). Released in 0.24.0. Issue #26. |
 | CR-024 | Done | Harness of the host (`<AgenticoProvider harness>`, `AgenticoHarness`): models with their own loop of tools next to the AI catalog for every agent without an executor, orchestrator included (`createHarnessExecutor`: brief, follow-ups, tools as JSON Schema, parsing, chat so far on rewind or mid-chat); `runHostTool`; host tabs in the settings (`settings.tabs`). Tests: 6 new (130 green). Verified in the CMS against the local build (typecheck, 569 tests, build). Released in 0.23.0. Issue #24. |
 | CR-022 | Done | Settings of Agentico in one schema (`defaultModel`, `reasoning`, `providers`, `chatTitles`, `threadEvents`), shown/fixed/hidden by the host, kept by its store; gear in the panel header opens `AgenticoSettingsModal` with the connectors of the AI providers (`AIConnections`, @llmnative/react 3.2). Tests: 5 new (104 green). Released in 0.21.0. Issue #22. |
 | CR-021 | Done | Act on an event from the chat: `ThreadEvent.actions`/`open`, `ThreadEventsSource.onAction` with `chat.compose`/`chat.send`, `useAgentico().compose`. 98 tests. Version 0.20.0, verified in Playbook against the local build. Issue #21. |
