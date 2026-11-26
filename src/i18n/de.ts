@@ -215,7 +215,7 @@ export const agenticoDe: AgenticoDict = {
     projectsMemory: 'Gedächtnis',
     projectsDefaultRunner: 'Der Standard',
     projectsNoMemory: 'Keines',
-    projectsReadOnly: 'Den Runner ändert nur, wer die Plattform verwaltet; das Gedächtnis Ihres Namespace wählen Sie selbst.',
+    projectsReadOnly: 'Runner und Gedächtnis Ihres Namespace wählen Sie selbst, unter denen, die Sie verwalten.',
     connectionsError: 'Etwas ist schiefgelaufen: {error}',
     harnessGroup: '{provider} · auf dem Runner',
     harnessNoCredit: 'Das Guthaben des Abonnements ist bis {at} aufgebraucht.',

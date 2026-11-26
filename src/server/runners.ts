@@ -20,12 +20,26 @@ export interface RunnerRecord {
     /** The id of the platform key on the runner, to revoke it when the runner is removed. */
     keyId?: string;
     hostFingerprint?: string;
+    /**
+     * CR-028: the namespaces that administer it (a tenant's own runner; several: shared). None: a runner of the
+     * project, administered by the platform, that any namespace may be put on.
+     */
+    owners?: string[];
     createdAt: number;
     updatedAt: number;
 }
 
 /** What the pages see of a runner: never its key. */
-export type RunnerEntry = { id: string; name: string; url: string; isDefault: boolean; draining: boolean };
+export type RunnerEntry = { id: string; name: string; url: string; isDefault: boolean; draining: boolean; owners?: string[] };
+
+/** Who looks at the runners: the platform (all of them), or the admin of a namespace (its own). */
+export type RunnerViewer = { platform: true } | { platform: false; namespace: string };
+
+/** Whether a viewer administers a runner. */
+export const administersRunner = (viewer: RunnerViewer, record: Pick<RunnerRecord, 'owners'>) => viewer.platform || !!record.owners?.includes(viewer.namespace);
+
+/** Whether a namespace may work on a runner: one of the project, or one it owns. */
+export const usableBy = (namespace: string, record: Pick<RunnerRecord, 'owners'>) => !record.owners?.length || record.owners.includes(namespace);
 
 /** Which runner and memory a namespace uses. */
 export interface NamespaceRecord {
@@ -36,7 +50,7 @@ export interface NamespaceRecord {
     memoryId?: string;
 }
 
-interface PairingRecord { id: string; name: string; url: string; startedBy: string; expiresAt: string }
+interface PairingRecord { id: string; name: string; url: string; startedBy: string; expiresAt: string; owner?: string }
 interface ChatRecord { id: string; runnerId: string }
 export interface InstallRecord { id: string; status: 'running' | 'done' | 'error'; lines: string[]; runnerId?: string; error?: string; startedBy: string }
 
@@ -87,7 +101,7 @@ export function normalizeRunnerUrl(value: string): string {
     return parsed.origin;
 }
 
-const entryOf = (record: RunnerRecord): RunnerEntry => ({ id: record.id, name: record.name, url: record.url, isDefault: record.isDefault, draining: record.draining });
+const entryOf = (record: RunnerRecord): RunnerEntry => ({ id: record.id, name: record.name, url: record.url, isDefault: record.isDefault, draining: record.draining, ...(record.owners?.length ? { owners: [...record.owners] } : {}) });
 
 export type FleetDeps = {
     project: string;
@@ -111,9 +125,10 @@ export function createFleet(deps: FleetDeps) {
     const newId = deps.newId ?? (() => crypto.randomUUID().replace(/-/g, '').slice(0, 12));
     const now = deps.now ?? Date.now;
 
-    const runnerOf = async (id: string) => {
+    /** A runner (one the viewer administers, when a viewer is given: another's looks the same as none). */
+    const runnerOf = async (id: string, viewer?: RunnerViewer) => {
         const record = await records.get<RunnerRecord>(RUNNERS, id);
-        if (!record) throw new FleetError('not-found', 'RUNNER_NOT_FOUND');
+        if (!record || (viewer && !administersRunner(viewer, record))) throw new FleetError('not-found', 'RUNNER_NOT_FOUND');
         return record;
     };
     const keyOf = async (name: string) => {
@@ -128,7 +143,7 @@ export function createFleet(deps: FleetDeps) {
         return url;
     };
     const nameOf = (url: string, name?: string) => String(name ?? '').trim() || new URL(url).hostname;
-    const keep = async (input: { name: string; url: string; key: string; keyId?: string; hostFingerprint?: string }): Promise<RunnerEntry> => {
+    const keep = async (input: { name: string; url: string; key: string; keyId?: string; hostFingerprint?: string; owner?: string }): Promise<RunnerEntry> => {
         const id = newId();
         const at = now();
         await secrets.set(platformSecret(id), input.key);
@@ -136,8 +151,10 @@ export function createFleet(deps: FleetDeps) {
             id,
             name: input.name,
             url: input.url,
-            isDefault: (await records.list<RunnerRecord>(RUNNERS)).length === 0,
+            // The first runner of the project is its default; a tenant's own runner is never the project's.
+            isDefault: !input.owner && !(await records.list<RunnerRecord>(RUNNERS)).some((record) => !record.owners?.length),
             draining: false,
+            ...(input.owner ? { owners: [input.owner] } : {}),
             ...(input.keyId ? { keyId: input.keyId } : {}),
             ...(input.hostFingerprint ? { hostFingerprint: input.hostFingerprint } : {}),
             createdAt: at,
@@ -149,33 +166,51 @@ export function createFleet(deps: FleetDeps) {
     const namespaceRecord = async (namespace: string) => (await records.get<NamespaceRecord>(NAMESPACES, namespace)) ?? { id: namespace };
 
     const fleet = {
-        async list(): Promise<RunnerEntry[]> {
-            return (await records.list<RunnerRecord>(RUNNERS)).map(entryOf).sort((a, b) => a.name.localeCompare(b.name));
+        /** The runners a viewer administers (all of them without a viewer). */
+        async list(viewer?: RunnerViewer): Promise<RunnerEntry[]> {
+            return (await records.list<RunnerRecord>(RUNNERS)).filter((record) => !viewer || administersRunner(viewer, record)).map(entryOf).sort((a, b) => a.name.localeCompare(b.name));
+        },
+
+        /** Whether a namespace has a runner to work on (its own, or one of the project). */
+        async hasRunnerFor(namespace: string): Promise<boolean> {
+            const current = await namespaceRecord(namespace);
+            const runners = await records.list<RunnerRecord>(RUNNERS);
+            return runners.some((record) => record.id === current.runnerId) || runners.some((record) => !record.draining && usableBy(namespace, record));
+        },
+
+        /** A namespace becomes an owner of a runner (shared), or stops being one. */
+        async share(id: string, namespace: string): Promise<void> {
+            const record = await runnerOf(id);
+            if (!record.owners?.includes(namespace)) await records.put<RunnerRecord>(RUNNERS, { ...record, owners: [...(record.owners ?? []), namespace], updatedAt: now() });
+        },
+        async unshare(id: string, namespace: string): Promise<void> {
+            const record = await runnerOf(id);
+            if (record.owners?.includes(namespace)) await records.put<RunnerRecord>(RUNNERS, { ...record, owners: record.owners.filter((owner) => owner !== namespace), updatedAt: now() });
         },
 
         /** Connects a runner with a pairing code (the key it gives, of this project, stays here). */
-        async add(input: { name?: string; url: string; code?: string; key?: string }, extra: { hostFingerprint?: string } = {}): Promise<RunnerEntry> {
+        async add(input: { name?: string; url: string; code?: string; key?: string }, extra: { hostFingerprint?: string } = {}, owner?: string): Promise<RunnerEntry> {
             const url = await newUrl(String(input.url ?? ''));
             const name = nameOf(url, input.name);
             if (input.code) {
                 const paired = await connect(url).pair(String(input.code).trim(), deps.platformName, project);
-                return keep({ name, url, key: paired.key, keyId: paired.record.id, ...extra });
+                return keep({ name, url, key: paired.key, keyId: paired.record.id, ...extra, ...(owner ? { owner } : {}) });
             }
             if (input.key) {
                 const key = String(input.key).trim();
                 await connect(url, key).platform.status();
-                return keep({ name, url, key, ...extra });
+                return keep({ name, url, key, ...extra, ...(owner ? { owner } : {}) });
             }
             throw new FleetError('invalid', 'CODE_OR_KEY_REQUIRED');
         },
 
         /** Asks a runner to connect (device flow, with the project): its admin approves in its console. */
-        async startPairing(input: { name?: string; url: string }, startedBy: string): Promise<{ id: string; code: string; approveUrl: string; expiresAt: string }> {
+        async startPairing(input: { name?: string; url: string }, startedBy: string, owner?: string): Promise<{ id: string; code: string; approveUrl: string; expiresAt: string }> {
             const url = await newUrl(String(input.url ?? ''));
             const made = await connect(url).requestPairing(deps.platformName, project);
             const id = newId();
             await secrets.set(pairingSecret(id), made.request);
-            await records.put<PairingRecord>(PAIRINGS, { id, name: nameOf(url, input.name), url, startedBy, expiresAt: made.expiresAt });
+            await records.put<PairingRecord>(PAIRINGS, { id, name: nameOf(url, input.name), url, startedBy, expiresAt: made.expiresAt, ...(owner ? { owner } : {}) });
             return { id, code: made.code, approveUrl: made.approveUrl, expiresAt: made.expiresAt };
         },
 
@@ -196,11 +231,13 @@ export function createFleet(deps: FleetDeps) {
             if (polled.status === 'pending') return { status: 'pending' };
             await end();
             if (polled.status !== 'approved') return { status: polled.status };
-            return { status: 'approved', runner: await keep({ name: pending.name, url: pending.url, key: polled.key, keyId: polled.record.id }) };
+            return { status: 'approved', runner: await keep({ name: pending.name, url: pending.url, key: polled.key, keyId: polled.record.id, ...(pending.owner ? { owner: pending.owner } : {}) }) };
         },
 
-        async update(id: string, patch: { name?: string; isDefault?: boolean; draining?: boolean }): Promise<void> {
-            const record = await runnerOf(id);
+        async update(id: string, patch: { name?: string; isDefault?: boolean; draining?: boolean }, viewer?: RunnerViewer): Promise<void> {
+            const record = await runnerOf(id, viewer);
+            // The default of the project is the platform's to choose, among the runners of the project.
+            if (typeof patch.isDefault === 'boolean' && ((viewer && !viewer.platform) || record.owners?.length)) throw new FleetError('invalid', 'NOT_A_PROJECT_RUNNER');
             const next: RunnerRecord = { ...record, updatedAt: now() };
             if (typeof patch.name === 'string' && patch.name.trim()) next.name = patch.name.trim().slice(0, 100);
             if (typeof patch.draining === 'boolean') next.draining = patch.draining;
@@ -216,16 +253,22 @@ export function createFleet(deps: FleetDeps) {
         },
 
         /** Only a runner no namespace uses: its people would lose their chats and subscriptions there. */
-        async remove(id: string): Promise<void> {
-            const record = await runnerOf(id);
+        async remove(id: string, viewer?: RunnerViewer): Promise<void> {
+            const record = await runnerOf(id, viewer);
+            // One owner of a shared runner leaves it to the others; its own namespace must not be on it.
+            if (viewer && !viewer.platform && (record.owners?.length ?? 0) > 1) {
+                if ((await namespaceRecord(viewer.namespace)).runnerId === id) throw new FleetError('conflict', 'RUNNER_HAS_NAMESPACES');
+                await fleet.unshare(id, viewer.namespace);
+                return;
+            }
             if ((await records.list<NamespaceRecord>(NAMESPACES)).some((item) => item.runnerId === id)) throw new FleetError('conflict', 'RUNNER_HAS_NAMESPACES');
             if (record.keyId) await connectTo(record).then((runner) => runner.platform.revokePlatformKey(record.keyId!)).catch(() => false);
             await secrets.delete(platformSecret(id));
             await records.delete(RUNNERS, id);
         },
 
-        async status(id: string): Promise<RunnerStatus> {
-            return (await connectTo(await runnerOf(id))).platform.status();
+        async status(id: string, viewer?: RunnerViewer): Promise<RunnerStatus> {
+            return (await connectTo(await runnerOf(id, viewer))).platform.status();
         },
 
         /**
@@ -235,6 +278,7 @@ export function createFleet(deps: FleetDeps) {
         async assign(namespace: string, runnerId: string, options: { keepBefore?: boolean; name?: string } = {}): Promise<void> {
             const current = await namespaceRecord(namespace);
             const record = await runnerOf(runnerId);
+            if (!usableBy(namespace, record)) throw new FleetError('not-found', 'RUNNER_NOT_FOUND');
             if (current.runnerId === runnerId && await secrets.get(namespaceSecret(namespace, runnerId))) return;
             if (record.draining) throw new FleetError('conflict', 'RUNNER_DRAINING');
             const runner = await connectTo(record);
@@ -271,10 +315,12 @@ export function createFleet(deps: FleetDeps) {
                 const key = record ? await secrets.get(namespaceSecret(namespace, record.id)) : null;
                 if (record && key) return { runnerId: record.id, url: record.url, key };
             }
-            const runners = await records.list<RunnerRecord>(RUNNERS);
+            // Only the runners this namespace may work on: those of the project and its own, never another's.
+            const runners = (await records.list<RunnerRecord>(RUNNERS)).filter((record) => usableBy(namespace, record));
             let current = await namespaceRecord(namespace);
             const using = current.runnerId ? runners.find((record) => record.id === current.runnerId) : undefined;
             const fallback = runners.find((record) => record.isDefault && !record.draining && record.id !== using?.id)
+                ?? runners.find((record) => !!record.owners?.length && !record.draining && record.id !== using?.id)
                 ?? (using ? undefined : runners.find((record) => !record.draining));
             if (!using) {
                 if (!fallback) return null;
@@ -301,7 +347,7 @@ export function createFleet(deps: FleetDeps) {
          * Installs a runner over SSH and connects it; the log goes to its document as it comes. The SSH access is used
          * for this connection only, never kept.
          */
-        async install(input: { name?: string; domain: string; access: SshTarget; version?: string }, startedBy: string, onProgress?: (progress: InstallProgress) => void): Promise<{ installId: string; done: Promise<RunnerEntry> }> {
+        async install(input: { name?: string; domain: string; access: SshTarget; version?: string }, startedBy: string, onProgress?: (progress: InstallProgress) => void, owner?: string): Promise<{ installId: string; done: Promise<RunnerEntry> }> {
             if (!input.access?.host || !input.access.username || (!input.access.privateKey && !input.access.password)) throw new FleetError('invalid', 'SSH_ACCESS_REQUIRED');
             if (!String(input.domain ?? '').trim()) throw new FleetError('invalid', 'DOMAIN_REQUIRED');
             const installId = newId();
@@ -316,7 +362,7 @@ export function createFleet(deps: FleetDeps) {
             const done = (async () => {
                 try {
                     const installed = await install(input.access, { domain: input.domain, ...(input.version ? { version: input.version } : {}), onProgress: progress });
-                    const runner = await fleet.add({ name: input.name, url: installed.url, code: installed.pairingCode }, { hostFingerprint: installed.hostFingerprint });
+                    const runner = await fleet.add({ name: input.name, url: installed.url, code: installed.pairingCode }, { hostFingerprint: installed.hostFingerprint }, owner);
                     await writing;
                     await records.put<InstallRecord>(INSTALLS, { ...state, status: 'done', runnerId: runner.id });
                     return runner;

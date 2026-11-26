@@ -6,7 +6,7 @@ import { createConnections, type AdapterFactory } from './connections';
 import { createMemories, MemoryError, type MemoryEntry, type MemoryViewer } from './memories';
 import { inProject, namespaceOf, NamespaceError, tenantOf } from './namespace';
 import type { AgenticoIdentity, AgenticoKnownTenant, AgenticoRecords, AgenticoRole, AgenticoSecrets } from './ports';
-import { createFleet, FleetError, NAMESPACES, type NamespaceRecord, type RunnerConnection, type RunnerEntry } from './runners';
+import { createFleet, FleetError, NAMESPACES, type NamespaceRecord, type RunnerConnection, type RunnerEntry, type RunnerViewer } from './runners';
 
 export type AgenticoServerOptions = {
     /** Who asks, from the sign-in of the host; null: not signed in (401). */
@@ -142,7 +142,7 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
         if (area === 'me' && method === 'GET') {
             const namespace = namespaceOf(project, identity.tenant);
             // Whether the namespace has a runner (its own, or a runner of the project it would be put on).
-            const hasRunner = !!(await namespaceRecord(namespace)).runnerId || (await fleetOf(project).list()).some((runner) => !runner.draining);
+            const hasRunner = await fleetOf(project).hasRunnerFor(namespace);
             return json(200, { user: identity.user, role: identity.role, project, ...(identity.tenant ? { tenant: identity.tenant } : {}), namespace, hasRunner });
         }
 
@@ -222,20 +222,22 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
             return toRunner(request, identity, `/${parts.slice(1).map(encodeURIComponent).join('/')}`, true);
         }
 
-        // ── Runners of the project (platform) ───────────────────────────────────────────────────────────────
+        // ── Runners: the platform administers them all, the admin of a namespace its own (CR-028) ────────────
         if (area === 'runners') {
-            need(identity, 'platform');
+            need(identity, 'admin');
             const fleet = fleetOf(project);
-            if (!id && method === 'GET') return json(200, { runners: await fleet.list() });
+            const viewer: RunnerViewer = identity.role === 'platform' ? { platform: true } : { platform: false, namespace: namespaceOf(project, identity.tenant) };
+            const owner = viewer.platform ? undefined : viewer.namespace;
+            if (!id && method === 'GET') return json(200, { runners: await fleet.list(viewer) });
             if (!id && method === 'POST') {
                 const given = await body(request);
-                const runner = await fleet.add({ url: String(given.url ?? ''), ...(typeof given.name === 'string' ? { name: given.name } : {}), ...(typeof given.code === 'string' ? { code: given.code } : {}), ...(typeof given.key === 'string' ? { key: given.key } : {}) });
+                const runner = await fleet.add({ url: String(given.url ?? ''), ...(typeof given.name === 'string' ? { name: given.name } : {}), ...(typeof given.code === 'string' ? { code: given.code } : {}), ...(typeof given.key === 'string' ? { key: given.key } : {}) }, {}, owner);
                 log('runner connected', { project, runner: runner.id, by: identity.user.id });
                 return json(201, { runner });
             }
             if (id === 'pairings' && !sub && method === 'POST') {
                 const given = await body(request);
-                return json(201, await fleet.startPairing({ url: String(given.url ?? ''), ...(typeof given.name === 'string' ? { name: given.name } : {}) }, identity.user.id));
+                return json(201, await fleet.startPairing({ url: String(given.url ?? ''), ...(typeof given.name === 'string' ? { name: given.name } : {}) }, identity.user.id, owner));
             }
             if (id === 'pairings' && sub && method === 'GET') return json(200, await fleet.pairingStatus(sub, identity.user.id));
             if (id === 'installs' && !sub && method === 'POST') {
@@ -245,7 +247,7 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
                     access: (given.access ?? {}) as never,
                     ...(typeof given.name === 'string' ? { name: given.name } : {}),
                     ...(typeof given.version === 'string' ? { version: given.version } : {}),
-                }, identity.user.id);
+                }, identity.user.id, undefined, owner);
                 log('runner install', { project, install: started.installId, by: identity.user.id });
                 return json(202, { installId: started.installId });
             }
@@ -259,14 +261,14 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
                     ...(typeof given.name === 'string' ? { name: given.name } : {}),
                     ...(typeof given.isDefault === 'boolean' ? { isDefault: given.isDefault } : {}),
                     ...(typeof given.draining === 'boolean' ? { draining: given.draining } : {}),
-                });
+                }, viewer);
                 return json(200, { ok: true });
             }
             if (id && !sub && method === 'DELETE') {
-                await fleet.remove(id);
+                await fleet.remove(id, viewer);
                 return json(200, { ok: true });
             }
-            if (id && sub === 'status' && method === 'GET') return json(200, await fleet.status(id));
+            if (id && sub === 'status' && method === 'GET') return json(200, await fleet.status(id, viewer));
         }
 
         // ── Memories: the platform administers them all, the admin of a namespace its own (CR-027) ───────────
@@ -326,7 +328,7 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
         if (area === 'projects' && !id && method === 'GET') {
             need(identity, 'admin');
             const [runnerList, memoryList, saved, known] = await Promise.all([
-                RANK[identity.role] >= RANK.platform ? fleetOf(project).list() : Promise.resolve([] as RunnerEntry[]),
+                fleetOf(project).list(identity.role === 'platform' ? { platform: true } : { platform: false, namespace: namespaceOf(project, identity.tenant) }),
                 memories.list(identity.role === 'platform' ? { platform: true } : { platform: false, namespace: namespaceOf(project, identity.tenant) }),
                 namespaces(project),
                 options.tenants && identity.role === 'platform' ? options.tenants(identity) : Promise.resolve([] as AgenticoKnownTenant[]),
@@ -368,7 +370,8 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
             if (!platform && id !== namespaceOf(project, identity.tenant)) throw new HttpError(403, 'forbidden');
             const given = await body(request);
             if (typeof given.runnerId === 'string' && given.runnerId) {
-                if (!platform) throw new HttpError(403, 'forbidden');
+                // The admin of a namespace puts it on a runner it owns (CR-028); the platform on any of the project.
+                if (!platform && !(await fleetOf(project).list({ platform: false, namespace: id })).some((runner) => runner.id === given.runnerId)) throw new HttpError(404, 'runner not found');
                 await fleetOf(project).assign(id, given.runnerId);
             }
             if (given.memoryId !== undefined) {

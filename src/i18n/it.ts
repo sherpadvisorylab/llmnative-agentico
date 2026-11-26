@@ -215,7 +215,7 @@ export const agenticoIt: AgenticoDict = {
     projectsMemory: 'Memoria',
     projectsDefaultRunner: 'Quello predefinito',
     projectsNoMemory: 'Nessuna',
-    projectsReadOnly: 'Il runner lo cambia solo chi amministra la piattaforma; la memoria del tuo namespace la scegli tu.',
+    projectsReadOnly: 'Runner e memoria del tuo namespace li scegli tu, tra quelli che amministri.',
     connectionsError: 'Qualcosa non è andato: {error}',
     harnessGroup: '{provider} · sul runner',
     harnessNoCredit: 'Il credito dell’abbonamento è finito fino alle {at}.',

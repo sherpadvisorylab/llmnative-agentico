@@ -141,7 +141,8 @@ describe('the server of Agentico', () => {
 
     it('runners: the platform connects one by asking it, with its project; a namespace goes on it; people reach it as themselves', async () => {
         const { call, runner, fetched, lines } = setup();
-        expect((await call(admin, 'GET', '/runners')).status).toBe(403);
+        expect((await call(ana, 'GET', '/runners')).status).toBe(403);
+        expect((await call(admin, 'GET', '/runners')).json.runners).toEqual([]);
         const started = await call(boss, 'POST', '/runners/pairings', { url: 'https://runner.test' });
         expect(started.json).toMatchObject({ code: 'ABCD-EFGH' });
         expect(started.text).not.toContain('pr_secret_request');
@@ -218,7 +219,7 @@ describe('the server of Agentico', () => {
         const betaId = (await call(beta, 'GET', '/memories')).json.memories[0].id;
         expect((await call(admin, 'PUT', '/namespaces/cms-acme', { memoryId: betaId })).status).toBe(404);
         expect((await call(admin, 'PATCH', `/memories/${betaId}`, { name: 'Mine now' })).status).toBe(404);
-        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { runnerId: 'r1' })).status).toBe(403);
+        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { runnerId: 'r1' })).status).toBe(404);
         expect((await call(ana, 'GET', '/memory')).json).toMatchObject({ configured: true, namespace: 'cms-acme' });
         // A memory shared by two tenants (as the memory of a runner): one owner leaves it, the other keeps it.
         const shared = { id: 'shared', name: 'Runner memory', apiUrl: 'https://memory.test', owners: ['cms-acme', 'cms-beta'], createdAt: 1 };
@@ -231,5 +232,36 @@ describe('the server of Agentico', () => {
         // The last owner removes it, unless a namespace uses it.
         expect((await call(admin, 'DELETE', `/memories/${own.json.memory.id}`)).status).toBe(200);
         expect(await stores.records.get('agentico_memories', own.json.memory.id)).toBeNull();
+    });
+    it('runners owned by namespaces: an admin connects its own, others never see it nor work on it (CR-028)', async () => {
+        const { call, runner, stores } = setup();
+        const beta: AgenticoIdentity = { user: { id: 'bob' }, role: 'admin', project: 'cms', tenant: 'beta' };
+        const bea: AgenticoIdentity = { user: { id: 'bice' }, role: 'member', project: 'cms', tenant: 'beta' };
+        // Acme connects its own runner, by asking it.
+        const started = await call(admin, 'POST', '/runners/pairings', { url: 'https://runner.test' });
+        runner.approve();
+        const approved = await call(admin, 'GET', `/runners/pairings/${started.json.id}`);
+        expect(approved.json.runner).toMatchObject({ owners: ['cms-acme'], isDefault: false });
+        const id = approved.json.runner.id;
+        expect((await call(admin, 'GET', '/runners')).json.runners.map((r: { id: string }) => r.id)).toEqual([id]);
+        expect((await call(beta, 'GET', '/runners')).json.runners).toEqual([]);
+        expect((await call(boss, 'GET', '/runners')).json.runners).toHaveLength(1);
+        expect((await call(beta, 'GET', `/runners/${id}/status`)).status).toBe(404);
+        expect((await call(beta, 'PATCH', `/runners/${id}`, { draining: true })).status).toBe(404);
+        expect((await call(admin, 'PATCH', `/runners/${id}`, { isDefault: true })).status).toBe(400);
+        // Beta has no runner to work on: not the runner of Acme.
+        expect((await call(bea, 'GET', '/me')).json.hasRunner).toBe(false);
+        expect((await call(bea, 'GET', '/runner/v1/models')).status).toBe(409);
+        expect((await call(beta, 'PUT', '/namespaces/cms-beta', { runnerId: id })).status).toBe(404);
+        // Acme works on it.
+        expect((await call(ana, 'GET', '/me')).json.hasRunner).toBe(true);
+        expect((await call(ana, 'GET', '/runner/v1/models')).status).toBe(200);
+        expect(runner.calls.find((c) => c.what === 'createTenant')!.args[0]).toBe('cms-acme');
+        // Shared with Beta (as a server its organizations run on), Beta may put itself on it; one owner leaving keeps it.
+        const record = await stores.records.get<{ id: string; owners?: string[] }>('agentico_runners', id);
+        await stores.records.put('agentico_runners', { ...record!, owners: ['cms-acme', 'cms-beta'] });
+        expect((await call(beta, 'PUT', '/namespaces/cms-beta', { runnerId: id })).status).toBe(200);
+        expect((await call(beta, 'DELETE', `/runners/${id}`)).status).toBe(409);
+        expect((await call(admin, 'DELETE', `/runners/${id}`)).status).toBe(409);
     });
 });

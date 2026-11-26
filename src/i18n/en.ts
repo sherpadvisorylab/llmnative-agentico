@@ -215,7 +215,7 @@ export const agenticoEn: AgenticoDict = {
     projectsMemory: 'Memory',
     projectsDefaultRunner: 'The default one',
     projectsNoMemory: 'None',
-    projectsReadOnly: 'Only who administers the platform changes the runner; the memory of your namespace is yours to choose.',
+    projectsReadOnly: 'The runner and the memory of your namespace are yours to choose, among those you administer.',
     connectionsError: 'Something went wrong: {error}',
     harnessGroup: '{provider} · on the runner',
     harnessNoCredit: 'The credit of the subscription is over until {at}.',

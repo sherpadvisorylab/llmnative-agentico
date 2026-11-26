@@ -49,6 +49,8 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
     const t = useAgenticoI18n();
     const { locale } = useI18n();
     const platform = me.role === 'platform';
+    // CR-028: the admin of a namespace connects and administers its own runners; the platform all of them.
+    const administers = me.role !== 'member';
     const store = useMemo(() => cloud?.store ?? backend.connections(), [backend, cloud?.store]);
     const [connected, setConnected] = useState<number | null>(null);
     const [runners, setRunners] = useState<RunnerEntry[] | null>(null);
@@ -58,12 +60,12 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
     const load = useCallback(async () => {
         try {
             setConnected((await store.load()).providers.length);
-            if (platform) setRunners(await backend.fleet.list());
+            if (administers) setRunners(await backend.fleet.list());
             setError(null);
         } catch (failure) {
             setError(reason(failure));
         }
-    }, [backend, store, platform]);
+    }, [backend, store, administers]);
     useEffect(() => { void load(); }, [load]);
     const close = () => {
         setOpen(null);
@@ -82,7 +84,7 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
                     badge={connected ? <Badge variant="success">{interpolate(t.cloudConnected, { count: connected })}</Badge> : <Badge variant="light">{t.cloudNone}</Badge>}
                     onClick={() => setOpen('cloud')}
                 />
-                {platform && runners?.map((runner) => (
+                {administers && runners?.map((runner) => (
                     <ListCard
                         key={runner.id}
                         icon="server"
@@ -92,10 +94,10 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
                         onClick={() => setOpen({ runner })}
                     />
                 ))}
-                {!platform && me.hasRunner && (
+                {!administers && me.hasRunner && (
                     <ListCard icon="server" title={t.runnerOfProject} description={t.runnerOfProjectDescription} onClick={() => setOpen('mine')} />
                 )}
-                {platform && (
+                {administers && (
                     <ListCard icon="plus" dashed title={t.runnerAdd} description={t.runnerAddDescription} onClick={() => setOpen('add')} />
                 )}
             </div>
@@ -112,13 +114,13 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
             {open === 'add' && (
                 <AddRunner fleet={backend.fleet} t={textsFor(locale)} locale={locale} onClose={close} onAdded={close} />
             )}
-            {open && typeof open === 'object' && <RunnerModal backend={backend} runner={open.runner} onClose={close} />}
+            {open && typeof open === 'object' && <RunnerModal backend={backend} runner={open.runner} platform={platform} onClose={close} />}
         </div>
     );
 }
 
 /** One runner of the project: its state, its accounts for the namespace, default and draining, remove. */
-function RunnerModal({ backend, runner, onClose }: { backend: AgenticoBackend; runner: RunnerEntry; onClose: () => void }) {
+function RunnerModal({ backend, runner, platform, onClose }: { backend: AgenticoBackend; runner: RunnerEntry; platform: boolean; onClose: () => void }) {
     const t = useAgenticoI18n();
     const { locale } = useI18n();
     const [status, setStatus] = useState<RunnerStatus | null>(null);
@@ -152,7 +154,7 @@ function RunnerModal({ backend, runner, onClose }: { backend: AgenticoBackend; r
                 ]} />
                 <Form appearance="empty" showNotice={false} onSubmit={() => false}>
                     <div className="flex flex-col gap-2">
-                        <Switch name="isDefault" label={t.runnerSetDefault} defaultValue={runner.isDefault ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ isDefault: Boolean(value) })} />
+                        {platform && !(runner as RunnerEntry & { owners?: string[] }).owners?.length && <Switch name="isDefault" label={t.runnerSetDefault} defaultValue={runner.isDefault ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ isDefault: Boolean(value) })} />}
                         <Switch name="draining" label={t.runnerSetDraining} defaultValue={runner.draining ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ draining: Boolean(value) })} />
                     </div>
                 </Form>
@@ -307,7 +309,7 @@ export function AgenticoProjectsTab({ backend, me }: { backend: AgenticoBackend;
         try {
             const [projects, runnerList, memoryList] = await Promise.all([
                 backend.projects.list(),
-                platform ? backend.fleet.list() : Promise.resolve([] as RunnerEntry[]),
+                backend.fleet.list(),
                 backend.memories.list(),
             ]);
             setRows(projects.namespaces);
@@ -340,7 +342,7 @@ export function AgenticoProjectsTab({ backend, me }: { backend: AgenticoBackend;
                     </div>
                     {platform || row.namespace === me.namespace ? (
                         <Form appearance="empty" showNotice={false} onSubmit={() => false} className="contents">
-                            {platform ? (
+                            {platform || runners.length > 0 ? (
                                 <Select
                                     name={`runner-${row.namespace}`}
                                     label={t.projectsRunner}
