@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Runners owned by namespaces (CR-028): `owners` on a runner. Where the host lets its admins (`tenantOwned.runners`), the
+  admin of a namespace connects (code, request, install), updates and removes the runners of its namespace and puts its
+  namespace on one of them; the platform all of them; the default of the project only among the runners of the project.
+  A namespace works only on runners of the project or its own, never on another's. A shared runner is left by one
+  owner and kept for the others. The settings show an admin its runners and Add a runner.
+- `tenantOwned: { runners?, memories? }`: whether the admins of a namespace administer runners and memories of their own
+  (Playbook). `GET me` says what the person administers (`administers`).
+
+### Changed
+- Without `tenantOwned`, runners and memories are the platform's again (as up to 0.24): in 0.25.0 every admin could add
+  memories; a host that wants it passes `tenantOwned.memories`.
+
 ## [0.25.0] - 2026-11-26
 
 ### Added

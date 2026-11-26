@@ -36,6 +36,38 @@
 | [CR-025](#cr-025--pacchetto-server-llmnativeagenticoserver) | Pacchetto server: connessioni, runner, memoria, progetti | Alta | CR-024, runner 1.2 | ✅ |
 | [CR-026](#cr-026--impostazioni-connessioni-memoria-progetti) | Impostazioni: Connessioni, Memoria, Progetti sul backend dell'host | Alta | CR-025 | ✅ |
 | [CR-027](#cr-027--memorie-di-proprietà-dei-namespace) | Memorie di proprietà dei namespace: ogni tenant amministra le sue | Alta | CR-025 | ✅ |
+| [CR-028](#cr-028--runner-di-proprietà-dei-namespace) | Runner di proprietà dei namespace, e `tenantOwned` dell'host | Alta | CR-027 | 🔄 |
+
+---
+
+## CR-028 — Runner di proprietà dei namespace
+
+**Stato:** 🔄 in progress
+**Issue:** [#28](https://github.com/sherpadvisorylab/llmnative-agentico/issues/28)
+**Priorità:** Alta
+**Dipende da:** CR-027
+
+### Motivazione
+
+F6 del piano (Playbook): un server lo vede chi l'ha creato e i membri delle organizzazioni che ci girano, lo modificano chi
+l'ha creato e i loro admin. Come per le memorie (CR-027) serve che un tenant possieda i suoi runner. Nel CMS invece
+assegnare l'infrastruttura resta un'azione della piattaforma: la proprietà dei tenant è un'opzione dell'host.
+
+### Scope
+
+- `RunnerRecord.owners`; un namespace lavora solo su runner del progetto o suoi (route, assign, `hasRunner`).
+- Con `tenantOwned.runners`: l'admin collega (codice, richiesta, installazione), modifica e rimuove i runner del suo
+  namespace e ci mette il suo namespace; il predefinito del progetto resta della piattaforma.
+- `tenantOwned.memories` per CR-027; senza opzione, runner e memorie sono della piattaforma.
+- `GET me` con `administers`; impostazioni: un admin vede i suoi runner e *Aggiungi un runner* quando può.
+
+### Checklist
+
+- [x] Proprietari, isolamento nel routing, permessi, test
+- [x] Opzione `tenantOwned` e test con e senza
+- [x] Interfaccia per l'admin
+- [x] Verifica in Playbook (tenantOwned acceso, test della memoria e della rotta)
+- [ ] Release
 
 ---
 
