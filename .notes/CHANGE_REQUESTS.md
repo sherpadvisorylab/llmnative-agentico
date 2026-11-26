@@ -33,6 +33,85 @@
 | [CR-022](#cr-022--impostazioni-di-agentico-in-una-sua-modale-con-i-connettori-ai) | Impostazioni di Agentico in una sua modale, con i connettori AI | Alta | CR-132, CR-134 (framework) | ✅ |
 | [CR-023](#cr-023--routing-sottoagenti-strumenti-e-contesto-per-pagina) | Routing: sottoagenti, strumenti e contesto per pagina | Alta | — | ✅ |
 | [CR-024](#cr-024--harness-dellhost-modelli-che-girano-col-loro-ciclo-di-strumenti-per-ogni-agente) | Harness dell'host: modelli col loro ciclo di strumenti, per ogni agente | Alta | CR-009, CR-016, CR-022 | ✅ |
+| [CR-025](#cr-025--pacchetto-server-llmnativeagenticoserver) | Pacchetto server: connessioni, runner, memoria, progetti | Alta | CR-024, runner 1.2 | 🔄 |
+| [CR-026](#cr-026--impostazioni-connessioni-memoria-progetti) | Impostazioni: Connessioni, Memoria, Progetti sul backend dell'host | Alta | CR-025 | ⬜ |
+
+---
+
+## CR-025 — Pacchetto server `@llmnative/agentico/server`
+
+**Stato:** 🔄 in progress
+**Issue:** [#25](https://github.com/sherpadvisorylab/llmnative-agentico/issues/25)
+**Priorità:** Alta
+**Dipende da:** CR-024, `@llmnative/runner` 1.2
+
+### Motivazione
+
+Decisione del 26/11/2026 (piano in Playbook, `docs/piano-agentico-connessioni.md`): in ogni host (CRM, CMS, Playbook) i
+modelli, i runner e la memoria stanno nelle impostazioni di Agentico, sempre uguali. Oggi ogni host ha la sua logica sul
+server (connessioni AI, flotta dei runner, inoltro al runner, memoria). Agentico diventa portabile con il client **e** il
+server: l'host fornisce solo dove tiene dati e segreti.
+
+Cambia un principio di CR-024: il pacchetto ora conosce il runner (`@llmnative/runner`, client e setup) perché è la
+porta per installarlo e collegarlo. Resta senza segreti nel browser: tutto ciò che è segreto sta nel pacchetto server.
+
+### Scope
+
+- **Ingresso** `@llmnative/agentico/server`: Node puro, nessun React, nessuna dipendenza da Firebase o Hono.
+- **Namespace** `<project>` o `<project>-<tenant>` (progetto senza trattino): tenant del runner e contenitore della memoria.
+- **Porte dell'host**:
+  - `identity(request)`: persona (id, nome), ruolo (`platform` | `admin` | `member`), progetto, tenant;
+  - `records`: documenti non segreti per collezione;
+  - `secrets`: segreti per nome.
+  - Adattatori di riferimento: in memoria (test) e file JSON 0600 (Node).
+- **`createAgenticoServer(options).handle(request)`**, rotte sotto un prefisso:
+  - connessioni cloud del framework: il lato server di `AIConnectionStore` (verifica della chiave col provider prima di
+    tenerla, account, ordine), proxy delle chiavi (CR-102) e risposta di un modello (`complete`);
+  - runner: elenco, stato, collegamento chiedendo al runner (device flow, con il progetto) o con un codice, installazione
+    via SSH con log, aggiornamento (predefinito, svuotamento), rimozione, assegnazione di un namespace (tenant e chiave sul
+    runner), inoltro delle richieste di una persona al runner del suo namespace (`act-as-user`, chat in streaming);
+  - memorie: elenco, aggiunta (indirizzo API, MCP, chiave), verifica, rimozione; ricerca e scrittura nel namespace;
+  - progetti: namespace → runner, memoria.
+- **Client del browser** `createAgenticoBackend({ baseUrl })`: `AIConnectionStore`, `RunnerFleet` di
+  `@llmnative/runner/ui`, client del runner del namespace, memorie, progetti.
+
+### Checklist
+
+- [ ] Porte, namespace, adattatori in memoria e su file
+- [ ] Connessioni cloud: store, verifica, proxy CR-102, complete
+- [ ] Runner: flotta (dal CMS), collegamento con progetto, installazione, assegnazione, inoltro
+- [ ] Memorie: store, verifica, ricerca e scrittura
+- [ ] Progetti
+- [ ] `handle(Request)` con i permessi per ruolo; nessun segreto nelle risposte né nei log
+- [ ] Client del browser
+- [ ] Test (provider, runner e memoria finti), build dell'ingresso server
+- [ ] README, llms.txt, CHANGELOG, STATUS
+
+## CR-026 — Impostazioni: Connessioni, Memoria, Progetti
+
+**Stato:** ⬜ todo
+**Issue:** [#26](https://github.com/sherpadvisorylab/llmnative-agentico/issues/26)
+**Priorità:** Alta
+**Dipende da:** CR-025
+
+### Scope
+
+- `<AgenticoProvider backend>`: con un backend, le impostazioni hanno le schede *Connessioni*, *Memoria*, *Progetti*.
+- *Connessioni*: box cliccabili (`ListCard`) che aprono una `Modal`: *Cloud* (`AIConnections`), uno per runner (stato,
+  versione, carico, account del runner con `RunnerAccounts`, svuota, rimuovi), *Aggiungi un runner* (`RunnersSettings` di
+  `@llmnative/runner/ui`: installazione automatica o guidata, collegamento con la challenge).
+- *Memoria*: box per memoria (indirizzo API, MCP, chiave che si scrive e non si rilegge, *Verifica*), *Aggiungi*.
+- *Progetti*: namespace → runner, memoria, modificabili da chi amministra la piattaforma.
+- Switch al posto delle checkbox (anche i provider del catalogo); l'harness del runner (CR-024) costruito da Agentico.
+
+### Checklist
+
+- [ ] Prop `backend`, schede e permessi per ruolo
+- [ ] Connessioni a box, modali, Aggiungi un runner
+- [ ] Memoria, Progetti
+- [ ] Harness del runner dal backend; menu dei modelli dalle connessioni
+- [ ] Switch al posto delle checkbox
+- [ ] Test, verifica in un host, README, CHANGELOG, STATUS
 
 ---
 

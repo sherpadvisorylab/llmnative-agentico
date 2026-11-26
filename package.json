@@ -10,6 +10,11 @@
       "types": "./dist/types/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/types/server/index.d.ts",
+      "import": "./dist/server.mjs",
+      "require": "./dist/server.js"
     }
   },
   "files": [
@@ -54,6 +59,7 @@
     "zod": "^3.24.1"
   },
   "dependencies": {
+    "@llmnative/runner": "^1.2.0",
     "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
@@ -62,6 +68,7 @@
     "@supabase/supabase-js": "^2.119.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
+    "@types/node": "^24.19.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "firebase": "^12.19.0",

@@ -19,7 +19,7 @@ export default defineConfig({
     build: {
         target: 'baseline-widely-available',
         lib: {
-            entry: { index: resolve(__dirname, 'src/index.ts') },
+            entry: { index: resolve(__dirname, 'src/index.ts'), server: resolve(__dirname, 'src/server/index.ts') },
             formats: ['es', 'cjs'],
             fileName: (format, entryName) => (format === 'es' ? `${entryName}.mjs` : `${entryName}.js`),
         },
