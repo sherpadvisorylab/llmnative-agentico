@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-26
+
 ### Added
 - Runners owned by namespaces (CR-028): `owners` on a runner. Where the host lets its admins (`tenantOwned.runners`), the
   admin of a namespace connects (code, request, install), updates and removes the runners of its namespace and puts its

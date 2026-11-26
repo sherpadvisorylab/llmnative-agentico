@@ -36,13 +36,13 @@
 | [CR-025](#cr-025--pacchetto-server-llmnativeagenticoserver) | Pacchetto server: connessioni, runner, memoria, progetti | Alta | CR-024, runner 1.2 | ✅ |
 | [CR-026](#cr-026--impostazioni-connessioni-memoria-progetti) | Impostazioni: Connessioni, Memoria, Progetti sul backend dell'host | Alta | CR-025 | ✅ |
 | [CR-027](#cr-027--memorie-di-proprietà-dei-namespace) | Memorie di proprietà dei namespace: ogni tenant amministra le sue | Alta | CR-025 | ✅ |
-| [CR-028](#cr-028--runner-di-proprietà-dei-namespace) | Runner di proprietà dei namespace, e `tenantOwned` dell'host | Alta | CR-027 | 🔄 |
+| [CR-028](#cr-028--runner-di-proprietà-dei-namespace) | Runner di proprietà dei namespace, e `tenantOwned` dell'host | Alta | CR-027 | ✅ |
 
 ---
 
 ## CR-028 — Runner di proprietà dei namespace
 
-**Stato:** 🔄 in progress
+**Stato:** ✅ done (0.26.0)
 **Issue:** [#28](https://github.com/sherpadvisorylab/llmnative-agentico/issues/28)
 **Priorità:** Alta
 **Dipende da:** CR-027
@@ -67,7 +67,7 @@ assegnare l'infrastruttura resta un'azione della piattaforma: la proprietà dei 
 - [x] Opzione `tenantOwned` e test con e senza
 - [x] Interfaccia per l'admin
 - [x] Verifica in Playbook (tenantOwned acceso, test della memoria e della rotta)
-- [ ] Release
+- [x] Release 0.26.0
 
 ---
 
