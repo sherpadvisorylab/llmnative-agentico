@@ -151,3 +151,17 @@ export {
     type HostToolTurn,
 } from './domain/harness';
 export { useAgenticoHarness } from './presentation/harnessContext';
+
+// CR-025: the browser side of the server of Agentico (`@llmnative/agentico/server`)
+export {
+    createAgenticoBackend,
+    AgenticoBackendError,
+    type AgenticoBackend,
+    type AgenticoBackendOptions,
+    type AgenticoMe,
+    type AgenticoMemory,
+    type AgenticoMemoryCheck,
+    type AgenticoMemoryHit,
+    type AgenticoNamespaceRow,
+    type AgenticoRole,
+} from './backend/agenticoBackend';

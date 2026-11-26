@@ -17,6 +17,11 @@ export type AgenticoServerOptions = {
     platformName: string;
     /** The tenants of the project the host knows, listed in Projects even before they have a runner or a memory. */
     tenants?: (identity: AgenticoIdentity) => Promise<AgenticoKnownTenant[]>;
+    /**
+     * The headers that carry the session of the host (e.g. `x-session`): never forwarded by the proxy of the AI
+     * requests. The session must not be in `authorization` there, which is the provider's.
+     */
+    sessionHeaders?: string[];
     /** The path the handler is mounted on (e.g. `/api/agentico`): stripped from every request. */
     basePath?: string;
     adapter?: AdapterFactory;
@@ -43,7 +48,7 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 const PERSON_ROUTE = /^\/v1\/(info|models|complete|accounts(\/.*)?|chats(\/.*)?)$/;
 const CHAT_ROUTE = /^\/v1\/chats\/([a-f0-9]{8})(\/.*)?$/;
 /** Where the proxy of the browser may not go, whatever the placeholder says. */
-const PROXY_HEADERS_DROPPED = new Set(['host', 'cookie', 'content-length', 'connection']);
+const PROXY_HEADERS_DROPPED = new Set(['host', 'cookie', 'content-length', 'connection', 'origin', 'referer', 'x-llmnative-proxy']);
 
 export function createAgenticoServer(options: AgenticoServerOptions) {
     const { records, secrets } = options;
@@ -189,20 +194,20 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
             log('ai complete', { namespace: namespaceOf(project, identity.tenant), provider, user: identity.user.id });
             return json(200, { result: answer });
         }
-        if (area === 'ai' && id === 'proxy' && method === 'POST') {
-            const given = await body(request);
-            const headers = Object.fromEntries(Object.entries((given.headers && typeof given.headers === 'object' ? given.headers : {}) as Record<string, unknown>)
-                .filter(([name]) => !PROXY_HEADERS_DROPPED.has(name.toLowerCase())).map(([name, value]) => [name, String(value)]));
-            const resolved = await connections.resolve(namespaceOf(project, identity.tenant), { url: String(given.url ?? ''), headers });
+        // The proxy of the framework (CR-102, `providers.proxy.route`): `?url=<target>`, the method, headers and body of
+        // the request of the adapter; its placeholders become the keys of the namespace, only towards their provider.
+        if (area === 'ai' && id === 'proxy') {
+            const target = url.searchParams.get('url') ?? '';
+            const dropped = new Set([...PROXY_HEADERS_DROPPED, ...(options.sessionHeaders ?? []).map((name) => name.toLowerCase())]);
+            const headers: Record<string, string> = {};
+            request.headers.forEach((value, name) => {
+                if (!dropped.has(name.toLowerCase())) headers[name] = value;
+            });
+            const resolved = await connections.resolve(namespaceOf(project, identity.tenant), { url: target, headers });
             if (!resolved.ok) return json(resolved.status, { error: resolved.error });
-            const target = new URL(resolved.url);
-            if (target.protocol !== 'https:') return json(403, { error: 'forbidden-target' });
-            const answer = await fetchImpl(resolved.url, {
-                method: String(given.method ?? 'POST'),
-                headers: resolved.headers,
-                ...(given.body !== undefined && given.body !== null ? { body: typeof given.body === 'string' ? given.body : JSON.stringify(given.body) } : {}),
-                signal: request.signal,
-            }).catch(() => null);
+            if (new URL(resolved.url).protocol !== 'https:') return json(403, { error: 'forbidden-target' });
+            const raw = method === 'GET' || method === 'HEAD' ? undefined : await request.arrayBuffer();
+            const answer = await fetchImpl(resolved.url, { method, headers: resolved.headers, ...(raw && raw.byteLength ? { body: raw } : {}), signal: request.signal }).catch(() => null);
             if (!answer) return json(502, { error: 'unreachable' });
             return new Response(answer.body, { status: answer.status, headers: { 'content-type': answer.headers.get('content-type') ?? 'application/json', 'cache-control': 'no-store' } });
         }

