@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-11-26
+
+### Changed
+- With `settings.backend` and `settings.connections` together, the box Cloud is on the connections of the host (its
+  own store and the providers it allows): for a host that keeps its AI keys itself (the CMS), with its runners,
+  memories and projects on the server of Agentico.
+
 ## [0.24.0] - 2026-11-26
 
 ### Added
