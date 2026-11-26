@@ -20,6 +20,7 @@ import {
     interpolate,
     useI18n,
 } from '@llmnative/react';
+import type { AIConnectionsProps } from '@llmnative/react';
 import type { RunnerStatus } from '@llmnative/runner/client';
 import { AddRunner, RunnerAccounts, textsFor, type RunnerEntry } from '@llmnative/runner/ui';
 import type { AgenticoBackend, AgenticoMe, AgenticoMemory, AgenticoMemoryCheck, AgenticoNamespaceRow } from '../backend/agenticoBackend';
@@ -40,12 +41,15 @@ export function useAgenticoMe(backend: AgenticoBackend | undefined) {
     return { me, error };
 }
 
-/** Connections: Cloud, the runners of the project, Add a runner. */
-export function AgenticoConnectionsTab({ backend, me }: { backend: AgenticoBackend; me: AgenticoMe }) {
+/**
+ * Connections: Cloud, the runners of the project, Add a runner. `cloud`: the connections of the host when it keeps its
+ * AI keys itself (its own store, the providers it allows); without it, those of the server of Agentico.
+ */
+export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: AgenticoBackend; me: AgenticoMe; cloud?: Omit<AIConnectionsProps, 'className'> }) {
     const t = useAgenticoI18n();
     const { locale } = useI18n();
     const platform = me.role === 'platform';
-    const store = useMemo(() => backend.connections(), [backend]);
+    const store = useMemo(() => cloud?.store ?? backend.connections(), [backend, cloud?.store]);
     const [connected, setConnected] = useState<number | null>(null);
     const [runners, setRunners] = useState<RunnerEntry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -97,7 +101,7 @@ export function AgenticoConnectionsTab({ backend, me }: { backend: AgenticoBacke
             </div>
             {open === 'cloud' && (
                 <Modal title={t.cloudTitle} size="xl" onClose={close} footer={<ActionButton variant="link" label={t.settingsClose} onClick={close} />}>
-                    <AIConnections store={store} readOnly={me.role === 'member'} />
+                    <AIConnections {...(cloud ?? {})} store={store} readOnly={cloud?.readOnly ?? me.role === 'member'} />
                 </Modal>
             )}
             {open === 'mine' && (

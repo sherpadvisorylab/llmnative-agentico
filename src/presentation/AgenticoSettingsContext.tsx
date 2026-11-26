@@ -27,7 +27,8 @@ export interface AgenticoSettingsConfig {
     tabs?: AgenticoSettingsTab[];
     /**
      * CR-026: the server of Agentico of the host (`createAgenticoBackend`): the tabs Connections (Cloud, the runners,
-     * Add a runner), Memory and Projects. With it, Cloud takes the place of the Connectors section.
+     * Add a runner), Memory and Projects. With it, Cloud takes the place of the Connectors section: on `connections`
+     * when the host gives it (it keeps its AI keys itself), else on the server of Agentico.
      */
     backend?: AgenticoBackend;
 }

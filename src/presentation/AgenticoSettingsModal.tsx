@@ -128,7 +128,7 @@ export function AgenticoSettingsModal() {
                 // CR-026: on the server of Agentico, Connections (Cloud, runners), Memory and Projects.
                 backend && me && (
                     <TabItem key="connections" label={t.connectionsTab}>
-                        <AgenticoConnectionsTab backend={backend} me={me} />
+                        <AgenticoConnectionsTab backend={backend} me={me} {...(connections ? { cloud: connections } : {})} />
                     </TabItem>
                 ),
                 backend && me?.role === 'platform' && (

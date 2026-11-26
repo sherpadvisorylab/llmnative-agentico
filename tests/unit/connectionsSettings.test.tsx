@@ -66,4 +66,15 @@ describe('the settings on the server of Agentico', () => {
         expect(within(dialog).queryByText('Memory')).not.toBeInTheDocument();
         expect(within(dialog).queryByText('Projects')).not.toBeInTheDocument();
     });
+    it('Cloud is on the connections of the host when it keeps its AI keys itself', async () => {
+        const backend = backendFor({ user: { id: 'adele' }, role: 'admin', project: 'cms', tenant: 'acme' });
+        const store = { load: async () => ({ providers: [{ id: 'anthropic' }, { id: 'openai' }] }), connect: async () => ({ ok: true as const }), disconnect: async () => undefined };
+        render(<Open />, { wrapper: wrap({ backend, connections: { store }, hidden: ['defaultModel', 'reasoning', 'providers', 'chatTitles', 'threadEvents'] }) });
+        fireEvent.click(screen.getByText('open'));
+        const dialog = await screen.findByRole('dialog');
+        await waitFor(() => expect(within(dialog).getByText('Connections')).toBeInTheDocument());
+        fireEvent.click(within(dialog).getByText('Connections'));
+        expect(await within(dialog).findByText('2 connected')).toBeInTheDocument();
+        expect(within(dialog).queryByText('Connectors')).not.toBeInTheDocument();
+    });
 });
