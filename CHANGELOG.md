@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-26
+
 ### Added
 - Memories owned by namespaces (CR-027): `owners` on a memory. The admin of a namespace sees, adds, edits and assigns to
   its own namespace only the memories it owns; the platform all of them; a memory with several owners is shared (one

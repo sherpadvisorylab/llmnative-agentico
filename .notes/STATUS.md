@@ -7,16 +7,17 @@
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.24.1 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.2.0. | — |
+| Package | `@llmnative/agentico` 0.25.0 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.2.0. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 29 files / 138 tests (Vitest, happy-dom; the server in node). | — |
+| Tests | 29 files / 140 tests (Vitest, happy-dom; the server in node). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-027 | Done | Memories owned by namespaces (`owners`): admins administer their own, the platform all, shared memories left not removed; Memory tab for admins; `share`/`unshare`/`put`/`keyOf`; `me.hasRunner`. Verified in Playbook (memories of the organizations taken over, tests, build). Released in 0.25.0. Issue #27. |
 | CR-025 | Done | `@llmnative/agentico/server`: identity, records, secrets; connections (checked keys, proxy, complete), runners (pairing with the project, install, assign, forward), memories, projects; `createAgenticoBackend`. Tests: server end to end and the client against it. Released in 0.24.0. Issue #25. |
 | CR-026 | Done | Settings with `backend`: Connections boxes (Cloud, runners, Add a runner), Memory, Projects; switches; the runner as harness. Verified in the CMS against the local build (typecheck, 569 tests, build). Released in 0.24.0. Issue #26. |
 | CR-024 | Done | Harness of the host (`<AgenticoProvider harness>`, `AgenticoHarness`): models with their own loop of tools next to the AI catalog for every agent without an executor, orchestrator included (`createHarnessExecutor`: brief, follow-ups, tools as JSON Schema, parsing, chat so far on rewind or mid-chat); `runHostTool`; host tabs in the settings (`settings.tabs`). Tests: 6 new (130 green). Verified in the CMS against the local build (typecheck, 569 tests, build). Released in 0.23.0. Issue #24. |
