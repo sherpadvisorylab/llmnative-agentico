@@ -19,6 +19,8 @@ import {
     type AgenticoRoutingStore,
 } from '../domain/routing';
 import { AgenticoSettingsProvider, type AgenticoSettingsConfig } from './AgenticoSettingsContext';
+import { AgenticoHarnessContext } from './harnessContext';
+import type { AgenticoHarness } from '../domain/harness';
 
 /** Where results are saved and chats are kept: the host's current tenant, company, workspace…
  * `null` while the host has none selected — destinations then refuse to save. */
@@ -366,8 +368,11 @@ interface AgenticoContextValue {
 const AgenticoContext = createContext<AgenticoContextValue | null>(null);
 const NO_ROUTING: AgenticoRouting = {};
 
-export function AgenticoProvider({ children, scope = null, person = null, threadEvents = null, settings, route: routeProp = null }: {
+export function AgenticoProvider({ children, scope = null, person = null, threadEvents = null, settings, route: routeProp = null, harness = null }: {
     children: React.ReactNode;
+    /** CR-024: models of the host that run their own loop of tools (e.g. Claude Code with the person's subscription),
+     * offered next to the AI catalog for every agent without an executor of its own. Keep it stable (memoized). */
+    harness?: AgenticoHarness | null;
     /** CR-023: the current path of the host app and its routing (see routing.ts): which subagents and
      * data-collection tools are offered there, and the context the model gets. Absent = everything
      * offered, no context. Keep `defaults` stable (memoized). */
@@ -677,7 +682,9 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
     return (
         <AgenticoContext.Provider value={value}>
             <AgenticoSettingsProvider config={settings}>
-                {children}
+                <AgenticoHarnessContext.Provider value={harness}>
+                    {children}
+                </AgenticoHarnessContext.Provider>
             </AgenticoSettingsProvider>
         </AgenticoContext.Provider>
     );

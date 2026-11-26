@@ -19,7 +19,7 @@ export function useHasAgenticoSettings(): boolean {
 
 export function AgenticoSettingsModal() {
     const t = useAgenticoI18n();
-    const { settings, shown, connections, save, isOpen, close } = useAgenticoSettings();
+    const { settings, shown, connections, tabs, save, isOpen, close } = useAgenticoSettings();
     const form = useFormController();
     const registry = useAIProviderRegistry()?.registry ?? {};
     const { modelsByProvider } = useAIModelCatalog({ unfiltered: true });
@@ -128,6 +128,12 @@ export function AgenticoSettingsModal() {
                         <AIConnections {...connections} />
                     </TabItem>
                 ),
+                // CR-024: the host's tabs, drawn by the host.
+                ...(tabs ?? []).map((extra) => (
+                    <TabItem key={`host-${extra.id}`} label={extra.label}>
+                        {extra.render()}
+                    </TabItem>
+                )),
                 ].filter(Boolean)}
             </Tab>
         </Modal>

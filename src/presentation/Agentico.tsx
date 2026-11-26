@@ -23,6 +23,7 @@ import { findSubagentManifest } from '../domain/subagentRegistry';
 import { chatStartedAt, chatTitle, entityChatTaskId, listEntityChats, onEntityChatsChange, removeEntityChat, renameEntityChat } from '../domain/entityChatStore';
 import { useChatTitles } from './chatTitles';
 import { useAgenticoSettings } from './AgenticoSettingsContext';
+import { useAgenticoHarness } from './harnessContext';
 import { AgenticoSettingsModal, useHasAgenticoSettings } from './AgenticoSettingsModal';
 
 export { AGENTICO_WIDTH };
@@ -162,6 +163,8 @@ function AgenticoStarterComposer() {
     const t = useAgenticoI18n();
     const [text, setText] = useState('');
     const { hasProviders, modelsByProvider, selectedModel, setSelectedModel } = useAIModelCatalog();
+    // CR-024: the models of the harness of the host, before the catalog's.
+    const harness = useAgenticoHarness();
 
     const handleSubmit = (payload: { text: string; files: File[]; model: string }) => {
         if (!payload.text.trim()) return;
@@ -185,7 +188,7 @@ function AgenticoStarterComposer() {
             disabled={!text.trim() || modelRequired}
             onSubmit={handleSubmit}
             attachments
-            models={flattenModelOptions(modelsByProvider)}
+            models={[...(harness?.models() ?? []), ...flattenModelOptions(modelsByProvider)]}
             selectedModel={selectedModel}
             onModelChange={setSelectedModel}
             modelPlaceholder={t.selectModelPlaceholder}

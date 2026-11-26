@@ -7,16 +7,17 @@
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.22.1 (published from the tag by GitHub Actions). Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
+| Package | `@llmnative/agentico` 0.23.0 (published from the tag by GitHub Actions). Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependency `zod-to-json-schema`. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
-| Tests | 23 files / 104 tests (Vitest, happy-dom). | — |
+| Tests | 26 files / 130 tests (Vitest, happy-dom). | — |
 
 ## Completed change requests
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-024 | Done | Harness of the host (`<AgenticoProvider harness>`, `AgenticoHarness`): models with their own loop of tools next to the AI catalog for every agent without an executor, orchestrator included (`createHarnessExecutor`: brief, follow-ups, tools as JSON Schema, parsing, chat so far on rewind or mid-chat); `runHostTool`; host tabs in the settings (`settings.tabs`). Tests: 6 new (130 green). Verified in the CMS against the local build (typecheck, 569 tests, build). Released in 0.23.0. Issue #24. |
 | CR-022 | Done | Settings of Agentico in one schema (`defaultModel`, `reasoning`, `providers`, `chatTitles`, `threadEvents`), shown/fixed/hidden by the host, kept by its store; gear in the panel header opens `AgenticoSettingsModal` with the connectors of the AI providers (`AIConnections`, @llmnative/react 3.2). Tests: 5 new (104 green). Released in 0.21.0. Issue #22. |
 | CR-021 | Done | Act on an event from the chat: `ThreadEvent.actions`/`open`, `ThreadEventsSource.onAction` with `chat.compose`/`chat.send`, `useAgentico().compose`. 98 tests. Version 0.20.0, verified in Playbook against the local build. Issue #21. |
 | CR-020 | Done | Images in sight (`attachmentPreviews`, `imagePreviews`: previews kept with the chat, opened larger) and events going on (`ThreadEvent.running`, a spinner). 96 tests. Version 0.19.0, verified in Playbook against the local build. Issue #20. |

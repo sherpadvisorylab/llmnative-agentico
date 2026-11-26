@@ -22,6 +22,15 @@ export interface AgenticoSettingsConfig {
     hidden?: AgenticoSettingKey[];
     /** The section Connectors of the modal: the AI providers (and the host's connectors, e.g. a subscription on a runner). */
     connections?: Omit<AIConnectionsProps, 'className'>;
+    /** CR-024: tabs of the host after Agentico's (e.g. "My subscriptions" on a runner), drawn by the host. */
+    tabs?: AgenticoSettingsTab[];
+}
+
+/** A tab of the host in the settings modal. */
+export interface AgenticoSettingsTab {
+    id: string;
+    label: string;
+    render: () => React.ReactNode;
 }
 
 interface AgenticoSettingsContextValue {
@@ -29,6 +38,7 @@ interface AgenticoSettingsContextValue {
     /** The settings the modal shows. */
     shown: AgenticoSettingKey[];
     connections?: AgenticoSettingsConfig['connections'];
+    tabs?: AgenticoSettingsTab[];
     save: (values: Partial<AgenticoSettings>) => Promise<void>;
     isOpen: boolean;
     open: () => void;
@@ -61,11 +71,12 @@ export function AgenticoSettingsProvider({ config, children }: { config?: Agenti
         settings,
         shown,
         connections: config?.connections,
+        tabs: config?.tabs,
         save,
         isOpen,
         open: () => setIsOpen(true),
         close: () => setIsOpen(false),
-    }), [settings, shown, config?.connections, save, isOpen]);
+    }), [settings, shown, config?.connections, config?.tabs, save, isOpen]);
     return <AgenticoSettingsContext.Provider value={value}>{children}</AgenticoSettingsContext.Provider>;
 }
 

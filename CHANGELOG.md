@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-26
+
+### Added
+- The harness of the host (CR-024): `<AgenticoProvider harness>` with `AgenticoHarness { models(), turn(), close?() }` —
+  models that run their own loop of tools (e.g. Claude Code with the person's subscription on a runner of the host).
+  They are offered next to the AI catalog for every agent without an executor of its own, the orchestrator included,
+  and in the composer that starts a chat. Agentico composes the executor (`createHarnessExecutor`) from the agent:
+  `buildPrompt` then `buildFollowUpPrompt` (micro-prompts applied), `getTools` as JSON Schema, `parseResponse`. A
+  harness started in the middle of a chat, or taken back to a message (CR-016), gets the chat so far
+  (`harnessTranscript`); files go to it (CR-017).
+- `runHostTool(tools, name, input, turn, labels)`: a tool of the app called by a harness or any remote model,
+  validated, approved by the person when it needs it (CR-008), shown as a step, its card added (CR-014). It never
+  throws: errors are answers with `isError`.
+- Tabs of the host in the settings modal: `settings.tabs` (`AgenticoSettingsTab { id, label, render }`), after
+  Agentico's own (e.g. "My subscriptions").
+
 ## [0.22.1] - 2026-11-25
 
 ### Changed

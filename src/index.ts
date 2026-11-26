@@ -80,7 +80,7 @@ export { Agentico, AGENTICO_WIDTH, type AgenticoProps } from './presentation/Age
 export { AGENTICO_MIN_WIDTH, AGENTICO_MAX_WIDTH, AGENTICO_WIDTH_STORAGE_KEY, type AgenticoPanelSize } from './presentation/panelWidth';
 export { AgenticoToggle } from './presentation/AgenticoToggle';
 // ── Settings (CR-022): one schema, shown or fixed by the host, with the connectors of the AI providers ─────────────
-export { useAgenticoSettings, type AgenticoSettingsConfig } from './presentation/AgenticoSettingsContext';
+export { useAgenticoSettings, type AgenticoSettingsConfig, type AgenticoSettingsTab } from './presentation/AgenticoSettingsContext';
 export { AgenticoSettingsModal } from './presentation/AgenticoSettingsModal';
 export {
     AGENTICO_SETTING_KEYS,
@@ -137,3 +137,17 @@ export {
     type SubagentSelection,
 } from './presentation/reports/subagentReportRegistry';
 export { registerSubagentControls, getSubagentControls, type SubagentControls, type SubagentControlsProps, type UseSubagentControls } from './presentation/subagentControls';
+
+// CR-024: the harness of the host
+export {
+    createHarnessExecutor,
+    harnessTranscript,
+    runHostTool,
+    type AgenticoHarness,
+    type AgenticoHarnessTool,
+    type AgenticoHarnessTurn,
+    type HarnessExecutorOptions,
+    type HostToolLabels,
+    type HostToolTurn,
+} from './domain/harness';
+export { useAgenticoHarness } from './presentation/harnessContext';

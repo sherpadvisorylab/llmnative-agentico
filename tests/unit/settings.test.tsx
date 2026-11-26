@@ -123,4 +123,17 @@ describe('the settings modal', () => {
         expect(store.values).toMatchObject({ chatTitles: false });
         expect(store.values).not.toHaveProperty('reasoning');
     });
+
+    it('shows the tabs of the host after its own (CR-024)', async () => {
+        function Open() {
+            const { open } = useAgenticoSettings();
+            return <><button type="button" onClick={open}>open</button><AgenticoSettingsModal /></>;
+        }
+        render(<Open />, { wrapper: wrap({ tabs: [{ id: 'subscriptions', label: 'My subscriptions', render: () => <p>Claude Code: connected</p> }] }) });
+        fireEvent.click(screen.getByText('open'));
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.click(within(dialog).getByText('My subscriptions'));
+        expect(await within(dialog).findByText('Claude Code: connected')).toBeInTheDocument();
+    });
 });
+

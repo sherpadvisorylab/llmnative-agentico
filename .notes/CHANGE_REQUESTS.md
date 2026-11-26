@@ -32,8 +32,59 @@
 | [CR-021](#cr-021--azioni-sulle-card-degli-eventi-e-testo-precompilato) | Azioni sulle card degli eventi e testo precompilato nella chat | Alta | CR-019 | ✅ |
 | [CR-022](#cr-022--impostazioni-di-agentico-in-una-sua-modale-con-i-connettori-ai) | Impostazioni di Agentico in una sua modale, con i connettori AI | Alta | CR-132, CR-134 (framework) | ✅ |
 | [CR-023](#cr-023--routing-sottoagenti-strumenti-e-contesto-per-pagina) | Routing: sottoagenti, strumenti e contesto per pagina | Alta | — | ✅ |
+| [CR-024](#cr-024--harness-dellhost-modelli-che-girano-col-loro-ciclo-di-strumenti-per-ogni-agente) | Harness dell'host: modelli col loro ciclo di strumenti, per ogni agente | Alta | CR-009, CR-016, CR-022 | ✅ |
 
 ---
+
+## CR-024 — Harness dell'host: modelli che girano col loro ciclo di strumenti, per ogni agente
+
+**Stato:** ✅ done (0.23.0)
+**Issue:** [#24](https://github.com/sherpadvisorylab/llmnative-agentico/issues/24)
+**Priorità:** Alta
+**Dipende da:** CR-009, CR-016, CR-022
+
+### Motivazione
+
+Emersa il 26/11/2026 dal runner (`@llmnative/runner`, design in Playbook `docs/runner-extraction.md` §8). Le persone
+collegano il proprio abbonamento (Claude Code) su un runner dell'host. Vogliono usarlo in Agentico come un modello qualunque,
+accanto ai modelli API del tenant, con **tutti** gli agenti: l'orchestratore e i sottoagenti, con i loro strumenti.
+
+Un esecutore (CR-003/CR-009) è per agente e lo scrive l'host. L'orchestratore, però, nasce dentro Agentico, e ripetere per
+ogni sottoagente lo stesso ponte (prompt, strumenti via MCP, approvazioni, card) sarebbe codice duplicato in ogni host.
+Agentico non deve conoscere il runner: niente dipendenze oltre al framework. Serve quindi una porta.
+
+### Scope
+
+- **Porta `AgenticoHarness`** (`<AgenticoProvider harness>`), che l'host implementa:
+  - `models()`: i modelli che l'harness esegue adesso per la persona, per esempio «Claude Code · il tuo abbonamento».
+    Una lista vuota vuol dire che non offre niente;
+  - `turn()`: un turno, con prompt, strumenti, `callTool`, modello, allegati e stream di testo, ragionamento e passi;
+  - `close?(chatId)`: la chat finita.
+- **Esecutore costruito da Agentico**: per ogni agente senza `executor` proprio, Agentico ne compone uno accanto al
+  catalogo (CR-009) a partire dalla porta.
+  - **Prompt:** usa quelli dell'agente, `buildPrompt` al primo turno e `buildFollowUpPrompt` dopo.
+  - **Strumenti:** sono quelli di `getTools`, serializzati in JSON Schema.
+  - **Risposta:** la legge `parseResponse`.
+  - **Riprova e modifica (CR-016):** l'esecutore riparte dalla chat così com'è in quel punto.
+  - **Allegati:** passano all'harness.
+  - **Modelli:** quelli dell'harness compaiono nel composer nel loro gruppo, accanto ai modelli API.
+- **`runHostTool`** (esportato): esegue uno strumento chiamato da un harness come farebbe sul catalogo.
+  - Chiede l'approvazione della persona quando serve (CR-008).
+  - Mostra il passo, valida l'input e aggiunge la card (CR-014).
+  - È ciò che fa oggi a mano `runOnServer` in Playbook, che potrà usarlo.
+- **Schede dell'host nelle impostazioni** (`<AgenticoProvider settingsTabs>`): schede in più nella modale di CR-022,
+  per esempio «I miei abbonamenti» del CMS, disegnate dall'host.
+- Gli errori dell'harness (credito finito, nessun abbonamento) arrivano come errore del turno con il testo dell'host. La
+  persona sceglie un modello API dal menu: il passaggio automatico è un'evoluzione successiva.
+
+### Checklist
+
+- [x] Tipi `AgenticoHarness`, `AgenticoHarnessTurn`, `AgenticoSettingsTab`; prop `harness` e `settingsTabs` del provider
+- [x] `createHarnessExecutor(definition, harness)` e uso in `useAgent` per gli agenti senza esecutore
+- [x] `runHostTool` (approvazione, passo, card, validazione) esportato
+- [x] Schede dell'host nella modale delle impostazioni
+- [x] Test: esecutore dall'harness (primo turno, seguito, strumenti con approvazione, parse), schede
+- [x] README, llms.txt, CHANGELOG, STATUS; release; verifica nel CMS
 
 ## CR-023 — Routing: sottoagenti, strumenti e contesto per pagina
 

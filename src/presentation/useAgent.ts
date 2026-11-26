@@ -17,6 +17,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseAIModelRef, PromptUtils, useAIProviderRegistry } from '@llmnative/react';
 import { useAgenticoSettings } from './AgenticoSettingsContext';
+import { useAgenticoHarness } from './harnessContext';
+import { createHarnessExecutor } from '../domain/harness';
 import type { AIAttachment, AIConversationTurn, AIModelDescriptor, AIProviderAdapter, AIToolResult } from '@llmnative/react';
 import type { AgentDefinition, AgentExecutorModel, AgentExecutorPartOptions, AgentExecutorStep, AgentModelGroupBadge, AgentTool, LatestAttachmentsRef } from '../domain/agentDefinition';
 import {
@@ -343,7 +345,24 @@ export function useAgent<TParams, TContext, TResult>(
     const catalogModel = allowedIn(catalogProviders, selectedModel) ? selectedModel : (Object.values(offeredCatalog).flat()[0]?.id ?? '');
     const ref = enabled && catalogModel ? parseAIModelRef(catalogModel) : null;
     const provider = ref ? registry[ref.provider] : null;
-    const executor = definition.executor;
+    // CR-024: an agent without an executor of its own runs on the harness of the host when the person picks one of
+    // its models, next to the AI catalog: its brief, its tools (approvals, steps, cards) and its parsing.
+    const harness = useAgenticoHarness();
+    const harnessExecutor = useMemo(() => (!definition.executor && harness ? createHarnessExecutor(definition, harness, {
+        labels: {
+            approveQuestion: labelsRef.current.approveQuestion,
+            approve: labelsRef.current.approve,
+            reject: labelsRef.current.reject,
+            rejected: getAgenticoPrompts().toolRejected,
+        },
+        // The chat before the message being sent, when the harness starts in its middle.
+        earlier: () => {
+            const log = activityRef.current;
+            const at = log.findIndex((entry) => entry.id === sendingRef.current);
+            return (at >= 0 ? log.slice(0, at) : log).filter((entry) => entry.status !== 'running');
+        },
+    }) : undefined), [definition, harness]); // eslint-disable-line react-hooks/exhaustive-deps
+    const executor = definition.executor ?? harnessExecutor;
     // An executor alongside the AI catalog (CR-009) answers only the turns of its own models.
     const alongside = Boolean(executor?.alongside);
     const remote = Boolean(executor) && !alongside;
