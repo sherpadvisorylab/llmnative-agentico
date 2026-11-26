@@ -75,6 +75,9 @@ describe('the settings on the server of Agentico', () => {
         await waitFor(() => expect(within(dialog).getByText('Connections')).toBeInTheDocument());
         fireEvent.click(within(dialog).getByText('Connections'));
         expect(await within(dialog).findByText('2 connected')).toBeInTheDocument();
+        // CR-027: an admin administers the memories of their namespace.
+        fireEvent.click(within(dialog).getByText('Memory'));
+        expect(await within(dialog).findByText('Add a memory')).toBeInTheDocument();
         expect(within(dialog).queryByText('Connectors')).not.toBeInTheDocument();
     });
 });

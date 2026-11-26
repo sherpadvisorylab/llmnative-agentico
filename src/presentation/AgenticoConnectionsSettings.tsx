@@ -308,7 +308,7 @@ export function AgenticoProjectsTab({ backend, me }: { backend: AgenticoBackend;
             const [projects, runnerList, memoryList] = await Promise.all([
                 backend.projects.list(),
                 platform ? backend.fleet.list() : Promise.resolve([] as RunnerEntry[]),
-                platform ? backend.memories.list() : Promise.resolve([] as AgenticoMemory[]),
+                backend.memories.list(),
             ]);
             setRows(projects.namespaces);
             setRunners(runnerList);
@@ -338,16 +338,18 @@ export function AgenticoProjectsTab({ backend, me }: { backend: AgenticoBackend;
                         <span className="font-medium">{row.name ?? row.tenant ?? row.namespace}</span>
                         <span className="font-mono text-xs text-muted-foreground">{row.namespace}</span>
                     </div>
-                    {platform ? (
+                    {platform || row.namespace === me.namespace ? (
                         <Form appearance="empty" showNotice={false} onSubmit={() => false} className="contents">
-                            <Select
-                                name={`runner-${row.namespace}`}
-                                label={t.projectsRunner}
-                                defaultValue={row.runner?.id ?? ''}
-                                placeholderOption={{ label: t.projectsDefaultRunner, value: '' }}
-                                options={runners.map((runner) => ({ label: runner.name, value: runner.id }))}
-                                onChange={({ value }: { value?: unknown }) => { if (value) void set(row.namespace, { runnerId: String(value) }); }}
-                            />
+                            {platform ? (
+                                <Select
+                                    name={`runner-${row.namespace}`}
+                                    label={t.projectsRunner}
+                                    defaultValue={row.runner?.id ?? ''}
+                                    placeholderOption={{ label: t.projectsDefaultRunner, value: '' }}
+                                    options={runners.map((runner) => ({ label: runner.name, value: runner.id }))}
+                                    onChange={({ value }: { value?: unknown }) => { if (value) void set(row.namespace, { runnerId: String(value) }); }}
+                                />
+                            ) : <span className="text-sm">{row.runner?.name ?? t.projectsDefaultRunner}</span>}
                             <Select
                                 name={`memory-${row.namespace}`}
                                 label={t.projectsMemory}

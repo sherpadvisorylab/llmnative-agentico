@@ -3,7 +3,7 @@
 // No answer and no log carries a key, a prompt or a reply.
 import { RunnerError, type RunnerStatus } from '@llmnative/runner/client';
 import { createConnections, type AdapterFactory } from './connections';
-import { createMemories, MemoryError, type MemoryEntry } from './memories';
+import { createMemories, MemoryError, type MemoryEntry, type MemoryViewer } from './memories';
 import { inProject, namespaceOf, NamespaceError, tenantOf } from './namespace';
 import type { AgenticoIdentity, AgenticoKnownTenant, AgenticoRecords, AgenticoRole, AgenticoSecrets } from './ports';
 import { createFleet, FleetError, NAMESPACES, type NamespaceRecord, type RunnerConnection, type RunnerEntry } from './runners';
@@ -266,17 +266,18 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
             if (id && sub === 'status' && method === 'GET') return json(200, await fleet.status(id));
         }
 
-        // ── Memories of the project (platform), and the memory of the namespace (everyone) ──────────────────
+        // ── Memories: the platform administers them all, the admin of a namespace its own (CR-027) ───────────
         if (area === 'memories') {
-            need(identity, 'platform');
-            if (!id && method === 'GET') return json(200, { memories: await memories.list() });
+            need(identity, 'admin');
+            const viewer: MemoryViewer = identity.role === 'platform' ? { platform: true } : { platform: false, namespace: namespaceOf(project, identity.tenant) };
+            if (!id && method === 'GET') return json(200, { memories: await memories.list(viewer) });
             if (id === 'check' && method === 'POST') {
                 const given = await body(request);
                 return json(200, await memories.check({ apiUrl: String(given.apiUrl ?? ''), key: String(given.key ?? '') }));
             }
             if (!id && method === 'POST') {
                 const given = await body(request);
-                const memory = await memories.add({ apiUrl: String(given.apiUrl ?? ''), key: String(given.key ?? ''), ...(typeof given.name === 'string' ? { name: given.name } : {}), ...(typeof given.mcpUrl === 'string' ? { mcpUrl: given.mcpUrl } : {}) });
+                const memory = await memories.add({ apiUrl: String(given.apiUrl ?? ''), key: String(given.key ?? ''), ...(typeof given.name === 'string' ? { name: given.name } : {}), ...(typeof given.mcpUrl === 'string' ? { mcpUrl: given.mcpUrl } : {}) }, viewer.platform ? undefined : viewer.namespace);
                 log('memory connected', { project, memory: memory.id, by: identity.user.id });
                 return json(201, { memory });
             }
@@ -286,10 +287,21 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
                     ...(typeof given.name === 'string' ? { name: given.name } : {}),
                     ...(given.mcpUrl === null || typeof given.mcpUrl === 'string' ? { mcpUrl: given.mcpUrl as string | null } : {}),
                     ...(typeof given.key === 'string' ? { key: given.key } : {}),
-                }) });
+                }, viewer) });
             }
             if (id && method === 'DELETE') {
-                await memories.remove(id, (await records.list<NamespaceRecord>(NAMESPACES)).some((item) => item.memoryId === id));
+                const record = await memories.of(id, viewer);
+                const users = (await records.list<NamespaceRecord>(NAMESPACES)).filter((item) => item.memoryId === id);
+                if (!viewer.platform && (record.owners?.length ?? 0) > 1) {
+                    // One owner of a shared memory leaves it to the others; its own namespace stops using it.
+                    await memories.remove(id, false, viewer);
+                    for (const item of users.filter((user) => user.id === viewer.namespace)) {
+                        const { memoryId: _gone, ...rest } = item;
+                        await records.put(NAMESPACES, rest);
+                    }
+                } else {
+                    await memories.remove(id, users.length > 0, viewer);
+                }
                 return json(200, { ok: true });
             }
         }
@@ -312,7 +324,7 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
             need(identity, 'admin');
             const [runnerList, memoryList, saved, known] = await Promise.all([
                 RANK[identity.role] >= RANK.platform ? fleetOf(project).list() : Promise.resolve([] as RunnerEntry[]),
-                RANK[identity.role] >= RANK.platform ? memories.list() : Promise.resolve([] as MemoryEntry[]),
+                memories.list(identity.role === 'platform' ? { platform: true } : { platform: false, namespace: namespaceOf(project, identity.tenant) }),
                 namespaces(project),
                 options.tenants && identity.role === 'platform' ? options.tenants(identity) : Promise.resolve([] as AgenticoKnownTenant[]),
             ]);
@@ -345,16 +357,23 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
             return json(200, { project, namespaces: rows });
         }
         if (area === 'namespaces' && id && !sub && method === 'PUT') {
-            need(identity, 'platform');
+            need(identity, 'admin');
             if (!inProject(project, id)) throw new HttpError(404, 'not found');
             namespaceOf(project, tenantOf(project, id));
+            // The admin of a namespace chooses its memory among its own (CR-027); the runner stays the platform's.
+            const platform = identity.role === 'platform';
+            if (!platform && id !== namespaceOf(project, identity.tenant)) throw new HttpError(403, 'forbidden');
             const given = await body(request);
-            if (typeof given.runnerId === 'string' && given.runnerId) await fleetOf(project).assign(id, given.runnerId);
+            if (typeof given.runnerId === 'string' && given.runnerId) {
+                if (!platform) throw new HttpError(403, 'forbidden');
+                await fleetOf(project).assign(id, given.runnerId);
+            }
             if (given.memoryId !== undefined) {
                 const record = await namespaceRecord(id);
                 if (given.memoryId === null || given.memoryId === '') delete record.memoryId;
                 else {
-                    if (!(await memories.list()).some((memory) => memory.id === given.memoryId)) throw new HttpError(404, 'memory not found');
+                    const viewer: MemoryViewer = platform ? { platform: true } : { platform: false, namespace: id };
+                    if (!(await memories.list(viewer)).some((memory) => memory.id === given.memoryId)) throw new HttpError(404, 'memory not found');
                     record.memoryId = String(given.memoryId);
                 }
                 await records.put(NAMESPACES, record);

@@ -12,10 +12,21 @@ export interface MemoryRecord {
     apiUrl: string;
     /** The MCP server the agents and the IDE connect to. */
     mcpUrl?: string;
+    /**
+     * CR-027: the namespaces that administer it (a tenant's own memory; several: shared, e.g. the memory of a runner
+     * its organizations use). None: a memory of the project, administered by the platform.
+     */
+    owners?: string[];
     createdAt: number;
 }
 
 export type MemoryEntry = Omit<MemoryRecord, 'createdAt'>;
+
+/** Who looks at the memories: the platform (all of them), or the admin of a namespace (its own). */
+export type MemoryViewer = { platform: true } | { platform: false; namespace: string };
+
+/** Whether a viewer administers a memory. */
+export const administers = (viewer: MemoryViewer, record: Pick<MemoryRecord, 'owners'>) => viewer.platform || !!record.owners?.includes(viewer.namespace);
 export type MemoryCheck = { ok: true } | { ok: false; error: 'rejected' | 'unreachable' | 'invalid'; status?: number };
 export type MemoryHit = { id?: string; title?: string; content: string; score?: number; metadata?: Record<string, unknown> };
 
@@ -82,8 +93,19 @@ export function createMemories(deps: MemoriesDeps) {
     };
 
     const memories = {
-        async list(): Promise<MemoryEntry[]> {
-            return (await records.list<MemoryRecord>(MEMORIES)).map(({ createdAt: _at, ...entry }) => entry).sort((a, b) => a.name.localeCompare(b.name));
+        /** The memories a viewer administers (all of them without a viewer). */
+        async list(viewer?: MemoryViewer): Promise<MemoryEntry[]> {
+            return (await records.list<MemoryRecord>(MEMORIES))
+                .filter((record) => !viewer || administers(viewer, record))
+                .map(({ createdAt: _at, ...entry }) => entry)
+                .sort((a, b) => a.name.localeCompare(b.name));
+        },
+
+        /** A memory the viewer administers, or not found (another tenant's looks the same as none). */
+        async of(id: string, viewer?: MemoryViewer): Promise<MemoryRecord> {
+            const record = await recordOf(id);
+            if (viewer && !administers(viewer, record)) throw new MemoryError('not-found', 'MEMORY_NOT_FOUND');
+            return record;
         },
 
         /** Whether a memory answers with these credentials: a search that finds nothing is fine. */
@@ -104,24 +126,28 @@ export function createMemories(deps: MemoriesDeps) {
             }
         },
 
-        /** Adds a memory once it answers with its key. */
-        async add(input: { name?: string; apiUrl: string; mcpUrl?: string; key: string }): Promise<MemoryEntry> {
+        /**
+         * Adds a memory once it answers with its key; `owner`: the namespace of the admin who adds it (a memory of the
+         * project without). The same address twice only under different owners (each tenant its own key).
+         */
+        async add(input: { name?: string; apiUrl: string; mcpUrl?: string; key: string }, owner?: string): Promise<MemoryEntry> {
             const apiUrl = httpsUrl(input.apiUrl, true)!;
             const mcpUrl = httpsUrl(input.mcpUrl, false);
-            if ((await records.list<MemoryRecord>(MEMORIES)).some((record) => record.apiUrl === apiUrl)) throw new MemoryError('conflict', 'MEMORY_ALREADY_CONNECTED');
+            const sameOwners = (record: MemoryRecord) => (owner ? !!record.owners?.includes(owner) : !record.owners?.length);
+            if ((await records.list<MemoryRecord>(MEMORIES)).some((record) => record.apiUrl === apiUrl && sameOwners(record))) throw new MemoryError('conflict', 'MEMORY_ALREADY_CONNECTED');
             const checked = await memories.check({ apiUrl, key: input.key });
             if (!checked.ok) throw new MemoryError(checked.error === 'invalid' ? 'invalid' : checked.error, checked.error.toUpperCase());
             const id = newId();
             await secrets.set(keySecret(id), input.key.trim());
-            const record: MemoryRecord = { id, name: String(input.name ?? '').trim().slice(0, 100) || new URL(apiUrl).hostname, apiUrl, ...(mcpUrl ? { mcpUrl } : {}), createdAt: now() };
+            const record: MemoryRecord = { id, name: String(input.name ?? '').trim().slice(0, 100) || new URL(apiUrl).hostname, apiUrl, ...(mcpUrl ? { mcpUrl } : {}), ...(owner ? { owners: [owner] } : {}), createdAt: now() };
             await records.put(MEMORIES, record);
             const { createdAt: _at, ...entry } = record;
             return entry;
         },
 
         /** Name and MCP address; a new key only when given (it is checked first). */
-        async update(id: string, patch: { name?: string; mcpUrl?: string | null; key?: string }): Promise<MemoryEntry> {
-            const record = await recordOf(id);
+        async update(id: string, patch: { name?: string; mcpUrl?: string | null; key?: string }, viewer?: MemoryViewer): Promise<MemoryEntry> {
+            const record = await memories.of(id, viewer);
             if (patch.key?.trim()) {
                 const checked = await memories.check({ apiUrl: record.apiUrl, key: patch.key });
                 if (!checked.ok) throw new MemoryError(checked.error === 'invalid' ? 'invalid' : checked.error, checked.error.toUpperCase());
@@ -136,11 +162,44 @@ export function createMemories(deps: MemoriesDeps) {
             return entry;
         },
 
-        async remove(id: string, inUse: boolean): Promise<void> {
-            await recordOf(id);
+        /**
+         * Removes a memory no namespace uses. An admin of one of several owners only leaves it to the others; the last
+         * owner (or the platform) removes it.
+         */
+        async remove(id: string, inUse: boolean, viewer?: MemoryViewer): Promise<void> {
+            const record = await memories.of(id, viewer);
+            if (viewer && !viewer.platform && (record.owners?.length ?? 0) > 1) {
+                await records.put<MemoryRecord>(MEMORIES, { ...record, owners: record.owners!.filter((owner) => owner !== viewer.namespace) });
+                return;
+            }
             if (inUse) throw new MemoryError('conflict', 'MEMORY_IN_USE');
             await secrets.delete(keySecret(id));
             await records.delete(MEMORIES, id);
+        },
+
+        /** A namespace becomes an owner of a memory (a memory shared, e.g. the one of a runner its tenants use). */
+        async share(id: string, namespace: string): Promise<void> {
+            const record = await recordOf(id);
+            if (record.owners?.includes(namespace)) return;
+            await records.put<MemoryRecord>(MEMORIES, { ...record, owners: [...(record.owners ?? []), namespace] });
+        },
+
+        /** A namespace stops owning a memory; the memory stays for its other owners (or the platform). */
+        async unshare(id: string, namespace: string): Promise<void> {
+            const record = await recordOf(id);
+            if (!record.owners?.includes(namespace)) return;
+            await records.put<MemoryRecord>(MEMORIES, { ...record, owners: record.owners.filter((owner) => owner !== namespace) });
+        },
+
+        /** Keeps a memory as given (a host taking over its memories): its key as a secret, its record as it is. */
+        async put(record: Omit<MemoryRecord, 'createdAt'> & { createdAt?: number }, key?: string): Promise<void> {
+            if (key) await secrets.set(keySecret(record.id), key.trim());
+            await records.put<MemoryRecord>(MEMORIES, { ...record, apiUrl: httpsUrl(record.apiUrl, true)!, createdAt: record.createdAt ?? now() });
+        },
+
+        /** The key of a memory, for the host's own use on the server (a package of the IDE): never for a browser. */
+        async keyOf(id: string): Promise<string | null> {
+            return secrets.get(keySecret(id));
         },
 
         /** The passages of a namespace that answer a query, best first. */

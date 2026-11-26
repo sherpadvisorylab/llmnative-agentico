@@ -10,5 +10,5 @@ export { createConnections, defaultAdapterFactory, CONNECTIONS } from './connect
 export type { AdapterFactory, Connections, ConnectionsSnapshot, ConnectionResult } from './connections';
 export { createFleet, FleetError, normalizeRunnerUrl, NAMESPACE_KEY_PERMISSIONS, RUNNERS, NAMESPACES } from './runners';
 export type { Fleet, RunnerEntry, RunnerRecord, NamespaceRecord, RunnerConnection, RunnerTarget } from './runners';
-export { createMemories, MemoryError, MEMORIES } from './memories';
-export type { Memories, MemoryEntry, MemoryCheck, MemoryHit } from './memories';
+export { createMemories, MemoryError, MEMORIES, administers } from './memories';
+export type { Memories, MemoryEntry, MemoryCheck, MemoryHit, MemoryRecord, MemoryViewer } from './memories';

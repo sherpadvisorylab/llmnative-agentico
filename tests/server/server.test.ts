@@ -186,7 +186,8 @@ describe('the server of Agentico', () => {
         expect(added.text).not.toContain('mem-key');
         expect((await call(ana, 'GET', '/memory')).json).toEqual({ configured: false });
         expect((await call(ana, 'POST', '/memory/search', { query: 'x' })).status).toBe(409);
-        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { memoryId: added.json.memory.id })).status).toBe(403);
+        // A memory of the project is not the admin's: to it, it does not exist (CR-027).
+        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { memoryId: added.json.memory.id })).status).toBe(404);
         expect((await call(boss, 'PUT', '/namespaces/cms-acme', { memoryId: added.json.memory.id })).status).toBe(200);
         expect((await call(boss, 'PUT', '/namespaces/crm-acme', { memoryId: added.json.memory.id })).status).toBe(404);
         expect((await call(ana, 'GET', '/memory')).json).toEqual({ configured: true, apiUrl: 'https://memory.test', mcpUrl: 'https://memory.test/mcp', namespace: 'cms-acme' });
@@ -198,5 +199,37 @@ describe('the server of Agentico', () => {
         expect(fetched.at(-1)!.url).toBe('https://memory.test/ns/cms-acme/document');
         expect(JSON.parse(String(fetched.at(-1)!.init.body))).toMatchObject({ id: 'decision-x', metadata: { title: 'A decision', tags: 'cms-acme' } });
         expect((await call(boss, 'DELETE', `/memories/${added.json.memory.id}`)).status).toBe(409);
+    });
+    it('memories owned by namespaces: each admin administers its own, a shared one is left, not removed (CR-027)', async () => {
+        const { call, stores } = setup();
+        const beta: AgenticoIdentity = { user: { id: 'bob' }, role: 'admin', project: 'cms', tenant: 'beta' };
+        const own = await call(admin, 'POST', '/memories', { name: 'Acme memory', apiUrl: 'https://memory.test', key: 'mem-key' });
+        expect(own.status).toBe(201);
+        expect((await stores.records.get<{ id: string; owners?: string[] }>('agentico_memories', own.json.memory.id))?.owners).toEqual(['cms-acme']);
+        // The same address under another tenant: its own memory, its own key.
+        expect((await call(beta, 'POST', '/memories', { name: 'Beta memory', apiUrl: 'https://memory.test', key: 'mem-key' })).status).toBe(201);
+        expect((await call(beta, 'POST', '/memories', { apiUrl: 'https://memory.test', key: 'mem-key' })).status).toBe(409);
+        expect((await call(admin, 'GET', '/memories')).json.memories.map((m: { name: string }) => m.name)).toEqual(['Acme memory']);
+        expect((await call(boss, 'GET', '/memories')).json.memories.map((m: { name: string }) => m.name)).toEqual(['Acme memory', 'Beta memory']);
+        expect((await call(ana, 'GET', '/memories')).status).toBe(403);
+        // The admin puts its own namespace on its own memory, never another namespace nor another's memory.
+        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { memoryId: own.json.memory.id })).status).toBe(200);
+        expect((await call(admin, 'PUT', '/namespaces/cms-beta', { memoryId: own.json.memory.id })).status).toBe(403);
+        const betaId = (await call(beta, 'GET', '/memories')).json.memories[0].id;
+        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { memoryId: betaId })).status).toBe(404);
+        expect((await call(admin, 'PATCH', `/memories/${betaId}`, { name: 'Mine now' })).status).toBe(404);
+        expect((await call(admin, 'PUT', '/namespaces/cms-acme', { runnerId: 'r1' })).status).toBe(403);
+        expect((await call(ana, 'GET', '/memory')).json).toMatchObject({ configured: true, namespace: 'cms-acme' });
+        // A memory shared by two tenants (as the memory of a runner): one owner leaves it, the other keeps it.
+        const shared = { id: 'shared', name: 'Runner memory', apiUrl: 'https://memory.test', owners: ['cms-acme', 'cms-beta'], createdAt: 1 };
+        await stores.records.put('agentico_memories', shared);
+        await stores.secrets.set('memory/shared/key', 'mem-key');
+        await call(admin, 'PUT', '/namespaces/cms-acme', { memoryId: 'shared' });
+        expect((await call(admin, 'DELETE', '/memories/shared')).status).toBe(200);
+        expect((await stores.records.get<{ id: string; owners?: string[] }>('agentico_memories', 'shared'))?.owners).toEqual(['cms-beta']);
+        expect((await call(ana, 'GET', '/memory')).json).toEqual({ configured: false });
+        // The last owner removes it, unless a namespace uses it.
+        expect((await call(admin, 'DELETE', `/memories/${own.json.memory.id}`)).status).toBe(200);
+        expect(await stores.records.get('agentico_memories', own.json.memory.id)).toBeNull();
     });
 });
