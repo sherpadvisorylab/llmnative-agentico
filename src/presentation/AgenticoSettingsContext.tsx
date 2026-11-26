@@ -2,6 +2,7 @@
 // the connectors of the AI providers shown in the settings modal.
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { AIConnectionsProps } from '@llmnative/react';
+import type { AgenticoBackend } from '../backend/agenticoBackend';
 import {
     browserSettingsStore,
     effectiveSettings,
@@ -24,6 +25,11 @@ export interface AgenticoSettingsConfig {
     connections?: Omit<AIConnectionsProps, 'className'>;
     /** CR-024: tabs of the host after Agentico's (e.g. "My subscriptions" on a runner), drawn by the host. */
     tabs?: AgenticoSettingsTab[];
+    /**
+     * CR-026: the server of Agentico of the host (`createAgenticoBackend`): the tabs Connections (Cloud, the runners,
+     * Add a runner), Memory and Projects. With it, Cloud takes the place of the Connectors section.
+     */
+    backend?: AgenticoBackend;
 }
 
 /** A tab of the host in the settings modal. */
@@ -39,6 +45,7 @@ interface AgenticoSettingsContextValue {
     shown: AgenticoSettingKey[];
     connections?: AgenticoSettingsConfig['connections'];
     tabs?: AgenticoSettingsTab[];
+    backend?: AgenticoBackend;
     save: (values: Partial<AgenticoSettings>) => Promise<void>;
     isOpen: boolean;
     open: () => void;
@@ -72,11 +79,12 @@ export function AgenticoSettingsProvider({ config, children }: { config?: Agenti
         shown,
         connections: config?.connections,
         tabs: config?.tabs,
+        backend: config?.backend,
         save,
         isOpen,
         open: () => setIsOpen(true),
         close: () => setIsOpen(false),
-    }), [settings, shown, config?.connections, config?.tabs, save, isOpen]);
+    }), [settings, shown, config?.connections, config?.tabs, config?.backend, save, isOpen]);
     return <AgenticoSettingsContext.Provider value={value}>{children}</AgenticoSettingsContext.Provider>;
 }
 

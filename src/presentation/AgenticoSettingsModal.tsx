@@ -1,25 +1,27 @@
 // CR-022: the settings modal of Agentico: the settings the host lets the person change, and the connectors of the
 // AI providers (the page of the framework, CR-134), subscriptions on a runner included when the host has them.
 import React, { useState } from 'react';
-import { AIConnections, Checkbox, Form, LoadingButton, ActionButton, Modal, Select, Switch, Tab, TabItem, useAIProviderRegistry, useFormController, type AIReasoningLevel } from '@llmnative/react';
+import { AIConnections, Form, LoadingButton, ActionButton, Modal, Select, Switch, Tab, TabItem, useAIProviderRegistry, useFormController, type AIReasoningLevel } from '@llmnative/react';
 import { AgenticoPagesSettings, AgenticoSubagentsSettings, AgenticoToolsSettings } from './AgenticoRoutingSettings';
 import { getSubagentRegistry } from '../domain/subagentRegistry';
 import { useAgenticoI18n } from '../i18n';
 import type { AgenticoSettings } from '../domain/settings';
 import { useAgenticoSettings } from './AgenticoSettingsContext';
 import { useAIModelCatalog } from './useAIModelCatalog';
+import { AgenticoConnectionsTab, AgenticoMemoryTab, AgenticoProjectsTab, useAgenticoMe } from './AgenticoConnectionsSettings';
 
 const LEVELS: AIReasoningLevel[] = ['low', 'medium', 'high', 'max'];
 
 /** Whether the modal has anything to show: a setting the person changes, the subagents, tools and pages (CR-023), or the connectors. */
 export function useHasAgenticoSettings(): boolean {
-    const { shown, connections } = useAgenticoSettings();
-    return shown.length > 0 || Boolean(connections) || getSubagentRegistry().length > 0;
+    const { shown, connections, backend } = useAgenticoSettings();
+    return shown.length > 0 || Boolean(connections) || Boolean(backend) || getSubagentRegistry().length > 0;
 }
 
 export function AgenticoSettingsModal() {
     const t = useAgenticoI18n();
-    const { settings, shown, connections, tabs, save, isOpen, close } = useAgenticoSettings();
+    const { settings, shown, connections, tabs, backend, save, isOpen, close } = useAgenticoSettings();
+    const { me } = useAgenticoMe(isOpen ? backend : undefined);
     const form = useFormController();
     const registry = useAIProviderRegistry()?.registry ?? {};
     const { modelsByProvider } = useAIModelCatalog({ unfiltered: true });
@@ -99,7 +101,7 @@ export function AgenticoSettingsModal() {
                                 {show('providers') && providerIds.length > 0 && (
                                     <fieldset className="space-y-1">
                                         <legend className="text-sm font-medium">{t.settingsProviders}</legend>
-                                        {providerIds.map((id) => <Checkbox key={id} name={`provider_${id}`} label={labelOf(id)} />)}
+                                        {providerIds.map((id) => <Switch key={id} name={`provider_${id}`} label={labelOf(id)} />)}
                                     </fieldset>
                                 )}
                                 {show('chatTitles') && <Switch name="chatTitles" label={t.settingsChatTitles} />}
@@ -123,7 +125,23 @@ export function AgenticoSettingsModal() {
                         <AgenticoPagesSettings onStack={setStacked} />
                     </TabItem>
                 ),
-                connections && (
+                // CR-026: on the server of Agentico, Connections (Cloud, runners), Memory and Projects.
+                backend && me && (
+                    <TabItem key="connections" label={t.connectionsTab}>
+                        <AgenticoConnectionsTab backend={backend} me={me} />
+                    </TabItem>
+                ),
+                backend && me?.role === 'platform' && (
+                    <TabItem key="memory" label={t.memoryTab}>
+                        <AgenticoMemoryTab backend={backend} />
+                    </TabItem>
+                ),
+                backend && me && me.role !== 'member' && (
+                    <TabItem key="projects" label={t.projectsTab}>
+                        <AgenticoProjectsTab backend={backend} me={me} />
+                    </TabItem>
+                ),
+                connections && !backend && (
                     <TabItem key="connectors" label={t.settingsConnectors}>
                         <AIConnections {...connections} />
                     </TabItem>

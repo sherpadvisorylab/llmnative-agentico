@@ -20,6 +20,7 @@ import {
 } from '../domain/routing';
 import { AgenticoSettingsProvider, type AgenticoSettingsConfig } from './AgenticoSettingsContext';
 import { AgenticoHarnessContext } from './harnessContext';
+import { BackendHarness } from './BackendHarness';
 import type { AgenticoHarness } from '../domain/harness';
 
 /** Where results are saved and chats are kept: the host's current tenant, company, workspace…
@@ -387,6 +388,8 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
      * in order of time, each with who did it. The model never reads it. Keep it stable (memoized). */
     threadEvents?: ThreadEventsSource | null;
 }) {
+    // CR-026: with the server of Agentico and no harness of the host, the runner of the namespace is the harness.
+    const [fromBackend, setFromBackend] = useState<AgenticoHarness | null>(null);
     const [task, setTaskState] = useState<AgenticoTask | null>(null);
     // Stabile per tutta la vita del provider (vedi openTask sotto) — leggere `task` da una ref
     // invece che dalle dipendenze di useCallback evita che openTask cambi identità ogni volta che
@@ -682,7 +685,8 @@ export function AgenticoProvider({ children, scope = null, person = null, thread
     return (
         <AgenticoContext.Provider value={value}>
             <AgenticoSettingsProvider config={settings}>
-                <AgenticoHarnessContext.Provider value={harness}>
+                <AgenticoHarnessContext.Provider value={harness ?? fromBackend}>
+                {settings?.backend && !harness && <BackendHarness backend={settings.backend} onChange={setFromBackend} />}
                     {children}
                 </AgenticoHarnessContext.Provider>
             </AgenticoSettingsProvider>
