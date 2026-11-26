@@ -35,6 +35,39 @@
 | [CR-024](#cr-024--harness-dellhost-modelli-che-girano-col-loro-ciclo-di-strumenti-per-ogni-agente) | Harness dell'host: modelli col loro ciclo di strumenti, per ogni agente | Alta | CR-009, CR-016, CR-022 | ✅ |
 | [CR-025](#cr-025--pacchetto-server-llmnativeagenticoserver) | Pacchetto server: connessioni, runner, memoria, progetti | Alta | CR-024, runner 1.2 | ✅ |
 | [CR-026](#cr-026--impostazioni-connessioni-memoria-progetti) | Impostazioni: Connessioni, Memoria, Progetti sul backend dell'host | Alta | CR-025 | ✅ |
+| [CR-027](#cr-027--memorie-di-proprietà-dei-namespace) | Memorie di proprietà dei namespace: ogni tenant amministra le sue | Alta | CR-025 | 🔄 |
+
+---
+
+## CR-027 — Memorie di proprietà dei namespace
+
+**Stato:** 🔄 in progress
+**Issue:** [#27](https://github.com/sherpadvisorylab/llmnative-agentico/issues/27)
+**Priorità:** Alta
+**Dipende da:** CR-025
+
+### Motivazione
+
+F5 del piano (Playbook, `docs/piano-agentico-connessioni.md`): in Playbook ogni organizzazione gestisce la propria memoria,
+isolata dalle altre, e la memoria di un runner è condivisa dalle organizzazioni che ci girano. Il modello di CR-025
+(memorie della piattaforma assegnate ai namespace) non basta: serve che un tenant possieda le sue.
+
+### Scope
+
+- `MemoryRecord.owners`: i namespace che la amministrano; nessuno = memoria del progetto (piattaforma).
+- Admin di un namespace: vede, aggiunge, modifica e assegna al proprio namespace solo le memorie che possiede; uscire da
+  una memoria condivisa la lascia agli altri proprietari; l'ultimo la rimuove se nessun namespace la usa.
+- Piattaforma: tutte.
+- Scheda Memoria anche per gli admin; in Progetti l'admin sceglie la memoria del proprio namespace.
+- `createMemories`: `share`, `unshare`, `put`, `keyOf` per un host che prende in carico le sue memorie.
+- `GET me` con `hasRunner`.
+
+### Checklist
+
+- [x] Proprietari, permessi nel server, test (memorie proprie, condivise, uscita, rimozione)
+- [x] Interfaccia: Memoria per gli admin, Progetti con la memoria del proprio namespace
+- [x] Verifica in Playbook (memorie delle organizzazioni prese in carico, test, build)
+- [ ] Release
 
 ---
 

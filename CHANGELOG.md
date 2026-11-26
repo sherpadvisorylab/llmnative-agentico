@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Memories owned by namespaces (CR-027): `owners` on a memory. The admin of a namespace sees, adds, edits and assigns to
+  its own namespace only the memories it owns; the platform all of them; a memory with several owners is shared (one
+  owner leaving keeps it for the others). The tab Memory is for admins too; in Projects an admin chooses the memory of
+  its own namespace. `createMemories` gains `share`, `unshare`, `put` and `keyOf` for a host that takes over its
+  memories (the studio of Playbook).
+- `GET me` says `hasRunner`: the box Runner of a person only when its namespace has a runner to work on.
+
 ## [0.24.1] - 2026-11-26
 
 ### Changed
