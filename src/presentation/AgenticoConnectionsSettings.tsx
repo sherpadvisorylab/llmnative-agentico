@@ -92,7 +92,7 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
                         onClick={() => setOpen({ runner })}
                     />
                 ))}
-                {!platform && (
+                {!platform && me.hasRunner && (
                     <ListCard icon="server" title={t.runnerOfProject} description={t.runnerOfProjectDescription} onClick={() => setOpen('mine')} />
                 )}
                 {platform && (

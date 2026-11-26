@@ -9,10 +9,12 @@ import { createAgenticoServer, memoryStores, type AgenticoIdentity } from '../..
 
 // CR-026: the tabs Connections, Memory and Projects of the settings, on a real server of Agentico in memory.
 
-function backendFor(identity: AgenticoIdentity) {
+function backendFor(identity: AgenticoIdentity, options: { runner?: boolean } = {}) {
+    const stores = memoryStores();
+    if (options.runner) void stores.records.put('agentico_runners', { id: 'r1', name: 'Runner', url: 'https://runner.test', isDefault: true, draining: false, createdAt: 1, updatedAt: 1 });
     const server = createAgenticoServer({
         identity: async () => identity,
-        ...memoryStores(),
+        ...stores,
         platformName: 'Test',
         basePath: '/api/agentico',
         adapter: async (provider) => ({ id: provider, validateApiKey: async () => ({ valid: true }) }) as unknown as AIProviderAdapter,
@@ -55,7 +57,7 @@ describe('the settings on the server of Agentico', () => {
     });
 
     it('a member sees only Connections: Cloud read only, and their own subscriptions on the runner', async () => {
-        const backend = backendFor({ user: { id: 'ana' }, role: 'member', project: 'cms', tenant: 'acme' });
+        const backend = backendFor({ user: { id: 'ana' }, role: 'member', project: 'cms', tenant: 'acme' }, { runner: true });
         render(<Open />, { wrapper: wrap({ backend, hidden: ['defaultModel', 'reasoning', 'providers', 'chatTitles', 'threadEvents'] }) });
         fireEvent.click(screen.getByText('open'));
         const dialog = await screen.findByRole('dialog');

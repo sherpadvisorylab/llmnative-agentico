@@ -140,7 +140,10 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
         const project = identity.project;
 
         if (area === 'me' && method === 'GET') {
-            return json(200, { user: identity.user, role: identity.role, project, ...(identity.tenant ? { tenant: identity.tenant } : {}), namespace: namespaceOf(project, identity.tenant) });
+            const namespace = namespaceOf(project, identity.tenant);
+            // Whether the namespace has a runner (its own, or a runner of the project it would be put on).
+            const hasRunner = !!(await namespaceRecord(namespace)).runnerId || (await fleetOf(project).list()).some((runner) => !runner.draining);
+            return json(200, { user: identity.user, role: identity.role, project, ...(identity.tenant ? { tenant: identity.tenant } : {}), namespace, hasRunner });
         }
 
         // ── Cloud connections of the namespace ──────────────────────────────────────────────────────────────
