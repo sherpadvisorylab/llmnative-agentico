@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useI18n } from '@llmnative/react';
 import { agenticoDe } from './de';
 import { agenticoEn } from './en';
@@ -18,5 +19,6 @@ export const agenticoTranslations = {
 export function useAgenticoI18n(): AgenticoDict {
     const { dict } = useI18n();
     const fromHost = (dict as { agentico?: Partial<AgenticoDict> }).agentico;
-    return fromHost ? { ...agenticoEn, ...fromHost } : agenticoEn;
+    // The same object while the strings of the host are the same: hooks depend on it.
+    return useMemo(() => (fromHost ? { ...agenticoEn, ...fromHost } : agenticoEn), [fromHost]);
 }

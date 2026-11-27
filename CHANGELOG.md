@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-11-27
+
+### Fixed
+- The harness of the runner of the namespace read `/v1/models` without end when the host gave its own strings of
+  Agentico: `useAgenticoI18n` built a new object at every render, the harness was made again and read the models again.
+  The strings are now the same object while the host's are, and the harness follows the backend only.
+
 ## [0.27.0] - 2026-11-27
 
 ### Added
