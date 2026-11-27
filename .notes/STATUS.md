@@ -7,7 +7,7 @@
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.27.1 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.2.0. | — |
+| Package | `@llmnative/agentico` 0.28.0 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.4.0. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
@@ -17,6 +17,7 @@
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-030 | Done | The subscriptions on the runner: `RunnerAccounts` 1.4.0 in the runner of the namespace with, under each subscription, its default model and reasoning (`runner-defaults`, `backend.runnerDefaults`, `AgenticoHarness.defaultModel`); the modals of the settings on the right, stacked; PATCH forwarded. Verified in Playbook against the local builds. Released in 0.28.0. Issue #30. |
 | CR-029 | Done | Models of the host in the settings (`settings.models`): the default model among the models of a host that keeps the AI providers on its server, kept by its store. Verified in the CRM against the local build (typecheck, 899 tests, build). Released in 0.27.0. Issue #29. |
 | CR-028 | Done | Runners owned by namespaces (`owners`), a namespace only on runners of the project or its own; `tenantOwned` of the host (Playbook on, CMS off); `me.administers`; settings for admins. Verified in Playbook. Released in 0.26.0. Issue #28. |
 | CR-027 | Done | Memories owned by namespaces (`owners`): admins administer their own, the platform all, shared memories left not removed; Memory tab for admins; `share`/`unshare`/`put`/`keyOf`; `me.hasRunner`. Verified in Playbook (memories of the organizations taken over, tests, build). Released in 0.25.0. Issue #27. |

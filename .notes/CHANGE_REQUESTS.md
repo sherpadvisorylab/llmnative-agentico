@@ -42,7 +42,7 @@
 
 ## CR-030 — Abbonamenti nel runner: predefiniti per abbonamento, modali a destra
 
-**Stato:** 🔄 in progress
+**Stato:** ✅ done (0.28.0)
 **Issue:** [#30](https://github.com/sherpadvisorylab/llmnative-agentico/issues/30)
 **Priorità:** Alta
 **Dipende da:** CR-026, CR-028; @llmnative/runner 1.4.0
@@ -65,8 +65,8 @@ account in ordine, stato, nome, modello e ragionamento predefiniti. Un posto sol
 
 - [x] Server, backend, harness, UI, test
 - [x] Docs, CHANGELOG
-- [ ] Verifica in Playbook
-- [ ] Release 0.28.0
+- [x] Verifica in Playbook (build locali di runner 1.4.0 e Agentico: typecheck, 732 test)
+- [x] Release 0.28.0
 
 ---
 
