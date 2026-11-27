@@ -169,6 +169,10 @@ describe('the server of Agentico', () => {
         await call(admin, 'GET', '/runner-namespace/v1/accounts');
         expect(new Headers(fetched.at(-1)!.init.headers).get('x-runner-user')).toBeNull();
         expect((await call(admin, 'POST', '/runner-namespace/v1/chats', {})).status).toBe(404);
+        // The name of an account of the namespace (runner 1.4.0).
+        await call(admin, 'PATCH', '/runner-namespace/v1/accounts/claude-code/a1', { label: 'ana@example.com' });
+        expect(fetched.at(-1)!.url).toBe('https://runner.test/v1/accounts/claude-code/a1');
+        expect(fetched.at(-1)!.init.method).toBe('PATCH');
 
         // Projects: each namespace of the project, the tenants the host knows included.
         const projects = await call(boss, 'GET', '/projects');
@@ -264,5 +268,18 @@ describe('the server of Agentico', () => {
         expect((await call(beta, 'PUT', '/namespaces/cms-beta', { runnerId: id })).status).toBe(200);
         expect((await call(beta, 'DELETE', `/runners/${id}`)).status).toBe(409);
         expect((await call(admin, 'DELETE', `/runners/${id}`)).status).toBe(409);
+    });
+
+    it('the defaults of the subscriptions of a namespace: its people read them, its admin sets them (CR-030)', async () => {
+        const { call } = setup();
+        expect((await call(ana, 'GET', '/runner-defaults')).json).toEqual({ defaults: {} });
+        expect((await call(ana, 'PUT', '/runner-defaults', { provider: 'claude-code', model: 'opus' })).status).toBe(403);
+        expect((await call(admin, 'PUT', '/runner-defaults', { provider: 'claude-code', model: 'opus', reasoning: 'high' })).json).toEqual({ defaults: { 'claude-code': { model: 'opus', reasoning: 'high' } } });
+        expect((await call(admin, 'PUT', '/runner-defaults', { provider: 'opencode-go', reasoning: 'nonsense' })).json.defaults).not.toHaveProperty('opencode-go');
+        expect((await call(admin, 'PUT', '/runner-defaults', { provider: 'Bad Provider' })).status).toBe(400);
+        expect((await call(ana, 'GET', '/runner-defaults')).json.defaults).toEqual({ 'claude-code': { model: 'opus', reasoning: 'high' } });
+        // Another namespace has its own; nothing chosen clears it.
+        expect((await call(boss, 'GET', '/runner-defaults')).json.defaults).toEqual({});
+        expect((await call(admin, 'PUT', '/runner-defaults', { provider: 'claude-code' })).json.defaults).toEqual({});
     });
 });

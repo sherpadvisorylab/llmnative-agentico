@@ -197,6 +197,12 @@ export interface AgenticoDict {
     projectsReadOnly: string;
     connectionsError: string;
     harnessGroup: string;
+    runnerDefaultsTitle: string;
+    runnerDefaultsIntro: string;
+    runnerDefaultModel: string;
+    runnerDefaultModelNone: string;
+    runnerDefaultReasoning: string;
+    runnerDefaultReasoningNone: string;
     harnessNoCredit: string;
     harnessNoProvider: string;
     harnessFailed: string;

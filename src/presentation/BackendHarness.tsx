@@ -19,10 +19,10 @@ export function BackendHarness({ backend, onChange }: { backend: AgenticoBackend
         noCredit: (at) => interpolate(texts.current.harnessNoCredit, { at }),
         get noProvider() { return texts.current.harnessNoProvider; },
         failed: (code) => interpolate(texts.current.harnessFailed, { code }),
-    }), [backend]);
+    }, [], () => backend.runnerDefaults.get()), [backend]);
     useEffect(() => {
         let current = true;
-        harness.refresh().then((models) => { if (current) onChange(models.length ? { ...harness, models: harness.models } : null); }, () => { if (current) onChange(null); });
+        harness.refresh().then((models) => { if (current) onChange(models.length ? { ...harness, models: harness.models, defaultModel: harness.defaultModel } : null); }, () => { if (current) onChange(null); });
         return () => {
             current = false;
             onChange(null);

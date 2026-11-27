@@ -4,6 +4,7 @@ import { act, render, waitFor } from '@testing-library/react';
 import { DataProvider, I18nProvider, MockDataProvider } from '@llmnative/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AgenticoProvider, agenticoTranslations, createAgenticoBackend, type AgenticoSettingsConfig } from '../../src';
+import { defaultHarnessModel, withReasoning } from '../../src/backend/runnerHarness';
 
 // CR-026: the harness of the runner of the namespace reads its models once per backend, however often the host
 // renders — with the strings of Agentico of the host too (a new object each render looped on /v1/models).
@@ -42,5 +43,29 @@ describe('the harness of the backend', () => {
         for (let index = 0; index < 5; index += 1) await act(async () => rerender());
         await new Promise((resolve) => setTimeout(resolve, 50));
         expect(asked.filter((path) => path.endsWith('/runner/v1/models'))).toHaveLength(1);
+    });
+});
+
+describe('the defaults of the subscriptions (CR-030)', () => {
+    const models = [
+        { label: 'Claude Code · sonnet', value: 'runner:claude-code/sonnet' },
+        { label: 'Claude Code · opus', value: 'runner:claude-code/opus' },
+        { label: 'OpenCode Go · kimi-k3', value: 'runner:opencode-go/kimi-k3' },
+    ];
+
+    it('a chat starts on the default model of the first subscription that has one it runs; none: on the catalog', () => {
+        expect(defaultHarnessModel(models, {})).toBeUndefined();
+        expect(defaultHarnessModel(models, { 'opencode-go': { model: 'kimi-k3' } })).toBe('runner:opencode-go/kimi-k3');
+        expect(defaultHarnessModel(models, { 'claude-code': { model: 'opus' }, 'opencode-go': { model: 'kimi-k3' } })).toBe('runner:claude-code/opus');
+        // A model the subscription does not run now is passed over.
+        expect(defaultHarnessModel(models, { 'claude-code': { model: 'gone' }, 'opencode-go': { model: 'kimi-k3' } })).toBe('runner:opencode-go/kimi-k3');
+        expect(defaultHarnessModel(models, { 'claude-code': { reasoning: 'high' } })).toBeUndefined();
+    });
+
+    it('how much it reasons: Claude Code by its effort, opencode by the variant (medium: its own default)', () => {
+        expect(withReasoning({ provider: 'claude-code', model: 'opus' }, 'max')).toEqual({ provider: 'claude-code', model: 'opus', effort: 'max' });
+        expect(withReasoning({ provider: 'opencode-go', model: 'kimi-k3' }, 'high')).toEqual({ provider: 'opencode-go', model: 'kimi-k3', variant: 'high' });
+        expect(withReasoning({ provider: 'opencode-go', model: 'kimi-k3' }, 'medium')).toEqual({ provider: 'opencode-go', model: 'kimi-k3' });
+        expect(withReasoning({ provider: 'claude-code', model: 'opus' }, undefined)).toEqual({ provider: 'claude-code', model: 'opus' });
     });
 });

@@ -11,6 +11,8 @@ export type AgenticoMe = { user: { id: string; name?: string }; role: AgenticoRo
 export type AgenticoMemory = { id: string; name: string; apiUrl: string; mcpUrl?: string };
 export type AgenticoMemoryCheck = { ok: true } | { ok: false; error: 'rejected' | 'unreachable' | 'invalid'; status?: number };
 export type AgenticoNamespaceRow = { namespace: string; tenant?: string; name?: string; runner?: { id: string; name?: string }; memory?: { id: string; name?: string } };
+/** CR-030: how the chats of the namespace use a subscription of its runner: the model they start with, how much it reasons. */
+export type AgenticoRunnerDefault = { model?: string; reasoning?: 'low' | 'medium' | 'high' | 'max' };
 export type AgenticoMemoryHit = { id?: string; title?: string; content: string; score?: number };
 
 export class AgenticoBackendError extends Error {
@@ -45,6 +47,11 @@ export interface AgenticoBackend {
     runner(): RunnerClient;
     /** The runner of the namespace, as the namespace itself: its own accounts (admins). */
     runnerOfNamespace(): RunnerClient;
+    /** CR-030: per subscription of the runner of the namespace (claude-code, opencode-go…), its defaults; set by its admin. */
+    runnerDefaults: {
+        get(): Promise<Record<string, AgenticoRunnerDefault>>;
+        set(provider: string, value: AgenticoRunnerDefault): Promise<Record<string, AgenticoRunnerDefault>>;
+    };
     memories: {
         list(): Promise<AgenticoMemory[]>;
         check(input: { apiUrl: string; key: string }): Promise<AgenticoMemoryCheck>;
@@ -155,6 +162,10 @@ export function createAgenticoBackend(options: AgenticoBackendOptions): Agentico
         fleet,
         runner: () => runnerClient('runner'),
         runnerOfNamespace: () => runnerClient('runner-namespace'),
+        runnerDefaults: {
+            get: async () => (await call<{ defaults: Record<string, AgenticoRunnerDefault> }>('GET', '/runner-defaults')).defaults,
+            set: async (provider, value) => (await call<{ defaults: Record<string, AgenticoRunnerDefault> }>('PUT', '/runner-defaults', { provider, ...value })).defaults,
+        },
         memories: {
             list: async () => (await call<{ memories: AgenticoMemory[] }>('GET', '/memories')).memories,
             check: (input) => call<AgenticoMemoryCheck>('POST', '/memories/check', input),

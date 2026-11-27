@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-27
+
+### Added
+- The subscriptions on the runner (CR-030): in the runner of the namespace, `RunnerAccounts` of @llmnative/runner 1.4.0
+  (one section per subscription, Claude Code and OpenCode Go, several accounts in order, their state and name) and,
+  under each subscription, the model the chats start with on it and how much it reasons. `GET/PUT runner-defaults` on
+  the server (read by the people of the namespace, set by its admin), `backend.runnerDefaults`. A chat starts on the
+  default model of the first subscription that has one it runs (none: on the catalog), with its reasoning as the
+  effort of Claude Code or the variant of opencode. `AgenticoHarness.defaultModel`.
+
+### Changed
+- The modals of the settings (Cloud, a runner, Add a runner, My runner, a memory) open on the right, over the
+  settings, which dim behind them; the modal of a runner dims behind the name of an account.
+- Dependency `@llmnative/runner` ^1.4.0.
+
 ## [0.27.1] - 2026-11-27
 
 ### Fixed

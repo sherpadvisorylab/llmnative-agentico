@@ -40,6 +40,36 @@
 
 ---
 
+## CR-030 — Abbonamenti nel runner: predefiniti per abbonamento, modali a destra
+
+**Stato:** 🔄 in progress
+**Issue:** [#30](https://github.com/sherpadvisorylab/llmnative-agentico/issues/30)
+**Priorità:** Alta
+**Dipende da:** CR-026, CR-028; @llmnative/runner 1.4.0
+
+### Motivazione
+
+Gli abbonamenti (Claude Code, OpenCode Go) funzionano con un harness: i turni e le chat li usano dagli account del
+tenant sul runner. In Cloud c'era una copia dello studio (il dispatcher di prima), con una schermata migliore: più
+account in ordine, stato, nome, modello e ragionamento predefiniti. Un posto solo: il runner.
+
+### Scope
+
+- Modali delle impostazioni a destra, sovrapposte (quella sotto si attenua).
+- Nel runner del namespace, `RunnerAccounts` 1.4.0 e, sotto ogni abbonamento, modello e ragionamento predefiniti.
+- Server `GET/PUT runner-defaults` per namespace (persone: lettura; admin: scrittura); backend `runnerDefaults`.
+- Harness: la chat parte sul modello predefinito del primo abbonamento che ne ha uno; ragionamento come effort
+  (Claude Code) o variante (opencode).
+
+### Checklist
+
+- [x] Server, backend, harness, UI, test
+- [x] Docs, CHANGELOG
+- [ ] Verifica in Playbook
+- [ ] Release 0.28.0
+
+---
+
 ## CR-029 — Modelli dell'host nelle impostazioni
 
 **Stato:** ✅ done (0.27.0)

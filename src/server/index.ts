@@ -9,6 +9,6 @@ export { memoryStores, fileStores } from './stores';
 export { createConnections, defaultAdapterFactory, CONNECTIONS } from './connections';
 export type { AdapterFactory, Connections, ConnectionsSnapshot, ConnectionResult } from './connections';
 export { createFleet, FleetError, normalizeRunnerUrl, NAMESPACE_KEY_PERMISSIONS, RUNNERS, NAMESPACES } from './runners';
-export type { Fleet, RunnerEntry, RunnerRecord, NamespaceRecord, RunnerConnection, RunnerTarget } from './runners';
+export type { Fleet, RunnerEntry, RunnerRecord, NamespaceRecord, RunnerDefault, RunnerConnection, RunnerTarget } from './runners';
 export { createMemories, MemoryError, MEMORIES, administers } from './memories';
 export type { Memories, MemoryEntry, MemoryCheck, MemoryHit, MemoryRecord, MemoryViewer } from './memories';

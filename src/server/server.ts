@@ -6,7 +6,7 @@ import { createConnections, type AdapterFactory } from './connections';
 import { createMemories, MemoryError, type MemoryEntry, type MemoryViewer } from './memories';
 import { inProject, namespaceOf, NamespaceError, tenantOf } from './namespace';
 import type { AgenticoIdentity, AgenticoKnownTenant, AgenticoRecords, AgenticoRole, AgenticoSecrets } from './ports';
-import { createFleet, FleetError, NAMESPACES, type NamespaceRecord, type RunnerConnection, type RunnerEntry, type RunnerViewer } from './runners';
+import { createFleet, FleetError, NAMESPACES, type NamespaceRecord, type RunnerConnection, type RunnerDefault, type RunnerEntry, type RunnerViewer } from './runners';
 
 export type AgenticoServerOptions = {
     /** Who asks, from the sign-in of the host; null: not signed in (401). */
@@ -109,7 +109,7 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
     /** A request to the runner of the namespace, as a person (or as the namespace, for its own accounts). */
     async function toRunner(request: Request, identity: AgenticoIdentity, path: string, asNamespace: boolean): Promise<Response> {
         if (!PERSON_ROUTE.test(path) || (asNamespace && !path.startsWith('/v1/accounts'))) return json(404, { error: 'not found' });
-        if (!['GET', 'POST', 'PUT', 'DELETE'].includes(request.method)) return json(404, { error: 'not found' });
+        if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method)) return json(404, { error: 'not found' });
         const namespace = namespaceOf(identity.project, identity.tenant);
         const fleet = fleetOf(identity.project);
         const chat = CHAT_ROUTE.exec(path)?.[1];
@@ -229,6 +229,28 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
         if (area === 'runner-namespace') {
             need(identity, 'admin');
             return toRunner(request, identity, `/${parts.slice(1).map(encodeURIComponent).join('/')}`, true);
+        }
+
+        // ── The defaults of the subscriptions of the namespace (CR-030): read by its people, set by its admin ──────
+        if (area === 'runner-defaults' && !id) {
+            const namespace = namespaceOf(project, identity.tenant);
+            if (method === 'GET') return json(200, { defaults: (await namespaceRecord(namespace)).defaults ?? {} });
+            if (method === 'PUT') {
+                need(identity, 'admin');
+                const given = await body(request);
+                const provider = String(given.provider ?? '');
+                if (!/^[a-z][a-z0-9-]{0,31}$/.test(provider)) throw new HttpError(400, 'invalid');
+                const model = typeof given.model === 'string' ? given.model.trim().slice(0, 120) : '';
+                const reasoning = typeof given.reasoning === 'string' && ['low', 'medium', 'high', 'max'].includes(given.reasoning) ? given.reasoning as RunnerDefault['reasoning'] : undefined;
+                const record = await namespaceRecord(namespace);
+                const defaults = { ...(record.defaults ?? {}) };
+                const value: RunnerDefault = { ...(model ? { model } : {}), ...(reasoning ? { reasoning } : {}) };
+                if (Object.keys(value).length) defaults[provider] = value;
+                else delete defaults[provider];
+                await records.put(NAMESPACES, { ...record, defaults });
+                log('runner defaults set', { namespace, provider, by: identity.user.id });
+                return json(200, { defaults });
+            }
         }
 
         // ── Runners: the platform administers them all, the admin of a namespace its own (CR-028) ────────────

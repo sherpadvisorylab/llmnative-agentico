@@ -54,6 +54,8 @@ export interface AgenticoHarnessTurn {
 export interface AgenticoHarness {
     /** The models the harness runs now for the person (e.g. "Claude Code · your subscription"); none: nothing offered. */
     models(): AgentExecutorModel[];
+    /** CR-030: the model a chat starts with on the harness, one of `models()`; none: the chat starts on the catalog. */
+    defaultModel?(): string | undefined;
     /** A turn; rejects with the words for the person when it cannot run (no credit, no subscription…). */
     turn(turn: AgenticoHarnessTurn): Promise<{ text: string }>;
     /** A chat on the harness that is over (the person started again, or left). */
@@ -157,6 +159,7 @@ export function createHarnessExecutor<TParams, TContext, TResult>(
         canRewind: true,
         attachments: true,
         models: () => harness.models(),
+        ...(harness.defaultModel ? { defaultModel: () => harness.defaultModel?.() } : {}),
         async turn(turn: AgentExecutorTurn<TParams, TContext>) {
             const attachmentsRef: LatestAttachmentsRef = { current: undefined };
             const tools = definition.getTools?.(turn.params, turn.context, attachmentsRef) ?? [];

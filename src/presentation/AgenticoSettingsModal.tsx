@@ -131,12 +131,12 @@ export function AgenticoSettingsModal() {
                 // CR-026: on the server of Agentico, Connections (Cloud, runners), Memory and Projects.
                 backend && me && (
                     <TabItem key="connections" label={t.connectionsTab}>
-                        <AgenticoConnectionsTab backend={backend} me={me} {...(connections ? { cloud: connections } : {})} />
+                        <AgenticoConnectionsTab backend={backend} me={me} onStack={setStacked} {...(connections ? { cloud: connections } : {})} />
                     </TabItem>
                 ),
                 backend && me && (me.administers?.memories ?? me.role === 'platform') && (
                     <TabItem key="memory" label={t.memoryTab}>
-                        <AgenticoMemoryTab backend={backend} />
+                        <AgenticoMemoryTab backend={backend} onStack={setStacked} />
                     </TabItem>
                 ),
                 backend && me && me.role !== 'member' && (

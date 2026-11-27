@@ -5,6 +5,7 @@
 import { noCreditUntil, RunnerError, type RunnerChatModel, type RunnerClient, type RunnerModels } from '@llmnative/runner/client';
 import type { AgentExecutorModel } from '../domain/agentDefinition';
 import type { AgenticoHarness, AgenticoHarnessTurn } from '../domain/harness';
+import type { AgenticoRunnerDefault } from './agenticoBackend';
 
 export type RunnerHarnessTexts = {
     /** The group of the models in the composer, e.g. "Claude Code · your subscription". */
@@ -51,20 +52,55 @@ function failureOf(error: unknown, texts: RunnerHarnessTexts): Error {
 }
 
 /**
- * A harness on a runner client (pointed at runnerApi of the tenant). `models` is what `refresh` read last: Agentico
- * asks for it while rendering, so it is kept here, not fetched each time.
+ * How much a model of the runner reasons, from the defaults of its subscription (CR-030): Claude Code by its effort,
+ * opencode by the variant of the model (medium: its own default, none given).
  */
-export function createRunnerHarness(client: RunnerClient, texts: RunnerHarnessTexts, initial: AgentExecutorModel[] = []): AgenticoHarness & { refresh(): Promise<AgentExecutorModel[]> } {
+export function withReasoning(model: RunnerChatModel, reasoning: AgenticoRunnerDefault['reasoning']): RunnerChatModel {
+    if (!reasoning) return model;
+    if (model.provider === 'claude-code') return { ...model, effort: reasoning };
+    return reasoning === 'medium' ? model : { ...model, variant: reasoning };
+}
+
+/**
+ * The model a chat starts with on the runner (CR-030): the default model of the first subscription, in the order of
+ * the models offered, that the admin gave one and that runs it now; none otherwise (the chat starts on the catalog).
+ */
+export function defaultHarnessModel(models: AgentExecutorModel[], defaults: Record<string, AgenticoRunnerDefault>): string | undefined {
+    const providers = [...new Set(models.map((model) => modelOf(model.value)?.provider).filter((id): id is string => !!id))];
+    for (const provider of providers) {
+        const chosen = defaults[provider]?.model;
+        const value = chosen ? `${PREFIX}${provider}/${chosen}` : undefined;
+        if (value && models.some((model) => model.value === value)) return value;
+    }
+    return undefined;
+}
+
+/**
+ * A harness on a runner client (pointed at runnerApi of the tenant). `models` is what `refresh` read last: Agentico
+ * asks for it while rendering, so it is kept here, not fetched each time. `defaults` (CR-030): per subscription, the
+ * model chats start with and how much it reasons.
+ */
+export function createRunnerHarness(
+    client: RunnerClient,
+    texts: RunnerHarnessTexts,
+    initial: AgentExecutorModel[] = [],
+    loadDefaults?: () => Promise<Record<string, AgenticoRunnerDefault>>,
+): AgenticoHarness & { refresh(): Promise<AgentExecutorModel[]> } {
     let models = initial;
+    let defaults: Record<string, AgenticoRunnerDefault> = {};
     return {
         models: () => models,
+        defaultModel: () => defaultHarnessModel(models, defaults),
         async refresh() {
-            models = harnessModels(await client.models(), texts);
+            const [read, given] = await Promise.all([client.models(), loadDefaults ? loadDefaults().catch(() => ({})) : Promise.resolve({})]);
+            models = harnessModels(read, texts);
+            defaults = given;
             return models;
         },
         async turn(turn: AgenticoHarnessTurn) {
-            const model = modelOf(turn.model);
-            if (!model) throw new Error(texts.noProvider);
+            const picked = modelOf(turn.model);
+            if (!picked) throw new Error(texts.noProvider);
+            const model = withReasoning(picked, defaults[picked.provider]?.reasoning);
             let text = '';
             let reasoning = '';
             try {

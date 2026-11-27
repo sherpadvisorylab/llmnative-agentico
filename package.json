@@ -1,6 +1,6 @@
 {
   "name": "@llmnative/agentico",
-  "version": "0.27.1",
+  "version": "0.28.0",
   "description": "Agentic chat orchestrator for @llmnative/react apps: a persistent panel that talks with the user and hands the work to host-registered subagents.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -59,7 +59,7 @@
     "zod": "^3.24.1"
   },
   "dependencies": {
-    "@llmnative/runner": "^1.3.0",
+    "@llmnative/runner": "^1.4.0",
     "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {

@@ -21,9 +21,9 @@ import {
     useI18n,
 } from '@llmnative/react';
 import type { AIConnectionsProps } from '@llmnative/react';
-import type { RunnerStatus } from '@llmnative/runner/client';
+import type { RunnerProvider, RunnerStatus } from '@llmnative/runner/client';
 import { AddRunner, RunnerAccounts, textsFor, type RunnerEntry } from '@llmnative/runner/ui';
-import type { AgenticoBackend, AgenticoMe, AgenticoMemory, AgenticoMemoryCheck, AgenticoNamespaceRow } from '../backend/agenticoBackend';
+import type { AgenticoBackend, AgenticoMe, AgenticoMemory, AgenticoMemoryCheck, AgenticoNamespaceRow, AgenticoRunnerDefault } from '../backend/agenticoBackend';
 import { useAgenticoI18n } from '../i18n';
 
 const reason = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure));
@@ -45,7 +45,7 @@ export function useAgenticoMe(backend: AgenticoBackend | undefined) {
  * Connections: Cloud, the runners of the project, Add a runner. `cloud`: the connections of the host when it keeps its
  * AI keys itself (its own store, the providers it allows); without it, those of the server of Agentico.
  */
-export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: AgenticoBackend; me: AgenticoMe; cloud?: Omit<AIConnectionsProps, 'className'> }) {
+export function AgenticoConnectionsTab({ backend, me, cloud, onStack }: { backend: AgenticoBackend; me: AgenticoMe; cloud?: Omit<AIConnectionsProps, 'className'>; /** A modal of the tab is open over the settings (they dim behind it). */ onStack?: (open: boolean) => void }) {
     const t = useAgenticoI18n();
     const { locale } = useI18n();
     const platform = me.role === 'platform';
@@ -55,7 +55,12 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
     const [connected, setConnected] = useState<number | null>(null);
     const [runners, setRunners] = useState<RunnerEntry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [open, setOpen] = useState<'cloud' | 'add' | 'mine' | { runner: RunnerEntry } | null>(null);
+    const [open, setOpenState] = useState<'cloud' | 'add' | 'mine' | { runner: RunnerEntry } | null>(null);
+    // Every modal of the tab opens on the right, over the settings, which dim behind it.
+    const setOpen = (next: typeof open) => {
+        setOpenState(next);
+        onStack?.(next !== null);
+    };
 
     const load = useCallback(async () => {
         try {
@@ -102,17 +107,17 @@ export function AgenticoConnectionsTab({ backend, me, cloud }: { backend: Agenti
                 )}
             </div>
             {open === 'cloud' && (
-                <Modal title={t.cloudTitle} size="xl" onClose={close} footer={<ActionButton variant="link" label={t.settingsClose} onClick={close} />}>
+                <Modal title={t.cloudTitle} position="right" size="xl" onClose={close} footer={<ActionButton variant="link" label={t.settingsClose} onClick={close} />}>
                     <AIConnections {...(cloud ?? {})} store={store} readOnly={cloud?.readOnly ?? me.role === 'member'} />
                 </Modal>
             )}
             {open === 'mine' && (
-                <Modal title={t.runnerOfProject} size="lg" onClose={close} footer={<ActionButton variant="link" label={t.settingsClose} onClick={close} />}>
+                <Modal title={t.runnerOfProject} position="right" size="lg" onClose={close} footer={<ActionButton variant="link" label={t.settingsClose} onClick={close} />}>
                     <RunnerAccounts client={backend.runner()} scope="user" locale={locale} />
                 </Modal>
             )}
             {open === 'add' && (
-                <AddRunner fleet={backend.fleet} t={textsFor(locale)} locale={locale} onClose={close} onAdded={close} />
+                <AddRunner fleet={backend.fleet} t={textsFor(locale)} locale={locale} position="right" onClose={close} onAdded={close} />
             )}
             {open && typeof open === 'object' && <RunnerModal backend={backend} runner={open.runner} platform={platform} onClose={close} />}
         </div>
@@ -126,17 +131,23 @@ function RunnerModal({ backend, runner, platform, onClose }: { backend: Agentico
     const [status, setStatus] = useState<RunnerStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [removing, setRemoving] = useState(false);
+    // A modal of the accounts (the name of one) over this one: this one dims behind it.
+    const [stacked, setStacked] = useState(false);
+    const defaults = useRunnerDefaults(backend);
     useEffect(() => {
         let live = true;
         backend.fleet.status(runner.id).then((value) => { if (live) setStatus(value); }, (failure) => { if (live) setError(reason(failure)); });
         return () => { live = false; };
     }, [backend, runner.id]);
     const set = (patch: { isDefault?: boolean; draining?: boolean }) => backend.fleet.update(runner.id, patch).catch((failure) => setError(reason(failure)));
+    const runnerClient = useMemo(() => backend.runnerOfNamespace(), [backend]);
 
     return (
         <Modal
             title={runner.name}
+            position="right"
             size="lg"
+            stackedBehind={stacked}
             onClose={onClose}
             footer={(
                 <>
@@ -158,7 +169,14 @@ function RunnerModal({ backend, runner, platform, onClose }: { backend: Agentico
                         <Switch name="draining" label={t.runnerSetDraining} defaultValue={runner.draining ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ draining: Boolean(value) })} />
                     </div>
                 </Form>
-                <RunnerAccounts client={backend.runnerOfNamespace()} scope="tenant" locale={locale} />
+                <RunnerAccounts
+                    client={runnerClient}
+                    scope="tenant"
+                    locale={locale}
+                    onStack={setStacked}
+                    onChange={() => void defaults.reload()}
+                    renderProvider={(provider, accounts) => (accounts.length ? <RunnerDefaults provider={provider} defaults={defaults} /> : null)}
+                />
             </div>
             {removing && (
                 <ModalYesNo
@@ -183,16 +201,84 @@ function RunnerModal({ backend, runner, platform, onClose }: { backend: Agentico
     );
 }
 
+/** CR-030: the defaults of the subscriptions of the namespace, and the models each runs, read together. */
+function useRunnerDefaults(backend: AgenticoBackend) {
+    const [values, setValues] = useState<Record<string, AgenticoRunnerDefault>>({});
+    const [models, setModels] = useState<Record<string, string[]>>({});
+    const [error, setError] = useState<string | null>(null);
+    const reload = useCallback(async () => {
+        try {
+            const [given, read] = await Promise.all([backend.runnerDefaults.get(), backend.runnerOfNamespace().models()]);
+            setValues(given);
+            setModels(Object.fromEntries(read.providers.map((provider) => [provider.id, provider.models])));
+            setError(null);
+        } catch (failure) {
+            setError(reason(failure));
+        }
+    }, [backend]);
+    useEffect(() => { void reload(); }, [reload]);
+    const save = async (provider: string, value: AgenticoRunnerDefault) => {
+        try {
+            setValues(await backend.runnerDefaults.set(provider, value));
+            setError(null);
+        } catch (failure) {
+            setError(reason(failure));
+        }
+    };
+    return { values, models, error, reload, save };
+}
+
+/** CR-030: under a subscription of the runner, the model the chats of Agentico start with on it and how much it reasons. */
+function RunnerDefaults({ provider, defaults }: { provider: RunnerProvider; defaults: ReturnType<typeof useRunnerDefaults> }) {
+    const t = useAgenticoI18n();
+    const saved = defaults.values[provider] ?? {};
+    const offered = defaults.models[provider] ?? [];
+    const levels: Record<NonNullable<AgenticoRunnerDefault['reasoning']>, string> = { low: t.settingsReasoningLow, medium: t.settingsReasoningMedium, high: t.settingsReasoningHigh, max: t.settingsReasoningMax };
+    const save = (patch: AgenticoRunnerDefault) => {
+        const next = { ...saved, ...patch };
+        void defaults.save(provider, { ...(next.model ? { model: next.model } : {}), ...(next.reasoning ? { reasoning: next.reasoning } : {}) });
+    };
+    return (
+        <div className="flex flex-col gap-2 border-t border-border pt-3">
+            <h6 className="text-sm font-semibold">{t.runnerDefaultsTitle}</h6>
+            <p className="text-xs text-muted-foreground">{t.runnerDefaultsIntro}</p>
+            {defaults.error && <Alert variant="danger">{interpolate(t.connectionsError, { error: defaults.error })}</Alert>}
+            <Form appearance="empty" showNotice={false} defaultValues={{ model: saved.model ?? '', reasoning: saved.reasoning ?? '' }} onSubmit={() => false}>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Select
+                        name="model"
+                        label={t.runnerDefaultModel}
+                        placeholderOption={{ label: t.runnerDefaultModelNone, value: '' }}
+                        options={[...new Set([...offered, ...(saved.model ? [saved.model] : [])])].map((model) => ({ label: model, value: model }))}
+                        onChange={({ value }: { value?: unknown }) => save({ model: String(value ?? '') || undefined })}
+                    />
+                    <Select
+                        name="reasoning"
+                        label={t.runnerDefaultReasoning}
+                        placeholderOption={{ label: t.runnerDefaultReasoningNone, value: '' }}
+                        options={(Object.keys(levels) as Array<keyof typeof levels>).map((level) => ({ label: levels[level], value: level }))}
+                        onChange={({ value }: { value?: unknown }) => save({ reasoning: (String(value ?? '') || undefined) as AgenticoRunnerDefault['reasoning'] })}
+                    />
+                </div>
+            </Form>
+        </div>
+    );
+}
+
 const checkText = (t: ReturnType<typeof useAgenticoI18n>, check: AgenticoMemoryCheck) => (
     check.ok ? t.memoryOk : check.error === 'rejected' ? t.memoryRejected : check.error === 'unreachable' ? t.memoryUnreachable : t.memoryInvalid
 );
 
 /** Memory: a box per memory of the project, Add a memory. */
-export function AgenticoMemoryTab({ backend }: { backend: AgenticoBackend }) {
+export function AgenticoMemoryTab({ backend, onStack }: { backend: AgenticoBackend; onStack?: (open: boolean) => void }) {
     const t = useAgenticoI18n();
     const [memories, setMemories] = useState<AgenticoMemory[] | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [open, setOpen] = useState<AgenticoMemory | 'add' | null>(null);
+    const [open, setOpenState] = useState<AgenticoMemory | 'add' | null>(null);
+    const setOpen = (next: typeof open) => {
+        setOpenState(next);
+        onStack?.(next !== null);
+    };
     const load = useCallback(async () => {
         try {
             setMemories(await backend.memories.list());
@@ -233,6 +319,7 @@ function MemoryModal({ backend, memory, onClose }: { backend: AgenticoBackend; m
     return (
         <Modal
             title={memory?.name ?? t.memoryAdd}
+            position="right"
             size="lg"
             onClose={onClose}
             footer={(

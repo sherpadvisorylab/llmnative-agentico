@@ -163,5 +163,6 @@ export {
     type AgenticoMemoryCheck,
     type AgenticoMemoryHit,
     type AgenticoNamespaceRow,
+    type AgenticoRunnerDefault,
     type AgenticoRole,
 } from './backend/agenticoBackend';

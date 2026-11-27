@@ -48,6 +48,14 @@ export interface NamespaceRecord {
     /** The id of the key of the namespace on its runner. */
     runnerKeyId?: string;
     memoryId?: string;
+    /** CR-030: per subscription of the runner (claude-code, opencode-go…), the model its chats start with and how much it reasons. */
+    defaults?: Record<string, RunnerDefault>;
+}
+
+/** How the chats of a namespace use a subscription of its runner (CR-030). */
+export interface RunnerDefault {
+    model?: string;
+    reasoning?: 'low' | 'medium' | 'high' | 'max';
 }
 
 interface PairingRecord { id: string; name: string; url: string; startedBy: string; expiresAt: string; owner?: string }
