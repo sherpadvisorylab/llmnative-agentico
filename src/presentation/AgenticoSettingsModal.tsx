@@ -51,7 +51,7 @@ export function AgenticoSettingsModal() {
         <Modal
             title={t.settingsTitle}
             position="right"
-            size="lg"
+            size="xl"
             stackedBehind={stacked}
             onClose={close}
             footer={(
