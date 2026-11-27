@@ -70,6 +70,13 @@ const settings = useMemo<AgenticoSettingsConfig>(() => ({
 `useAgenticoSettings()` gives the values in effect. A reasoning set by the agent (`executor.catalogReasoning`) wins over
 the one of the settings.
 
+A host that keeps the AI providers on its server (their keys never reach the browser) gives the models it offers
+(CR-029): the modal lists them for the default model, and the host reads `defaultModel` from its store.
+
+```tsx
+settings={{ store: serverStore, models: [{ value: 'vertex/gemini-flash', label: 'gemini-flash', group: 'Vertex AI' }] }}
+```
+
 ## Server, connections, runners and memory (CR-025, CR-026)
 
 The same in every host: the models, the runners and the memory are in the settings of Agentico. The host mounts the

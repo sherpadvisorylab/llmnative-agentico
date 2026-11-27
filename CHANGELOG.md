@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-27
+
+### Added
+- Models of the host in the settings (CR-029): `settings.models` (`{ value, label, group? }`), the models of a host that
+  keeps the AI providers on its server. The modal lists them for the default model instead of the AI catalog of the
+  browser; the host reads `defaultModel` from its store and uses it on its server.
+
 ## [0.26.0] - 2026-11-26
 
 ### Added

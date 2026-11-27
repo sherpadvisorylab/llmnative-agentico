@@ -124,6 +124,27 @@ describe('the settings modal', () => {
         expect(store.values).not.toHaveProperty('reasoning');
     });
 
+    it('lists the models of the host for the default model when it gives them (CR-029)', async () => {
+        const store = hostStore();
+        function Open() {
+            const { open } = useAgenticoSettings();
+            return <><button type="button" onClick={open}>open</button><AgenticoSettingsModal /></>;
+        }
+        const models = [{ label: 'gemini-flash', value: 'vertex/gemini-flash', group: 'Vertex AI' }, { label: 'haiku', value: 'runner/claude-code:haiku', group: 'Runner' }];
+        render(<Open />, { wrapper: wrap({ store, models, hidden: ['reasoning', 'providers'] }) });
+        fireEvent.click(screen.getByText('open'));
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.click(within(dialog).getByText('Chats'));
+        const select = within(dialog).getByLabelText('The model chats start with') as HTMLSelectElement;
+        const options = Array.from(select.querySelectorAll('option')).map((option) => option.textContent);
+        expect(options).toEqual(expect.arrayContaining(['Vertex AI / gemini-flash', 'Runner / haiku']));
+        // Not the AI catalog of the browser.
+        expect(options.some((text) => text?.startsWith('ONE'))).toBe(false);
+        fireEvent.change(select, { target: { value: 'runner/claude-code:haiku' } });
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+        await waitFor(() => expect(store.values).toMatchObject({ defaultModel: 'runner/claude-code:haiku' }));
+    });
+
     it('shows the tabs of the host after its own (CR-024)', async () => {
         function Open() {
             const { open } = useAgenticoSettings();

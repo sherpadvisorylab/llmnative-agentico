@@ -40,6 +40,34 @@
 
 ---
 
+## CR-029 — Modelli dell'host nelle impostazioni
+
+**Stato:** 🔄 in progress
+**Issue:** [#29](https://github.com/sherpadvisorylab/llmnative-agentico/issues/29)
+**Priorità:** Media
+**Dipende da:** CR-022, CR-026
+
+### Motivazione
+
+F7 del piano (Playbook): il CRM tiene i provider AI sul suo server (le chiavi non arrivano al browser), quindi il
+catalogo AI del browser è vuoto e il *Modello predefinito* delle impostazioni non ha voci. Agentico nel CRM deve usare
+il modello scelto nelle sue impostazioni, Cloud o runner, invece di uno fisso.
+
+### Scope
+
+- `AgenticoSettingsConfig.models?: AgentExecutorModel[]`: i modelli che l'host offre (valore = id dell'host, `group`
+  = provider); dati, il modale li elenca per `defaultModel` al posto del catalogo del browser.
+- `defaultModel` resta salvato dallo `store` dell'host, che lo usa sul suo server.
+
+### Checklist
+
+- [x] Config, contesto, modale, test
+- [x] README, llms.txt, CHANGELOG
+- [ ] Verifica nel CRM
+- [ ] Release 0.27.0
+
+---
+
 ## CR-028 — Runner di proprietà dei namespace
 
 **Stato:** ✅ done (0.26.0)

@@ -20,7 +20,7 @@ export function useHasAgenticoSettings(): boolean {
 
 export function AgenticoSettingsModal() {
     const t = useAgenticoI18n();
-    const { settings, shown, connections, tabs, backend, save, isOpen, close } = useAgenticoSettings();
+    const { settings, shown, connections, models: hostModels, tabs, backend, save, isOpen, close } = useAgenticoSettings();
     const { me } = useAgenticoMe(isOpen ? backend : undefined);
     const form = useFormController();
     const registry = useAIProviderRegistry()?.registry ?? {};
@@ -33,7 +33,10 @@ export function AgenticoSettingsModal() {
 
     const providerIds = Object.keys(registry);
     const labelOf = (id: string) => registry[id]?.label ?? id;
-    const models = Object.values(modelsByProvider).flat();
+    // CR-029: the models of the host when it gives them (providers on its server), else the AI catalog of the browser.
+    const modelOptions = hostModels
+        ? hostModels.map((model) => ({ label: model.group ? `${model.group} / ${model.label}` : model.label, value: model.value }))
+        : Object.values(modelsByProvider).flat().map((model) => ({ label: `${model.providerLabel ?? model.provider} / ${model.model}`, value: model.id }));
     const levels: Record<AIReasoningLevel, string> = { low: t.settingsReasoningLow, medium: t.settingsReasoningMedium, high: t.settingsReasoningHigh, max: t.settingsReasoningMax };
     const show = (key: keyof AgenticoSettings) => shown.includes(key);
     const defaults: Record<string, string> = {
@@ -87,7 +90,7 @@ export function AgenticoSettingsModal() {
                                         name="defaultModel"
                                         label={t.settingsDefaultModel}
                                         placeholderOption={{ label: t.settingsDefaultModelNone, value: '' }}
-                                        options={models.map((model) => ({ label: `${model.providerLabel ?? model.provider} / ${model.model}`, value: model.id }))}
+                                        options={modelOptions}
                                     />
                                 )}
                                 {show('reasoning') && (

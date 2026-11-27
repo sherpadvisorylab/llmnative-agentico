@@ -3,6 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { AIConnectionsProps } from '@llmnative/react';
 import type { AgenticoBackend } from '../backend/agenticoBackend';
+import type { AgentExecutorModel } from '../domain/agentDefinition';
 import {
     browserSettingsStore,
     effectiveSettings,
@@ -21,6 +22,12 @@ export interface AgenticoSettingsConfig {
     fixed?: Partial<AgenticoSettings>;
     /** Settings not shown: they keep their saved or default value. */
     hidden?: AgenticoSettingKey[];
+    /**
+     * CR-029: the models the host offers for `defaultModel` when it keeps the AI providers on its server (their keys
+     * never reach the browser): `value` is the host's id of the model, `group` its provider. Given, the modal lists
+     * these instead of the AI catalog of the browser; the host reads `defaultModel` from its `store`.
+     */
+    models?: AgentExecutorModel[];
     /** The section Connectors of the modal: the AI providers (and the host's connectors, e.g. a subscription on a runner). */
     connections?: Omit<AIConnectionsProps, 'className'>;
     /** CR-024: tabs of the host after Agentico's (e.g. "My subscriptions" on a runner), drawn by the host. */
@@ -45,6 +52,7 @@ interface AgenticoSettingsContextValue {
     /** The settings the modal shows. */
     shown: AgenticoSettingKey[];
     connections?: AgenticoSettingsConfig['connections'];
+    models?: AgentExecutorModel[];
     tabs?: AgenticoSettingsTab[];
     backend?: AgenticoBackend;
     save: (values: Partial<AgenticoSettings>) => Promise<void>;
@@ -79,13 +87,14 @@ export function AgenticoSettingsProvider({ config, children }: { config?: Agenti
         settings,
         shown,
         connections: config?.connections,
+        models: config?.models,
         tabs: config?.tabs,
         backend: config?.backend,
         save,
         isOpen,
         open: () => setIsOpen(true),
         close: () => setIsOpen(false),
-    }), [settings, shown, config?.connections, config?.tabs, config?.backend, save, isOpen]);
+    }), [settings, shown, config?.connections, config?.models, config?.tabs, config?.backend, save, isOpen]);
     return <AgenticoSettingsContext.Provider value={value}>{children}</AgenticoSettingsContext.Provider>;
 }
 
