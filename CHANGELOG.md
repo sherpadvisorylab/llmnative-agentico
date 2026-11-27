@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-11-27
+
+### Added
+- The modal of a runner renames it: the field *Name* with *Rename* (the server already accepted `name`); the title follows.
+
 ## [0.28.1] - 2026-11-27
 
 ### Fixed

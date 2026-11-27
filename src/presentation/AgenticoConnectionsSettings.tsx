@@ -141,10 +141,24 @@ function RunnerModal({ backend, runner, platform, onClose }: { backend: Agentico
     }, [backend, runner.id]);
     const set = (patch: { isDefault?: boolean; draining?: boolean }) => backend.fleet.update(runner.id, patch).catch((failure) => setError(reason(failure)));
     const runnerClient = useMemo(() => backend.runnerOfNamespace(), [backend]);
+    // The name of the runner: saved with its button, the title follows it.
+    const [name, setName] = useState(runner.name);
+    const [draft, setDraft] = useState(runner.name);
+    const rename = async () => {
+        const next = draft.trim();
+        if (!next || next === name) return;
+        try {
+            await backend.fleet.update(runner.id, { name: next });
+            setName(next);
+            setError(null);
+        } catch (failure) {
+            setError(reason(failure));
+        }
+    };
 
     return (
         <Modal
-            title={runner.name}
+            title={name}
             position="right"
             size="lg"
             stackedBehind={stacked}
@@ -165,6 +179,12 @@ function RunnerModal({ backend, runner, platform, onClose }: { backend: Agentico
                 ]} />
                 <Form appearance="empty" showNotice={false} onSubmit={() => false}>
                     <div className="flex flex-col gap-2">
+                        <div className="flex items-end gap-2">
+                            <div className="min-w-0 flex-1">
+                                <TextInput name="name" label={t.runnerName} defaultValue={runner.name} onChange={({ value }: { value?: unknown }) => setDraft(String(value ?? ''))} />
+                            </div>
+                            <LoadingButton variant="outline-primary" label={t.runnerRename} disabled={!draft.trim() || draft.trim() === name} onClick={rename} />
+                        </div>
                         {platform && !(runner as RunnerEntry & { owners?: string[] }).owners?.length && <Switch name="isDefault" label={t.runnerSetDefault} defaultValue={runner.isDefault ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ isDefault: Boolean(value) })} />}
                         <Switch name="draining" label={t.runnerSetDraining} defaultValue={runner.draining ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ draining: Boolean(value) })} />
                     </div>

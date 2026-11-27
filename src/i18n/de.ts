@@ -182,6 +182,8 @@ export const agenticoDe: AgenticoDict = {
     runnerDraining: 'Wird geleert',
     runnerAdd: 'Runner hinzufügen',
     runnerAddDescription: 'Installieren Sie einen auf Ihrem VPS oder verbinden Sie einen bereits installierten.',
+    runnerName: 'Name',
+    runnerRename: 'Umbenennen',
     runnerVersion: 'Version',
     runnerLoad: 'Chats',
     runnerLoadValue: '{chats} von {max}',

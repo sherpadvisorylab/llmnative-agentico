@@ -161,6 +161,8 @@ export interface AgenticoDict {
     runnerDraining: string;
     runnerAdd: string;
     runnerAddDescription: string;
+    runnerName: string;
+    runnerRename: string;
     runnerVersion: string;
     runnerLoad: string;
     runnerLoadValue: string;
