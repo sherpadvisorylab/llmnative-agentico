@@ -42,7 +42,7 @@
 
 ## CR-029 — Modelli dell'host nelle impostazioni
 
-**Stato:** 🔄 in progress
+**Stato:** ✅ done (0.27.0)
 **Issue:** [#29](https://github.com/sherpadvisorylab/llmnative-agentico/issues/29)
 **Priorità:** Media
 **Dipende da:** CR-022, CR-026
@@ -63,8 +63,8 @@ il modello scelto nelle sue impostazioni, Cloud o runner, invece di uno fisso.
 
 - [x] Config, contesto, modale, test
 - [x] README, llms.txt, CHANGELOG
-- [ ] Verifica nel CRM
-- [ ] Release 0.27.0
+- [x] Verifica nel CRM (build locale: typecheck, 899 test, build web)
+- [x] Release 0.27.0
 
 ---
 

@@ -1,13 +1,13 @@
 # Project status
 
 > Snapshot verified against the real codebase.
-> Last reviewed: 2026-11-26
+> Last reviewed: 2026-11-27
 
 ## General state
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.26.0 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.2.0. | — |
+| Package | `@llmnative/agentico` 0.27.0 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.2.0. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
@@ -17,6 +17,7 @@
 
 | CR | State | Evidence |
 |----|-------|----------|
+| CR-029 | Done | Models of the host in the settings (`settings.models`): the default model among the models of a host that keeps the AI providers on its server, kept by its store. Verified in the CRM against the local build (typecheck, 899 tests, build). Released in 0.27.0. Issue #29. |
 | CR-028 | Done | Runners owned by namespaces (`owners`), a namespace only on runners of the project or its own; `tenantOwned` of the host (Playbook on, CMS off); `me.administers`; settings for admins. Verified in Playbook. Released in 0.26.0. Issue #28. |
 | CR-027 | Done | Memories owned by namespaces (`owners`): admins administer their own, the platform all, shared memories left not removed; Memory tab for admins; `share`/`unshare`/`put`/`keyOf`; `me.hasRunner`. Verified in Playbook (memories of the organizations taken over, tests, build). Released in 0.25.0. Issue #27. |
 | CR-025 | Done | `@llmnative/agentico/server`: identity, records, secrets; connections (checked keys, proxy, complete), runners (pairing with the project, install, assign, forward), memories, projects; `createAgenticoBackend`. Tests: server end to end and the client against it. Released in 0.24.0. Issue #25. |
