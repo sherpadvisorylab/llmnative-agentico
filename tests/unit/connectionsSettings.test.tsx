@@ -84,21 +84,16 @@ describe('the settings on the server of Agentico', () => {
         expect(within(dialog).queryByText('Connectors')).not.toBeInTheDocument();
     });
 
-    it('the platform renames a runner from its modal: the title and the list follow', async () => {
+    it('names a runner from its address: the box and its modal, with no name to type', async () => {
         const backend = backendFor({ user: { id: 'bea' }, role: 'platform', project: 'cms' }, { runner: true });
         render(<Open />, { wrapper: wrap({ backend, hidden: ['defaultModel', 'reasoning', 'providers', 'chatTitles', 'threadEvents'] }) });
         fireEvent.click(screen.getByText('open'));
         const dialog = await screen.findByRole('dialog');
         await waitFor(() => expect(within(dialog).getByText('Connections')).toBeInTheDocument());
         fireEvent.click(within(dialog).getByText('Connections'));
-        fireEvent.click(await within(dialog).findByText('Runner'));
-        const input = await screen.findByLabelText('Name');
-        const rename = screen.getByRole('button', { name: 'Rename' });
-        expect(rename).toBeDisabled();
-        fireEvent.change(input, { target: { value: 'sherpalab' } });
-        await waitFor(() => expect(rename).toBeEnabled());
-        fireEvent.click(rename);
-        await waitFor(async () => expect((await backend.fleet.list()).map((runner) => runner.name)).toEqual(['sherpalab']));
-        expect(await screen.findAllByText('sherpalab')).not.toHaveLength(0);
+        // https://runner.test: its main label.
+        fireEvent.click(await within(dialog).findByText('runner'));
+        expect(await screen.findAllByText('runner')).not.toHaveLength(0);
+        expect(screen.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument();
     });
 });

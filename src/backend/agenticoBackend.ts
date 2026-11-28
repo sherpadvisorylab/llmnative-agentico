@@ -9,6 +9,8 @@ import type { RunnerEntry, RunnerFleet, RunnerPairingStart, RunnerPairingState, 
 export type AgenticoRole = 'platform' | 'admin' | 'member';
 export type AgenticoMe = { user: { id: string; name?: string }; role: AgenticoRole; project: string; tenant?: string; namespace: string; /** The namespace has a runner to work on. */ hasRunner?: boolean; /** What this person administers (CR-027, CR-028). */ administers?: { runners: boolean; memories: boolean } };
 export type AgenticoMemory = { id: string; name: string; apiUrl: string; mcpUrl?: string };
+/** A namespace a memory keeps: its documents and the memories drawn from them. */
+export type AgenticoMemoryNamespace = { namespace: string; documents: number; memories: number; createdAt?: string };
 export type AgenticoMemoryCheck = { ok: true } | { ok: false; error: 'rejected' | 'unreachable' | 'invalid'; status?: number };
 export type AgenticoNamespaceRow = { namespace: string; tenant?: string; name?: string; runner?: { id: string; name?: string }; memory?: { id: string; name?: string } };
 /** CR-030: how the chats of the namespace use a subscription of its runner: the model they start with, how much it reasons. */
@@ -56,8 +58,10 @@ export interface AgenticoBackend {
         list(): Promise<AgenticoMemory[]>;
         check(input: { apiUrl: string; key: string }): Promise<AgenticoMemoryCheck>;
         add(input: { name?: string; apiUrl: string; mcpUrl?: string; key: string }): Promise<AgenticoMemory>;
-        update(id: string, patch: { name?: string; mcpUrl?: string | null; key?: string }): Promise<AgenticoMemory>;
+        update(id: string, patch: { name?: string; apiUrl?: string; mcpUrl?: string | null; key?: string }): Promise<AgenticoMemory>;
         remove(id: string): Promise<void>;
+        /** The namespaces the memory keeps, with how much each holds. */
+        namespaces(id: string): Promise<AgenticoMemoryNamespace[]>;
     };
     /** The memory of the namespace of the person. */
     memory: {
@@ -110,6 +114,7 @@ export function createAgenticoBackend(options: AgenticoBackendOptions): Agentico
             addAccount: (id, fields) => call<AIConnectionResult>('POST', `${provider(id)}/accounts${query}`, { fields }),
             removeAccount: async (id, accountId) => { await call('DELETE', `${provider(id)}/accounts/${encodeURIComponent(accountId)}${query}`); },
             orderAccounts: async (id, ids) => { await call('PUT', `${provider(id)}/accounts/order${query}`, { ids }); },
+            renameAccount: async (id, accountId, label) => { await call('PATCH', `${provider(id)}/accounts/${encodeURIComponent(accountId)}${query}`, { label }); },
             setOrder: async (order) => { await call('PUT', `/connections/order${query}`, { order }); },
             models: async (id) => (await call<{ models: AIModelDescriptor[] }>('GET', `${provider(id)}/models${query}`)).models,
         };
@@ -172,6 +177,7 @@ export function createAgenticoBackend(options: AgenticoBackendOptions): Agentico
             add: async (input) => (await call<{ memory: AgenticoMemory }>('POST', '/memories', input)).memory,
             update: async (id, patch) => (await call<{ memory: AgenticoMemory }>('PATCH', `/memories/${encodeURIComponent(id)}`, patch)).memory,
             remove: async (id) => { await call('DELETE', `/memories/${encodeURIComponent(id)}`); },
+            namespaces: async (id) => (await call<{ namespaces: AgenticoMemoryNamespace[] }>('GET', `/memories/${encodeURIComponent(id)}/namespaces`)).namespaces,
         },
         memory: {
             get: () => call('GET', '/memory'),

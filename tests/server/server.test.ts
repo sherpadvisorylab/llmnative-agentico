@@ -68,6 +68,7 @@ function setup(extra: { tenantOwned?: { runners?: boolean; memories?: boolean } 
             const key = new Headers(init.headers).get('x-api-key');
             if (key !== 'mem-key') return new Response('{}', { status: 401 });
             if (url.endsWith('/search')) return Response.json({ results: [{ id: 'd1', chunk: 'a passage', similarity: 0.9, metadata: { title: 'Decision' } }] });
+            if (url === 'https://memory.test/ns' && (init.method ?? 'GET') === 'GET') return Response.json({ namespaces: [{ id: 'x', namespace: 'cms-beta', documentCount: 1, memoryCount: 4, system: { createdAt: '2026-11-20T10:00:00Z' } }, { id: 'y', namespace: 'cms-acme', documentCount: 3, memoryCount: 0 }] });
             if (init.method === 'PATCH') return new Response('{}', { status: 404 });
             return Response.json({ id: 'doc-1' });
         }
@@ -205,6 +206,16 @@ describe('the server of Agentico', () => {
         expect(fetched.at(-1)!.url).toBe('https://memory.test/ns/cms-acme/document');
         expect(JSON.parse(String(fetched.at(-1)!.init.body))).toMatchObject({ id: 'decision-x', metadata: { title: 'A decision', tags: 'cms-acme' } });
         expect((await call(boss, 'DELETE', `/memories/${added.json.memory.id}`)).status).toBe(409);
+        // The namespaces it keeps, by name, with how much each holds; never the key.
+        const spaces = await call(boss, 'GET', `/memories/${added.json.memory.id}/namespaces`);
+        expect(spaces.json.namespaces).toEqual([
+            { namespace: 'cms-acme', documents: 3, memories: 0 },
+            { namespace: 'cms-beta', documents: 1, memories: 4, createdAt: '2026-11-20T10:00:00Z' },
+        ]);
+        expect((await call(ana, 'GET', `/memories/${added.json.memory.id}/namespaces`)).status).toBe(403);
+        // A new address is checked with the key kept: one that refuses it is not saved.
+        expect((await call(boss, 'PATCH', `/memories/${added.json.memory.id}`, { apiUrl: 'https://other.test' })).status).not.toBe(200);
+        expect((await call(boss, 'GET', '/memories')).json.memories[0].apiUrl).toBe('https://memory.test');
     });
     it('memories owned by namespaces: each admin administers its own, a shared one is left, not removed (CR-027)', async () => {
         const { call, stores } = setup({ tenantOwned: { runners: true, memories: true } });

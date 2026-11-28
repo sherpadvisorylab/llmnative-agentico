@@ -7,8 +7,10 @@ import {
     ActionButton,
     Alert,
     Badge,
+    Card,
     DescriptionList,
     Form,
+    Icon,
     ListCard,
     LoadingButton,
     Modal,
@@ -23,8 +25,9 @@ import {
 import type { AIConnectionsProps } from '@llmnative/react';
 import type { RunnerProvider, RunnerStatus } from '@llmnative/runner/client';
 import { AddRunner, RunnerAccounts, textsFor, type RunnerEntry } from '@llmnative/runner/ui';
-import type { AgenticoBackend, AgenticoMe, AgenticoMemory, AgenticoMemoryCheck, AgenticoNamespaceRow, AgenticoRunnerDefault } from '../backend/agenticoBackend';
+import type { AgenticoBackend, AgenticoMe, AgenticoMemory, AgenticoMemoryCheck, AgenticoMemoryNamespace, AgenticoNamespaceRow, AgenticoRunnerDefault } from '../backend/agenticoBackend';
 import { useAgenticoI18n } from '../i18n';
+import { nameOfHost } from './hostName';
 
 const reason = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure));
 
@@ -95,7 +98,7 @@ export function AgenticoConnectionsTab({ backend, me, cloud, onStack }: { backen
                     <ListCard
                         key={runner.id}
                         icon="server"
-                        title={runner.name}
+                        title={nameOfHost(runner.url)}
                         description={runner.url}
                         badge={runner.draining ? <Badge variant="warning">{t.runnerDraining}</Badge> : runner.isDefault ? <Badge variant="info">{t.runnerDefault}</Badge> : undefined}
                         onClick={() => setOpen({ runner })}
@@ -143,24 +146,11 @@ function RunnerModal({ backend, runner, platform, onClose }: { backend: Agentico
     }, [backend, runner.id]);
     const set = (patch: { isDefault?: boolean; draining?: boolean }) => backend.fleet.update(runner.id, patch).catch((failure) => setError(reason(failure)));
     const runnerClient = useMemo(() => backend.runnerOfNamespace(), [backend]);
-    // The name of the runner: saved with its button, the title follows it.
-    const [name, setName] = useState(runner.name);
-    const [draft, setDraft] = useState(runner.name);
-    const rename = async () => {
-        const next = draft.trim();
-        if (!next || next === name) return;
-        try {
-            await backend.fleet.update(runner.id, { name: next });
-            setName(next);
-            setError(null);
-        } catch (failure) {
-            setError(reason(failure));
-        }
-    };
 
     return (
         <Modal
-            title={name}
+            // Its name, from its address (no name to type).
+            title={nameOfHost(runner.url)}
             position="right"
             size="lg"
             stackedBehind={stacked}
@@ -181,13 +171,6 @@ function RunnerModal({ backend, runner, platform, onClose }: { backend: Agentico
                 ]} />
                 <Form appearance="empty" showNotice={false} onSubmit={() => false}>
                     <div className="flex flex-col gap-2">
-                        <TextInput
-                            name="name"
-                            label={t.runnerName}
-                            defaultValue={runner.name}
-                            onChange={({ value }: { value?: unknown }) => setDraft(String(value ?? ''))}
-                            after={<LoadingButton variant="outline-primary" label={t.runnerRename} disabled={!draft.trim() || draft.trim() === name} onClick={rename} />}
-                        />
                         {platform && !(runner as RunnerEntry & { owners?: string[] }).owners?.length && <Switch name="isDefault" label={t.runnerSetDefault} defaultValue={runner.isDefault ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ isDefault: Boolean(value) })} />}
                         <Switch name="draining" label={t.runnerSetDraining} defaultValue={runner.draining ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ draining: Boolean(value) })} />
                     </div>
@@ -324,7 +307,7 @@ export function AgenticoMemoryTab({ backend, onStack }: { backend: AgenticoBacke
             {memories && !memories.length && <p className="text-sm text-muted-foreground">{t.memoryNone}</p>}
             <div className="grid gap-3 sm:grid-cols-2">
                 {memories?.map((memory) => (
-                    <ListCard key={memory.id} icon="database" title={memory.name} description={memory.apiUrl} meta={memory.mcpUrl} onClick={() => setOpen(memory)} />
+                    <ListCard key={memory.id} icon="database" title={nameOfHost(memory.apiUrl)} description={memory.apiUrl} meta={memory.mcpUrl} onClick={() => setOpen(memory)} />
                 ))}
                 <ListCard icon="plus" dashed title={t.memoryAdd} description={t.memoryAddDescription} onClick={() => setOpen('add')} />
             </div>
@@ -333,17 +316,32 @@ export function AgenticoMemoryTab({ backend, onStack }: { backend: AgenticoBacke
     );
 }
 
+/**
+ * A memory: its MCP server, the address of its API (where it is written) and its key, in that order; its name comes
+ * from its address. Once connected, the namespaces it keeps, with how much each holds.
+ */
 function MemoryModal({ backend, memory, onClose }: { backend: AgenticoBackend; memory: AgenticoMemory | null; onClose: () => void }) {
     const t = useAgenticoI18n();
-    const [values, setValues] = useState({ name: memory?.name ?? '', apiUrl: memory?.apiUrl ?? '', mcpUrl: memory?.mcpUrl ?? '', key: '' });
+    const [values, setValues] = useState({ apiUrl: memory?.apiUrl ?? '', mcpUrl: memory?.mcpUrl ?? '', key: '' });
     const [notice, setNotice] = useState<{ variant: 'success' | 'danger'; text: string } | null>(null);
     const [removing, setRemoving] = useState(false);
+    const [namespaces, setNamespaces] = useState<AgenticoMemoryNamespace[] | null>(null);
+    const [namespacesError, setNamespacesError] = useState<string | null>(null);
     const field = (name: keyof typeof values) => ({ value }: { value?: unknown }) => setValues((all) => ({ ...all, [name]: String(value ?? '') }));
     const fail = (failure: unknown) => setNotice({ variant: 'danger', text: interpolate(t.connectionsError, { error: reason(failure) }) });
+    useEffect(() => {
+        if (!memory) return undefined;
+        let live = true;
+        backend.memories.namespaces(memory.id).then((list) => { if (live) setNamespaces(list); }, (failure) => { if (live) setNamespacesError(reason(failure)); });
+        return () => { live = false; };
+    }, [backend, memory]);
+    const name = values.apiUrl.trim() ? nameOfHost(values.apiUrl) : t.memoryAdd;
+    // Checked with the key typed, or (a memory already connected) with the one kept.
+    const canCheck = !!values.apiUrl.trim() && (!!values.key.trim() || !!memory);
 
     return (
         <Modal
-            title={memory?.name ?? t.memoryAdd}
+            title={memory ? nameOfHost(memory.apiUrl) : name}
             position="right"
             size="lg"
             onClose={onClose}
@@ -353,7 +351,7 @@ function MemoryModal({ backend, memory, onClose }: { backend: AgenticoBackend; m
                     <LoadingButton
                         variant="outline-primary"
                         label={t.memoryCheck}
-                        disabled={!values.apiUrl.trim() || !values.key.trim()}
+                        disabled={!canCheck || (!memory && !values.key.trim())}
                         onClick={async () => {
                             const check = await backend.memories.check({ apiUrl: values.apiUrl, key: values.key }).catch((failure) => ({ ok: false as const, error: 'unreachable' as const, failure }));
                             setNotice({ variant: check.ok ? 'success' : 'danger', text: checkText(t, check) });
@@ -362,11 +360,20 @@ function MemoryModal({ backend, memory, onClose }: { backend: AgenticoBackend; m
                     <LoadingButton
                         variant="primary"
                         label={t.memorySave}
-                        disabled={memory ? false : !values.apiUrl.trim() || !values.key.trim()}
+                        disabled={memory ? !values.apiUrl.trim() : !values.apiUrl.trim() || !values.key.trim()}
                         onClick={async () => {
                             try {
-                                if (memory) await backend.memories.update(memory.id, { name: values.name, mcpUrl: values.mcpUrl || null, ...(values.key.trim() ? { key: values.key } : {}) });
-                                else await backend.memories.add({ name: values.name, apiUrl: values.apiUrl, mcpUrl: values.mcpUrl || undefined, key: values.key });
+                                const named = nameOfHost(values.apiUrl);
+                                if (memory) {
+                                    await backend.memories.update(memory.id, {
+                                        name: named,
+                                        mcpUrl: values.mcpUrl.trim() || null,
+                                        ...(values.apiUrl.trim() !== memory.apiUrl ? { apiUrl: values.apiUrl.trim() } : {}),
+                                        ...(values.key.trim() ? { key: values.key } : {}),
+                                    });
+                                } else {
+                                    await backend.memories.add({ name: named, apiUrl: values.apiUrl, mcpUrl: values.mcpUrl.trim() || undefined, key: values.key });
+                                }
                                 onClose();
                             } catch (failure) {
                                 fail(failure);
@@ -376,16 +383,44 @@ function MemoryModal({ backend, memory, onClose }: { backend: AgenticoBackend; m
                 </>
             )}
         >
-            <Form appearance="empty" showNotice={false} onSubmit={() => false}>
-                <div className="flex flex-col gap-3">
-                    {notice && <Alert variant={notice.variant}>{notice.text}</Alert>}
-                    <TextInput name="name" label={t.memoryName} defaultValue={values.name} onChange={field('name')} />
-                    <TextInput name="apiUrl" label={t.memoryApiUrl} placeholder="https://memory.example.com" defaultValue={values.apiUrl} disabled={!!memory} onChange={field('apiUrl')} />
-                    <TextInput name="mcpUrl" label={t.memoryMcpUrl} placeholder="https://memory.example.com/mcp" defaultValue={values.mcpUrl} onChange={field('mcpUrl')} />
-                    <Password name="key" label={t.memoryKey} autoComplete="off" onChange={field('key')} />
-                    {memory && <p className="text-xs text-muted-foreground">{t.memoryKeyKeep}</p>}
-                </div>
-            </Form>
+            <div className="flex flex-col gap-5">
+                <Form appearance="empty" showNotice={false} onSubmit={() => false}>
+                    <div className="flex flex-col gap-3">
+                        {notice && <Alert variant={notice.variant}>{notice.text}</Alert>}
+                        <TextInput name="mcpUrl" label={t.memoryMcpUrl} feedback={t.memoryMcpUrlHint} placeholder="https://memory.example.com/mcp" defaultValue={values.mcpUrl} onChange={field('mcpUrl')} />
+                        <TextInput name="apiUrl" label={t.memoryApiUrl} placeholder="https://memory.example.com" defaultValue={values.apiUrl} onChange={field('apiUrl')} />
+                        <Password
+                            name="key"
+                            label={t.memoryKey}
+                            autoComplete="off"
+                            placeholder={memory ? t.memoryKeySaved : undefined}
+                            feedback={memory ? t.memoryKeyKeep : undefined}
+                            onChange={field('key')}
+                        />
+                    </div>
+                </Form>
+                {memory && (
+                    <section className="flex flex-col gap-2">
+                        <h5 className="text-sm font-semibold">{interpolate(t.memoryNamespaces, { count: namespaces?.length ?? 0 })}</h5>
+                        {namespacesError && <Alert variant="warning">{interpolate(t.connectionsError, { error: namespacesError })}</Alert>}
+                        {!namespaces && !namespacesError && <p className="text-xs text-muted-foreground">{t.memoryNamespacesLoading}</p>}
+                        {namespaces && !namespaces.length && <p className="text-xs text-muted-foreground">{t.memoryNamespacesNone}</p>}
+                        {namespaces && namespaces.length > 0 && (
+                            <ul className="divide-y divide-border rounded-md border border-border text-sm">
+                                {namespaces.map((item) => (
+                                    <li key={item.namespace} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                        <span className="font-mono text-xs">{item.namespace}</span>
+                                        <span className="flex flex-wrap items-center gap-1">
+                                            <Badge variant="light">{interpolate(t.memoryDocuments, { count: item.documents })}</Badge>
+                                            <Badge variant="light">{interpolate(t.memoryMemories, { count: item.memories })}</Badge>
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+                )}
+            </div>
             {removing && memory && (
                 <ModalYesNo
                     title={t.memoryRemove}
@@ -402,14 +437,14 @@ function MemoryModal({ backend, memory, onClose }: { backend: AgenticoBackend; m
                         return true;
                     }}
                 >
-                    {interpolate(t.memoryRemoveConfirm, { name: memory.name })}
+                    {interpolate(t.memoryRemoveConfirm, { name: nameOfHost(memory.apiUrl) })}
                 </ModalYesNo>
             )}
         </Modal>
     );
 }
 
-/** Projects: each namespace of the project, its runner and its memory. */
+/** Projects: each namespace of the project as a card, with the runner and the memory it uses. */
 export function AgenticoProjectsTab({ backend, me }: { backend: AgenticoBackend; me: AgenticoMe }) {
     const t = useAgenticoI18n();
     const platform = me.role === 'platform';
@@ -441,46 +476,66 @@ export function AgenticoProjectsTab({ backend, me }: { backend: AgenticoBackend;
             setError(reason(failure));
         }
     };
+    const runnerName = (row: AgenticoNamespaceRow) => {
+        const runner = runners.find((item) => item.id === row.runner?.id);
+        return runner ? nameOfHost(runner.url) : row.runner?.name ?? t.projectsDefaultRunner;
+    };
+    const memoryName = (row: AgenticoNamespaceRow) => {
+        const memory = memories.find((item) => item.id === row.memory?.id);
+        return memory ? nameOfHost(memory.apiUrl) : row.memory?.name ?? t.projectsNoMemory;
+    };
+    /** One choice of the card: an icon, what it is, and its select (or its value, read only). */
+    const choice = (icon: string, label: string, control: React.ReactNode) => (
+        <div className="flex items-start gap-3">
+            <span className="mt-6 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><Icon name={icon} /></span>
+            <div className="min-w-0 flex-1">{control ?? <span className="text-sm">{label}</span>}</div>
+        </div>
+    );
     return (
         <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">{t.projectsIntro}</p>
             {!platform && <p className="text-xs text-muted-foreground">{t.projectsReadOnly}</p>}
             {error && <Alert variant="danger">{interpolate(t.connectionsError, { error })}</Alert>}
-            {rows?.map((row) => (
-                <div key={row.namespace} className="grid gap-3 rounded-md border border-border p-3 sm:grid-cols-[1fr_12rem_12rem] sm:items-end">
-                    <div className="flex flex-col gap-1">
-                        <span className="font-medium">{row.name ?? row.tenant ?? row.namespace}</span>
-                        <span className="font-mono text-xs text-muted-foreground">{row.namespace}</span>
-                    </div>
-                    {platform || row.namespace === me.namespace ? (
-                        <Form appearance="empty" showNotice={false} onSubmit={() => false} className="contents">
-                            {platform || runners.length > 0 ? (
-                                <Select
-                                    name={`runner-${row.namespace}`}
-                                    label={t.projectsRunner}
-                                    defaultValue={row.runner?.id ?? ''}
-                                    placeholderOption={{ label: t.projectsDefaultRunner, value: '' }}
-                                    options={runners.map((runner) => ({ label: runner.name, value: runner.id }))}
-                                    onChange={({ value }: { value?: unknown }) => { if (value) void set(row.namespace, { runnerId: String(value) }); }}
-                                />
-                            ) : <span className="text-sm">{row.runner?.name ?? t.projectsDefaultRunner}</span>}
-                            <Select
-                                name={`memory-${row.namespace}`}
-                                label={t.projectsMemory}
-                                defaultValue={row.memory?.id ?? ''}
-                                placeholderOption={{ label: t.projectsNoMemory, value: '' }}
-                                options={memories.map((memory) => ({ label: memory.name, value: memory.id }))}
-                                onChange={({ value }: { value?: unknown }) => void set(row.namespace, { memoryId: value ? String(value) : null })}
-                            />
+            {rows?.map((row) => {
+                const editable = platform || row.namespace === me.namespace;
+                return (
+                    <Card
+                        key={row.namespace}
+                        headerClassName="justify-between"
+                        header={(
+                            <>
+                                <span className="font-medium">{row.name ?? row.tenant ?? row.namespace}</span>
+                                <Badge variant="light"><span className="font-mono">{row.namespace}</span></Badge>
+                            </>
+                        )}
+                    >
+                        <Form appearance="empty" showNotice={false} onSubmit={() => false}>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                {choice('server', runnerName(row), editable && (platform || runners.length > 0) ? (
+                                    <Select
+                                        name={`runner-${row.namespace}`}
+                                        label={t.projectsRunner}
+                                        defaultValue={row.runner?.id ?? ''}
+                                        placeholderOption={{ label: t.projectsDefaultRunner, value: '' }}
+                                        options={runners.map((runner) => ({ label: nameOfHost(runner.url), value: runner.id }))}
+                                        onChange={({ value }: { value?: unknown }) => { if (value) void set(row.namespace, { runnerId: String(value) }); }}
+                                    />
+                                ) : null)}
+                                {choice('database', memoryName(row), editable ? (
+                                    <Select
+                                        name={`memory-${row.namespace}`}
+                                        label={t.projectsMemory}
+                                        defaultValue={row.memory?.id ?? ''}
+                                        placeholderOption={{ label: t.projectsNoMemory, value: '' }}
+                                        options={memories.map((memory) => ({ label: nameOfHost(memory.apiUrl), value: memory.id }))}
+                                        onChange={({ value }: { value?: unknown }) => void set(row.namespace, { memoryId: value ? String(value) : null })}
+                                    />
+                                ) : null)}
+                            </div>
                         </Form>
-                    ) : (
-                        <>
-                            <span className="text-sm">{row.runner?.name ?? t.projectsDefaultRunner}</span>
-                            <span className="text-sm">{row.memory?.name ?? t.projectsNoMemory}</span>
-                        </>
-                    )}
-                </div>
-            ))}
+                    </Card>
+                );
+            })}
         </div>
     );
 }

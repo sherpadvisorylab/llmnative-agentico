@@ -159,6 +159,17 @@ export function createConnections(deps: ConnectionsDeps) {
             await write(record);
         },
 
+        /** A new name for an account (never its key); empty takes the name away. */
+        async renameAccount(namespace: string, provider: string, accountId: string, label: string): Promise<void> {
+            const record = await read(namespace);
+            const account = record.providers.find((item) => item.id === provider)?.accounts.find((item) => item.id === accountId);
+            if (!account) return;
+            const name = String(label ?? '').trim().slice(0, 100);
+            if (name) account.label = name;
+            else delete account.label;
+            await write(record);
+        },
+
         async orderAccounts(namespace: string, provider: string, accountIds: string[]): Promise<void> {
             const record = await read(namespace);
             const found = record.providers.find((item) => item.id === provider);

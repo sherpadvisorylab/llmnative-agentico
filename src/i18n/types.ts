@@ -161,8 +161,6 @@ export interface AgenticoDict {
     runnerDraining: string;
     runnerAdd: string;
     runnerAddDescription: string;
-    runnerName: string;
-    runnerRename: string;
     runnerVersion: string;
     runnerLoad: string;
     runnerLoadValue: string;
@@ -179,6 +177,13 @@ export interface AgenticoDict {
     memoryName: string;
     memoryApiUrl: string;
     memoryMcpUrl: string;
+    memoryMcpUrlHint: string;
+    memoryKeySaved: string;
+    memoryNamespaces: string;
+    memoryNamespacesLoading: string;
+    memoryNamespacesNone: string;
+    memoryDocuments: string;
+    memoryMemories: string;
     memoryKey: string;
     memoryKeyKeep: string;
     memoryCheck: string;

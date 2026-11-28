@@ -194,6 +194,10 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
                 await connections.removeAccount(namespace, id, subId);
                 return json(200, { ok: true });
             }
+            if (id && sub === 'accounts' && subId && subId !== 'order' && method === 'PATCH') {
+                await connections.renameAccount(namespace, id, subId, String((await body(request)).label ?? ''));
+                return json(200, { ok: true });
+            }
         }
 
         // ── AI with the keys of the namespace ───────────────────────────────────────────────────────────────
@@ -317,10 +321,13 @@ export function createAgenticoServer(options: AgenticoServerOptions) {
                 log('memory connected', { project, memory: memory.id, by: identity.user.id });
                 return json(201, { memory });
             }
+            // The namespaces the memory keeps (its containers), with how much each holds.
+            if (id && sub === 'namespaces' && method === 'GET') return json(200, { namespaces: await memories.namespaces(id, viewer) });
             if (id && method === 'PATCH') {
                 const given = await body(request);
                 return json(200, { memory: await memories.update(id, {
                     ...(typeof given.name === 'string' ? { name: given.name } : {}),
+                    ...(typeof given.apiUrl === 'string' ? { apiUrl: given.apiUrl } : {}),
                     ...(given.mcpUrl === null || typeof given.mcpUrl === 'string' ? { mcpUrl: given.mcpUrl as string | null } : {}),
                     ...(typeof given.key === 'string' ? { key: given.key } : {}),
                 }, viewer) });

@@ -161,6 +161,7 @@ export {
     type AgenticoMe,
     type AgenticoMemory,
     type AgenticoMemoryCheck,
+    type AgenticoMemoryNamespace,
     type AgenticoMemoryHit,
     type AgenticoNamespaceRow,
     type AgenticoRunnerDefault,

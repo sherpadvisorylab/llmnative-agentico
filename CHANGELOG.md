@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-11-28
+
+### Added
+- The keys of Cloud renamed: `renameAccount` of the connections (`PATCH …/accounts/<id>` `{ label }`).
+- The namespaces a memory keeps (`GET /memories/<id>/namespaces`, from `GET /ns` of supermemory), with their
+  documents and memories, listed in its modal; `backend.memories.namespaces(id)`.
+- A memory changes address: the new one checked with the key kept (or the new one).
+
+### Changed
+- The name of a runner and of a memory comes from its address (`nameOfHost`: the main label of its domain; the IP of
+  an address of sslip.io / nip.io), with no field to type; the modal of a runner has no Rename any more.
+- The modal of a memory: MCP server (optional), address of the API, key in that order; a key kept shows as saved.
+- Projects: a card per namespace with its runner and its memory.
+
 ## [0.29.0] - 2026-11-28
 
 ### Changed

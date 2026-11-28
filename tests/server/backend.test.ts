@@ -33,6 +33,9 @@ describe('the client of the server of Agentico', () => {
         const [first, second] = snapshot.providers[0].accounts!;
         await store.orderAccounts!('anthropic', [second.id, first.id]);
         expect((await store.load()).providers[0].accounts!.map((account) => account.id)).toEqual([second.id, first.id]);
+        // CR-157: an account renamed, never its key.
+        await store.renameAccount!('anthropic', first.id, 'Main');
+        expect((await store.load()).providers[0].accounts!.find((account) => account.id === first.id)?.label).toBe('Main');
         await store.setOrder!(['anthropic']);
         expect((await store.load()).order).toEqual({ list: ['anthropic'], manual: true });
         await store.disconnect('anthropic');

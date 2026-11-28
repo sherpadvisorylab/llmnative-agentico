@@ -29,6 +29,8 @@ export type MemoryViewer = { platform: true } | { platform: false; namespace: st
 export const administers = (viewer: MemoryViewer, record: Pick<MemoryRecord, 'owners'>) => viewer.platform || !!record.owners?.includes(viewer.namespace);
 export type MemoryCheck = { ok: true } | { ok: false; error: 'rejected' | 'unreachable' | 'invalid'; status?: number };
 export type MemoryHit = { id?: string; title?: string; content: string; score?: number; metadata?: Record<string, unknown> };
+/** A namespace a memory keeps: its documents and the memories drawn from them. */
+export type MemoryNamespace = { namespace: string; documents: number; memories: number; createdAt?: string };
 
 export class MemoryError extends Error {
     readonly code: 'invalid' | 'not-found' | 'conflict' | 'unreachable' | 'rejected';
@@ -145,15 +147,21 @@ export function createMemories(deps: MemoriesDeps) {
             return entry;
         },
 
-        /** Name and MCP address; a new key only when given (it is checked first). */
-        async update(id: string, patch: { name?: string; mcpUrl?: string | null; key?: string }, viewer?: MemoryViewer): Promise<MemoryEntry> {
+        /**
+         * Name, address and MCP address; a new key only when given. A new address or key is checked first (the new key,
+         * or the one kept, at the new address).
+         */
+        async update(id: string, patch: { name?: string; apiUrl?: string; mcpUrl?: string | null; key?: string }, viewer?: MemoryViewer): Promise<MemoryEntry> {
             const record = await memories.of(id, viewer);
-            if (patch.key?.trim()) {
-                const checked = await memories.check({ apiUrl: record.apiUrl, key: patch.key });
+            const apiUrl = patch.apiUrl?.trim() ? httpsUrl(patch.apiUrl, true)! : record.apiUrl;
+            if (patch.key?.trim() || apiUrl !== record.apiUrl) {
+                const key = patch.key?.trim() || await secrets.get(keySecret(id));
+                if (!key) throw new MemoryError('not-found', 'KEY_NOT_FOUND');
+                const checked = await memories.check({ apiUrl, key });
                 if (!checked.ok) throw new MemoryError(checked.error === 'invalid' ? 'invalid' : checked.error, checked.error.toUpperCase());
-                await secrets.set(keySecret(id), patch.key.trim());
+                if (patch.key?.trim()) await secrets.set(keySecret(id), patch.key.trim());
             }
-            const next: MemoryRecord = { ...record };
+            const next: MemoryRecord = { ...record, apiUrl };
             if (typeof patch.name === 'string' && patch.name.trim()) next.name = patch.name.trim().slice(0, 100);
             if (patch.mcpUrl === null || patch.mcpUrl === '') delete next.mcpUrl;
             else if (typeof patch.mcpUrl === 'string') next.mcpUrl = httpsUrl(patch.mcpUrl, false);
@@ -195,6 +203,27 @@ export function createMemories(deps: MemoriesDeps) {
         async put(record: Omit<MemoryRecord, 'createdAt'> & { createdAt?: number }, key?: string): Promise<void> {
             if (key) await secrets.set(keySecret(record.id), key.trim());
             await records.put<MemoryRecord>(MEMORIES, { ...record, apiUrl: httpsUrl(record.apiUrl, true)!, createdAt: record.createdAt ?? now() });
+        },
+
+        /** The namespaces the memory keeps (`GET /ns`), with their documents and memories, by name. */
+        async namespaces(id: string, viewer?: MemoryViewer): Promise<MemoryNamespace[]> {
+            await memories.of(id, viewer);
+            const { record, key } = await ofNamespace(id);
+            const response = await call(record.apiUrl, key, 'GET', '/ns');
+            if (!response.ok) throw new MemoryError(response.status === 401 || response.status === 403 ? 'rejected' : 'unreachable', `MEMORY_${response.status}`);
+            const body = await response.json().catch(() => ({})) as { namespaces?: Array<Record<string, unknown>> };
+            return (body.namespaces ?? [])
+                .filter((item) => typeof item.namespace === 'string')
+                .map((item) => {
+                    const system = item.system && typeof item.system === 'object' ? item.system as Record<string, unknown> : {};
+                    return {
+                        namespace: item.namespace as string,
+                        documents: Number(item.documentCount) || 0,
+                        memories: Number(item.memoryCount) || 0,
+                        ...(typeof system.createdAt === 'string' ? { createdAt: system.createdAt } : {}),
+                    };
+                })
+                .sort((a, b) => a.namespace.localeCompare(b.namespace));
         },
 
         /** The key of a memory, for the host's own use on the server (a package of the IDE): never for a browser. */
