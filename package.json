@@ -1,6 +1,6 @@
 {
   "name": "@llmnative/agentico",
-  "version": "0.28.3",
+  "version": "0.29.0",
   "description": "Agentic chat orchestrator for @llmnative/react apps: a persistent panel that talks with the user and hands the work to host-registered subagents.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -53,17 +53,17 @@
   },
   "packageManager": "npm@11.11.0",
   "peerDependencies": {
-    "@llmnative/react": "^3.2.0",
+    "@llmnative/react": "^3.22.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zod": "^3.24.1"
   },
   "dependencies": {
-    "@llmnative/runner": "^1.4.0",
+    "@llmnative/runner": "^1.5.0",
     "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
-    "@llmnative/react": "^3.2.0",
+    "@llmnative/react": "^3.22.0",
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.119.0",
     "@testing-library/jest-dom": "^7.0.1",

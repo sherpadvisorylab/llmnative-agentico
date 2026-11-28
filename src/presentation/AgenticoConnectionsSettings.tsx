@@ -56,6 +56,8 @@ export function AgenticoConnectionsTab({ backend, me, cloud, onStack }: { backen
     const [runners, setRunners] = useState<RunnerEntry[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [open, setOpenState] = useState<'cloud' | 'add' | 'mine' | { runner: RunnerEntry } | null>(null);
+    // A modal of a subscription over "My subscriptions": that one dims behind it.
+    const [mineStacked, setMineStacked] = useState(false);
     // Every modal of the tab opens on the right, over the settings, which dim behind it.
     const setOpen = (next: typeof open) => {
         setOpenState(next);
@@ -112,8 +114,8 @@ export function AgenticoConnectionsTab({ backend, me, cloud, onStack }: { backen
                 </Modal>
             )}
             {open === 'mine' && (
-                <Modal title={t.runnerOfProject} position="right" size="lg" onClose={close} footer={<ActionButton variant="link" label={t.settingsClose} onClick={close} />}>
-                    <RunnerAccounts client={backend.runner()} scope="user" locale={locale} />
+                <Modal title={t.runnerOfProject} position="right" size="lg" stackedBehind={mineStacked} onClose={close} footer={<ActionButton variant="link" label={t.settingsClose} onClick={close} />}>
+                    <RunnerAccounts client={backend.runner()} scope="user" locale={locale} onStack={setMineStacked} />
                 </Modal>
             )}
             {open === 'add' && (

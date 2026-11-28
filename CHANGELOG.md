@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-11-28
+
+### Changed
+- The connections as boxes everywhere (CR-157 of @llmnative/react 3.22.0): Cloud says on each box how many keys a
+  provider has and lists them in its modal; the subscriptions of the runner (`RunnerAccounts` of @llmnative/runner 1.5.0)
+  are a box per provider with its count, each opening its modal with its accounts in order. "My subscriptions" dims
+  behind the modal of a subscription. Peer `@llmnative/react` `^3.22.0`, `@llmnative/runner` `^1.5.0`.
+
 ## [0.28.3] - 2026-11-28
 
 ### Fixed

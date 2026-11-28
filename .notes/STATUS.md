@@ -7,7 +7,7 @@
 
 | Area | Verified real state | Target / gap |
 |------|---------------------|--------------|
-| Package | `@llmnative/agentico` 0.28.3 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.2.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.4.0. | — |
+| Package | `@llmnative/agentico` 0.29.0 (published from the tag by GitHub Actions), entries `.` and `./server`. Peers: `@llmnative/react` ^3.22.0, `react`/`react-dom` ^19.2, `zod` ^3.24; dependencies `zod-to-json-schema`, `@llmnative/runner` ^1.5.0. | — |
 | Host contract | Registration APIs (subagents, destinations, reports, cross-agent tools), prompt pack, chat store key, `<AgenticoProvider scope>`, `agentico` i18n namespace. No host-specific code in the package. | — |
 | Hosts | `llmnative-cms` (migrated from its internal `src/agentico`), `llmnative-playbook` (planned). | Playbook integration. |
 | UI | Composed with `@llmnative/react` components, except three hand-rolled controls inherited from the CMS. | CR-002. |
