@@ -179,12 +179,13 @@ function RunnerModal({ backend, runner, platform, onClose }: { backend: Agentico
                 ]} />
                 <Form appearance="empty" showNotice={false} onSubmit={() => false}>
                     <div className="flex flex-col gap-2">
-                        <div className="flex items-end gap-2">
-                            <div className="min-w-0 flex-1">
-                                <TextInput name="name" label={t.runnerName} defaultValue={runner.name} onChange={({ value }: { value?: unknown }) => setDraft(String(value ?? ''))} />
-                            </div>
-                            <LoadingButton variant="outline-primary" label={t.runnerRename} disabled={!draft.trim() || draft.trim() === name} onClick={rename} />
-                        </div>
+                        <TextInput
+                            name="name"
+                            label={t.runnerName}
+                            defaultValue={runner.name}
+                            onChange={({ value }: { value?: unknown }) => setDraft(String(value ?? ''))}
+                            after={<LoadingButton variant="outline-primary" label={t.runnerRename} disabled={!draft.trim() || draft.trim() === name} onClick={rename} />}
+                        />
                         {platform && !(runner as RunnerEntry & { owners?: string[] }).owners?.length && <Switch name="isDefault" label={t.runnerSetDefault} defaultValue={runner.isDefault ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ isDefault: Boolean(value) })} />}
                         <Switch name="draining" label={t.runnerSetDraining} defaultValue={runner.draining ? 'on' : ''} onChange={({ value }: { value?: unknown }) => void set({ draining: Boolean(value) })} />
                     </div>
@@ -228,7 +229,9 @@ function useRunnerDefaults(backend: AgenticoBackend) {
     const [error, setError] = useState<string | null>(null);
     const reload = useCallback(async () => {
         try {
-            const [given, read] = await Promise.all([backend.runnerDefaults.get(), backend.runnerOfNamespace().models()]);
+            // The models of the runner as its people see them: the runner answers its models to a person, not to the
+            // namespace alone (404).
+            const [given, read] = await Promise.all([backend.runnerDefaults.get(), backend.runner().models()]);
             setValues(given);
             setModels(Object.fromEntries(read.providers.map((provider) => [provider.id, provider.models])));
             setError(null);

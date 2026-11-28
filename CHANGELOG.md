@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.3] - 2026-11-28
+
+### Fixed
+- *Chats of Agentico* under a subscription of the runner said "not found": the models are asked to the runner as its
+  people see them (`runner()`), not with the namespace alone, which the runner does not answer.
+- *Rename* of a runner is the addon at the end of its field.
+
 ## [0.28.2] - 2026-11-27
 
 ### Added
